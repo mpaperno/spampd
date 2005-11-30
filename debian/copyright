@@ -1,0 +1,26 @@
+This package was debianized by Sven Mueller <debian@incase.de> on
+Mon, 13 Sep 2004 17:00:16 +0200.
+
+It was downloaded from http://www.worlddesign.com/index.cfm/rd/mta/spampd.htm
+
+Upstream Author: Maxim Paperno <MPaperno@WorldDesign.com>
+
+Copyright:
+
+spampd is Copyright © 2002 by World Design Group Inc. and Maxim Paperno
+
+Portions are Copyright © 2001 Morgan Stanley Dean Witter as mentioned
+in the CREDITS section at: http://www.worlddesign.com/index.cfm/rd/mta/spampd.htm
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details.
+
+The GNU GPL can be found at http://www.fsf.org/copyleft/gpl.html
+or at /usr/share/common-licenses/GPL

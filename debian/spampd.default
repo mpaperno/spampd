@@ -1,0 +1,49 @@
+# Defaults file for spampd, the spam proxy daemon
+# (spampd is using spamassassin to scan mails)
+
+# On boolean options, 0 means off/no/false, 1 means on/yes/true
+
+# Wether or not to start spampd (0/1)
+STARTSPAMPD=0
+
+# where to put the PID file
+PIDFILE=/var/run/spampd.pid
+
+# The IP to listen on
+LISTENHOST=127.0.0.1
+
+# The port to listen on
+LISTENPORT=10025
+
+# The host to forward the connection to
+DESTHOST=127.0.0.1
+
+# The port to forward the connection to
+DESTPORT=10026
+
+# How many parallel checks can be done in parallel
+CHILDREN=3
+
+# user ID to run as
+USERID=spampd
+
+# group ID to run as
+GRPID=spampd
+
+# Wether or not to tag all messages (0/1)
+TAGALL=1
+
+# Wether or not to use auto-whitelisting (0/1)
+AUTOWHITELIST=1
+
+# Wether or not to do only local checks 
+# if this is turned on, no network based checks
+# (like DNS-Blacklists) are done. (0/1)
+LOCALONLY=0
+
+# Wether to prefer INET (network) for syslog logging
+# instead of UNIX (unix domain socket) (0/1)
+LOGINET=0
+
+# Any additional parameters you want to pass to spampd
+ADDOPTS=""

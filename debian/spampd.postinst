@@ -1,0 +1,13 @@
+#!/bin/sh -e
+
+case "$1" in 
+	configure|install|upgrade)
+		adduser --system --group \
+		        --no-create-home --home /nonexistent \
+			--quiet spampd 
+		;;
+	*)
+		;;
+esac
+
+#DEBHELPER#

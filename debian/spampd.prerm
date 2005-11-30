@@ -1,0 +1,12 @@
+#!/bin/sh -e
+
+#DEBHELPER#
+
+case "$1" in
+	purge)
+		deluser spampd > /dev/null 2>&1 || true
+		delgroup spampd > /dev/null 2>&1 || true
+		;;
+	*)
+		;;
+esac

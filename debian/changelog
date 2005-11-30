@@ -1,0 +1,227 @@
+spampd (2.30-1) unstable; urgency=low
+
+  * New upstream release
+    - fixes possible DoS/remote exploit (closes #332259)
+  * remove various dpatch files (incorporated by upstream)
+
+ -- Sven Mueller <debian@incase.de>  Wed, 30 Nov 2005 17:27:45 +0100
+
+spampd (2.20-18) unstable; urgency=low
+
+  * Fix match/concatenation with uninitialized string (off by 1 error during
+    walk through array)
+  * Change all server->log calls to use "%s" as the second argument so that
+    any %* in the string passed as third argument aren't expanded. spampd
+    doesn't use the expansion feature anyway, so any expansion made would be
+    accidental.
+
+ -- Sven Mueller <debian@incase.de>  Wed, 19 Oct 2005 14:54:17 +0200
+
+spampd (2.20-17) unstable; urgency=high
+
+  * Make init script completely LSB 2.1/3.0 compliant, see
+    http://refspecs.freestandards.org/LSB_2.1.0/LSB-generic/LSB-generic/iniscrptact.html
+    http://refspecs.freestandards.org/LSB_2.1.0/LSB-generic/LSB-generic/initscrcomconv.html
+    respectively
+    http://refspecs.freestandards.org/LSB_3.0.0/LSB-generic/LSB-generic/iniscrptact.html
+    http://refspecs.freestandards.org/LSB_3.0.0/LSB-generic/LSB-generic/initscrcomconv.html
+  * remove the last remaining (possible) bashisms from init script
+    (closes #317746)
+  * fix up README.Debian a bit
+  * add note to README.Debian to document initially disabled state of the
+    daemon.
+  * Fix a DoS vulnerability in MSGID-Handling
+  * Fix match/concatenation with uninitialized string 
+
+ -- Sven Mueller <debian@incase.de>  Tue, 18 Oct 2005 21:33:35 +0200
+
+spampd (2.20-16) unstable; urgency=low
+
+  * Remove bashism from init script (closes #317746) 
+
+ -- Sven Mueller <debian@incase.de>  Tue, 12 Jul 2005 21:24:59 +0200
+
+spampd (2.20-14) unstable; urgency=low
+
+  * Don't depend on coreutils (closes #316427)
+  * Fix a small cosmetic problem with perl complain about the SA version
+    string not being a number. The fixtrims the SA version string to something
+    matches [0-9]+\.[0-9]+, an alternate patch which switches to textual
+    compares instead of numerical compares is available in debin/patches.
+
+ -- Sven Mueller <debian@incase.de>  Tue,  5 Jul 2005 14:55:05 +0200
+
+spampd (2.20-11) unstable; urgency=low
+
+  * Fix init script to exit with returncode 0 if asked to stop
+    non-running daemon (should make the init script LSB compliant
+    as far as I know).
+
+ -- Sven Mueller <debian@incase.de>  Thu, 30 Jun 2005 16:05:06 +0200
+
+spampd (2.20-10) unstable; urgency=low
+
+  * Never publicly released
+  * Fixed a small problem (numeric comparison of possibly non-numeric strings)
+    with detection of the used SpamAssassin version
+  * Fix my own dpatch scripts to never create backups of patched files. They
+    shouldn't be necessary because my scripts only apply the patches if a test
+    with 'patch --dry-run' doesn't report any problem
+
+ -- Sven Mueller <debian@incase.de>  Sun,  5 Jun 2005 01:35:36 +0200
+
+spampd (2.20-9) unstable; urgency=low
+
+  * Fix line duplication introduced by the add-envelope-from_to patch
+  * Fix a typo in debian/patches/55-add-envelope-from_to.dpatch which
+    prevented the patch from being applied. (closes: #295590)
+    - The option to enable addition of envelope headers is -seh or
+      --set-envelope-headers
+  * Fix a typo in the package description (closes: #300066)
+  * remove dh_testroot from build and clean targets. It's only needed
+    in the install target
+
+ -- Sven Mueller <debian@incase.de>  Mon, 21 Mar 2005 21:28:52 +0100
+
+spampd (2.20-8) unstable; urgency=high
+
+  * Fix two problems in the patch to add Envelope-To and Envelope-From
+    headers, which was introduced with the last upload (closes: #292410)
+  * Add some documentation regarding timeout values do the
+    debian readme (see also #292064)
+  * Add a ADDOPTS variable to /etc/default/spampd and use it
+    in /etc/init.d/spampd to allow passing of additional
+    commandline arguments to spampd
+
+ -- Sven Mueller <debian@incase.de>  Wed,  2 Feb 2005 01:38:55 +0100
+
+spampd (2.20-7) unstable; urgency=low
+
+  * Added patch which allows addition of Envelope-To and Envelope-From
+    headers before passing the message to SpamAssassin (closes: #285531)
+  * Remove spampd user only when the package is purged, not when removed
+  * Don't redirect any output (stdout/stderr) from adduser in postinst
+    script. Use --quiet instead
+  * Remove spampd.orig (is sometimes created by the dpatch scripts)
+    in the clean target
+
+ -- Sven Mueller <debian@incase.de>  Sat,  1 Jan 2005 18:15:47 +0100
+
+spampd (2.20-6) unstable; urgency=low
+
+  * Allow configuration of the syslog destination
+    via /etc/default/spampd (INET socket or UNIX socket)
+  * Switch default syslog destination to UNIX because Debian
+    standard configuration of syslogd doesn't allow logging
+    via INET socket.
+
+ -- Sven Mueller <debian@incase.de>  Sun, 12 Dec 2004 01:12:00 +0100
+
+spampd (2.20-5) unstable; urgency=low
+
+  * Added martin f. krafft as a co-maintainer on his request
+  * Depend on dpkg >= 1.10.23 (closes: #281101)
+  * pass setsid -> 1 to Net::Server when backgrounded
+    thereby closing stdin/stdout/stderr when daemonized
+  * don't redirect stdin/stdout/stderr on start-stop-daemon
+    in initscript (not needed anymore due to previous fix)
+  * Fix a minor mistake in debian/README.debian
+  * Moved over to dpatch for patch handling
+  * Replace Build-Depends with more appropriate
+    Build-Depends-Indep
+
+ -- Sven Mueller <debian@incase.de>  Tue, 16 Nov 2004 18:54:51 +0100
+
+spampd (2.20-4) unstable; urgency=low
+
+  * Fixed postinst and prerm scripts to suppress adduser/deluser
+    output. It just doesn't say anything important anyway.
+  * Suppress start-stop-daemon output on "/etc/init.d/spampd stop"
+    if the daemon is disabled in /etc/default/spampd.
+
+ -- Sven Mueller <debian@incase.de>  Sun, 10 Oct 2004 19:56:33 +0200
+
+spampd (2.20-3) unstable; urgency=low
+
+  * Fixed up the init script to some degree
+  * Changed init script to use start-stop-daemon instead of handling
+    everything manually
+
+ -- Sven Mueller <debian@incase.de>  Sat,  9 Oct 2004 12:55:57 +0200
+
+spampd (2.20-2) unstable; urgency=low
+
+  * Fixed a bug in preinst script which caused the spampd user not
+    to be added
+  * Added check after adding the user wether or not the user now 
+    exists. Fail preinst script if it doesn't exist
+  * Upstream changed version number without significant source
+    changes, to fix upgrade problems because of 2.2 being smaller
+    than 2.12
+
+ -- Sven Mueller <debian@incase.de>  Fri,  8 Oct 2004 02:00:23 +0200
+
+spampd (2.2-1) unstable; urgency=low
+
+  * Updated to new upstream release
+  * Now supports spamassassin 2.6 again
+
+ -- Sven Mueller <debian@incase.de>  Wed,  6 Oct 2004 13:28:17 +0200
+
+spampd (2.12-8) unstable; urgency=low
+
+  * Update control file to Standards version 3.6.1.1
+  * Corrected problems in package description
+  * Modified init script to accept yes/true/enable/1 to 
+    enable an option in /etc/default/spampd
+  * Sponsored by martin f. krafft <madduck@debian.org>
+    (closes: Bug#220007).
+
+ -- Sven Mueller <debian@incase.de>  Tue,  5 Oct 2004 18:52:09 +0200
+
+spampd (2.12-7) unstable; urgency=low
+
+  * Patched spampd to work with SpamAssassin version 3
+    (This breaks compatibility with SpamAssassin version 2!)
+  * Changed dependecy on SpamAssassin from << 3 to >= 3
+
+ -- Sven Mueller <debian@incase.de>  Wed, 29 Sep 2004 19:49:07 +0200
+
+spampd (2.12-6) unstable; urgency=low
+
+  * Added a < 3 to the SpamAssassin dependency
+
+ -- Sven Mueller <debian@incase.de>  Wed, 26 Sep 2004 19:49:07 +0200
+
+spampd (2.12-5) unstable; urgency=low
+
+  * Made the init script full LSB 2.0 compliant
+
+ -- Sven Mueller <debian@incase.de>  Thu, 25 Sep 2004 13:09:17 +0200
+
+spampd (2.12-4) unstable; urgency=low
+
+  * Fixed a typo in the init script which made it ignore various
+    /etc/default/spampd settings
+
+ -- Sven Mueller <debian@incase.de>  Wed, 24 Sep 2004 19:53:07 +0200
+
+spampd (2.12-3) unstable; urgency=low
+
+  * Removed default html documentation file and added make rule
+    to generate it freshly from the perl file (pod2html).
+
+ -- Sven Mueller <debian@incase.de>  Mon, 15 Sep 2004 19:49:07 +0200
+
+spampd (2.12-2) unstable; urgency=low
+
+  * Added manpages
+
+ -- Sven Mueller <debian@incase.de>  Mon, 14 Sep 2004 18:48:23 +0200
+
+spampd (2.12-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Sven Mueller <debian@incase.de>  Mon, 13 Sep 2004 17:00:16 +0200
+
