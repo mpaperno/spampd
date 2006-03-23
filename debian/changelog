@@ -1,3 +1,18 @@
+spampd (2.30-2) unstable; urgency=low
+
+  * Add workaround patch for the regression of libnet-server-perl's log()
+    function (closes: #344372)
+    Format string protection in Net::Server::PreForkSimple->log() calls
+    is now only used for libnet-server-perl versions below 0.89
+  * Don't read user config when parsing spamassassin config (related to:
+    bug #344373)
+    Note: Doesn't close bug yet because it's no real resolution.
+  * Make init script report insufficient privileges when not run as root
+    (closes: #350637)
+  * Update policy version (removes lintian warning)
+
+ -- Sven Mueller <debian@incase.de>  Thu, 23 Mar 2006 22:21:25 +0100
+
 spampd (2.30-1) unstable; urgency=low
 
   * New upstream release

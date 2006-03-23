@@ -31,6 +31,11 @@ PIDFILE=/var/run/spampd.pid
 USERID=spampd
 GRPID=spampd
 
+if [ "$EUID" !=  "0" ]; then
+	echo "ERROR: Insufficient privileges. Retry as root" >&2
+	exit 1
+fi
+
 if [ -f /etc/default/$NAME ]; then
 	. /etc/default/$NAME
 fi

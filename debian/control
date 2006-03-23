@@ -3,7 +3,7 @@ Section: mail
 Priority: optional
 Maintainer: Sven Mueller <debian@incase.de>
 Build-Depends-Indep: debhelper (>= 4.0.0), dpatch
-Standards-Version: 3.6.1.1
+Standards-Version: 3.6.2.2
 Uploaders: martin f. krafft <madduck@debian.org>
 
 Package: spampd

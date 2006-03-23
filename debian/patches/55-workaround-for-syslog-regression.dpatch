@@ -1,0 +1,131 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 55-workaround-for-syslog-regression.dpatch by Sven Mueller <debian@incase.de>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Work aroung the changed behaviour of Net::Server's log() implementation
+## DP: Which started with version 0.89
+
+@DPATCH@
+diff -urNad trunk/spampd /tmp/dpep.DGzWZV/trunk/spampd
+--- trunk/spampd	2006-01-28 20:02:55.000000000 +0100
++++ /tmp/dpep.DGzWZV/trunk/spampd	2006-01-28 20:04:45.646962139 +0100
+@@ -490,7 +490,12 @@
+ 		
+ 	    $msgid ||= "(unknown)";
+ 	    
+-	    $self->log(2, "%s", "processing message $msgid for ". $recips);
++	    if ($self->{spampd}->{pfs_uses_format}) {
++	        $self->log(2, "%s", "processing message $msgid for ". $recips);
++	    } else {
++	        $self->log(2, "processing message $msgid for". $recips);
++	    }
++	    
+ 	    
+ 		eval {
+ 			
+@@ -574,12 +579,21 @@
+ 		    my $msg_threshold = sprintf("%.2f",$status->get_required_hits);
+ 		    my $proc_time = sprintf("%.2f", time - $start);
+ 		    
+-			$self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
+-							"$recips in ". $proc_time . "s, $size bytes.");
++	                if ($self->{spampd}->{pfs_uses_format}) {
++			    $self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
++							    "$recips in ". $proc_time . "s, $size bytes.");
++			} else {
++			    $self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
++							    "$recips in ". $proc_time . "s, $size bytes.");
++			}
+ 			
+ 			# thanks to Kurt Andersen for this idea
+ 			if ( $self->{spampd}->{rh} ) {			
++	                    if ($self->{spampd}->{pfs_uses_format}) {
+ 				$self->log(2, "%s", "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
++			    } else {
++				$self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
++			    }
+ 	
+ 		    $status->finish();
+      
+@@ -589,7 +603,11 @@
+ 		};
+ 	
+ 		if ( $@ ne '' ) {
+-		  $self->log(1, "%s", "WARNING!! SpamAssassin error on message $msgid: $@");
++	          if ($self->{spampd}->{pfs_uses_format}) {
++		    $self->log(1, "%s", "WARNING!! SpamAssassin error on message $msgid: $@");
++		  } else {
++		    $self->log(1, "WARNING!! SpamAssassin error on message $msgid: $@");
++		  }
+ 	      return 0;
+ 	    }
+ 	
+@@ -679,7 +697,7 @@
+ 		
+ 		#close the temp file
+ 		$smtp_server->{data}->close
+-			or $self->log(1, "%s", "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
++			or $self->log(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+ 
+ 	    if ( $self->{spampd}->{debug} ) {
+ 	      $self->log(2, "Finished sending DATA"); }
+@@ -692,7 +710,11 @@
+ 		or die "Error in server->ok(client->hear): $!";
+ 		
+ 	  if ( $self->{spampd}->{debug} ) {
+-	    $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
++	    if ($self->{spampd}->{pfs_uses_format}) {
++	      $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
++	    } else {
++	      $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
++	    }
+ 	  
+ 	  # if we're in data state but the response is an error, exit data state.
+ 	  # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
+@@ -723,7 +745,11 @@
+   if ($@ ne '') {
+ 	  chomp($@);
+ 	  $msg = "WARNING!! Error in process_request eval block: $@";
+-	  $self->log(0, "%s", $msg);
++	  if ($self->{spampd}->{pfs_uses_format}) {
++	    $self->log(0, "%s", $msg);
++	  } else {
++	    $self->log(0, $msg);
++	  }
+ 	  die ($msg . "\n");
+   }
+   
+@@ -766,6 +792,17 @@
+ my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
+ 						 # passing it to spamassassin. Set to 1 to enable this
+ my $setenvelopefrom = 0; # Set X-Envelope-From header only
++my $pfs_uses_format = 1; # Wether or not Net::Server::PreForkSimple allows
++                         # format strings as the second parameter. Note that
++			 # 1 is the safe default: It might not log all wanted
++			 # information, but it will not be open to format
++			 # string attacks.
++
++if ( $Net::Server::PreForkSimple::VERSION ge 0.89 ) {
++	# Version 0.89 and higher don't support format strings in ->log()
++	# calls anymore. Disable the format string protection
++	$pfs_uses_format = 0;
++}
+ 
+ my %options = (port => \$port,
+ 	       host => \$host,
+@@ -783,6 +820,7 @@
+ 	       logsock => \$logsock,
+ 	       envelopeheaders => \$envelopeheaders,
+ 	       setenvelopefrom => \$setenvelopefrom,
++	       pfs_uses_format => \$pfs_uses_format,
+ 	      );
+ 
+ usage(1) unless GetOptions(\%options,
+@@ -907,6 +945,7 @@
+ 				instance => 0,
+ 				envelopeheaders => $envelopeheaders,
+ 				setenvelopefrom => $setenvelopefrom,
++	       			pfs_uses_format => $pfs_uses_format,
+ 			   },
+    }, 'SpamPD';
+ 
