@@ -1,3 +1,12 @@
+spampd (2.30-3) unstable; urgency=low
+
+  * Fix syntax errors introduced during prior update (slipped in after test)
+    Thanks for the report and fix to Adam James <ad@heliosphan.co.uk>
+    (closes: #362839)
+  * Remove Martin F. Krafft from the uploaders field
+
+ -- Sven Mueller <debian@incase.de>  Fri, 14 Apr 2006 20:14:44 +0200
+
 spampd (2.30-2) unstable; urgency=low
 
   * Add workaround patch for the regression of libnet-server-perl's log()

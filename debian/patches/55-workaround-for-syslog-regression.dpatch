@@ -6,9 +6,9 @@
 ## DP: Which started with version 0.89
 
 @DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.DGzWZV/trunk/spampd
---- trunk/spampd	2006-01-28 20:02:55.000000000 +0100
-+++ /tmp/dpep.DGzWZV/trunk/spampd	2006-01-28 20:04:45.646962139 +0100
+diff -urNad trunk/spampd /tmp/dpep.s3Xmyu/trunk/spampd
+--- trunk/spampd	2006-04-16 18:49:55.000000000 +0200
++++ /tmp/dpep.s3Xmyu/trunk/spampd	2006-04-16 18:51:19.357204394 +0200
 @@ -490,7 +490,12 @@
  		
  	    $msgid ||= "(unknown)";
@@ -17,36 +17,39 @@ diff -urNad trunk/spampd /tmp/dpep.DGzWZV/trunk/spampd
 +	    if ($self->{spampd}->{pfs_uses_format}) {
 +	        $self->log(2, "%s", "processing message $msgid for ". $recips);
 +	    } else {
-+	        $self->log(2, "processing message $msgid for". $recips);
++	        $self->log(2, "processing message $msgid for ". $recips);
 +	    }
 +	    
  	    
  		eval {
  			
-@@ -574,12 +579,21 @@
+@@ -574,13 +579,22 @@
  		    my $msg_threshold = sprintf("%.2f",$status->get_required_hits);
  		    my $proc_time = sprintf("%.2f", time - $start);
  		    
 -			$self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
 -							"$recips in ". $proc_time . "s, $size bytes.");
-+	                if ($self->{spampd}->{pfs_uses_format}) {
-+			    $self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
-+							    "$recips in ". $proc_time . "s, $size bytes.");
-+			} else {
-+			    $self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
-+							    "$recips in ". $proc_time . "s, $size bytes.");
-+			}
++ 	                if ($self->{spampd}->{pfs_uses_format}) {
++ 			    $self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
++ 							    "$recips in ". $proc_time . "s, $size bytes.");
++ 			} else {
++ 			    $self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
++ 							    "$recips in ". $proc_time . "s, $size bytes.");
++ 			}
  			
  			# thanks to Kurt Andersen for this idea
  			if ( $self->{spampd}->{rh} ) {			
-+	                    if ($self->{spampd}->{pfs_uses_format}) {
- 				$self->log(2, "%s", "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
-+			    } else {
-+				$self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
-+			    }
- 	
+-				$self->log(2, "%s", "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
+-	
++ 	                    if ($self->{spampd}->{pfs_uses_format}) {
++  				$self->log(2, "%s", "rules hit for $msgid: " . $status->get_names_of_tests_hit);
++ 			    } else {
++ 				$self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
++ 			    }
++		    
  		    $status->finish();
       
+ 		    # set the timeout alarm back to wherever it was at
 @@ -589,7 +603,11 @@
  		};
  	
@@ -75,7 +78,7 @@ diff -urNad trunk/spampd /tmp/dpep.DGzWZV/trunk/spampd
  	  if ( $self->{spampd}->{debug} ) {
 -	    $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
 +	    if ($self->{spampd}->{pfs_uses_format}) {
-+	      $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
++	      $self->log(2, "%s", "Destination response: '" . $destresp . "'");
 +	    } else {
 +	      $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
 +	    }
