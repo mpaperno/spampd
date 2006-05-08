@@ -1,3 +1,10 @@
+spampd (2.30-4) unstable; urgency=low
+
+  * Fix init script return value when run by non-root
+  * Use error handler for init script calls in postinst/prerm (closes: #366362)
+
+ -- Sven Mueller <debian@incase.de>  Mon,  8 May 2006 02:43:00 +0200
+
 spampd (2.30-3) unstable; urgency=low
 
   * Fix syntax errors introduced during prior update (slipped in after test)

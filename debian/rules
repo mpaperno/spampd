@@ -70,7 +70,7 @@ binary-arch: build install
 binary-indep: build install
 	dh_testdir
 	dh_installdocs
-	dh_installinit
+	dh_installinit --no-start
 	dh_installman
 	dh_installchangelogs changelog.txt
 	dh_compress

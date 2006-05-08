@@ -1,5 +1,22 @@
 #!/bin/sh -e
 
+function handle_init_errs ()
+{
+	if [ "$1" = "6" ]; then
+		return 0
+	else
+		exit $1
+	fi
+}
+
+if [ -x "/etc/init.d/spampd" ]; then
+	if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+		invoke-rc.d spampd stop || handle_init_errs $?
+	else
+		/etc/init.d/spampd stop || handle_init_errs $?
+	fi
+fi
+
 #DEBHELPER#
 
 case "$1" in
