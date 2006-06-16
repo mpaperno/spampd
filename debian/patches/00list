@@ -2,4 +2,4 @@
 45-fix-man-references.dpatch
 50-fix-fd-usage.dpatch
 55-workaround-for-syslog-regression.dpatch
-60-dont-open-userprefs.dpatch
+60-use-spampd-conf.dpatch

@@ -60,6 +60,8 @@ install: build
 
 	# Add here commands to install the package into debian/spampd.
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/spampd
+	mkdir -p $(CURDIR)/debian/spampd/etc
+	cp debian/spampd.conf	$(CURDIR)/debian/spampd/etc/spampd.conf
 
 
 # Build architecture-independent files here.
@@ -70,7 +72,7 @@ binary-arch: build install
 binary-indep: build install
 	dh_testdir
 	dh_installdocs
-	dh_installinit --no-start
+	dh_installinit --error-handler handle_init_errs
 	dh_installman
 	dh_installchangelogs changelog.txt
 	dh_compress

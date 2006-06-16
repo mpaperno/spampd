@@ -1,0 +1,89 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 60-dont-open-userprefs.dpatch by Sven Mueller <debian@incase.de>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Dont open user preferences for spamassassin
+
+@DPATCH@
+diff -urNad trunk/spampd /tmp/dpep.IFxtvg/trunk/spampd
+--- trunk/spampd	2006-06-13 20:06:05.000000000 +0200
++++ /tmp/dpep.IFxtvg/trunk/spampd	2006-06-13 20:07:52.078374699 +0200
+@@ -778,6 +778,7 @@
+ my $satimeout = 285; # SpamAssassin timeout in seconds (15s less than Postfix 
+                      # default for smtp_data_done_timeout)
+ my $pidfile = '/var/run/spampd.pid'; # write pid to file
++my $configfile = undef; # file to read spampd specific config from
+ my $user = 'mail'; # user to run as
+ my $group = 'mail'; # group to run as
+ my $tagall = 0; # mark-up all msgs with SA, not just spam
+@@ -809,6 +810,7 @@
+ 	       relayhost => \$relayhost,
+ 	       relayport => \$relayport,
+ 	       pid => \$pidfile,
++	       config => \$configfile,
+ 	       user => \$user,
+ 	       group => \$group,
+ 	       maxrequests => \$maxrequests,
+@@ -845,6 +847,7 @@
+ 		   'debug|d',
+ 		   'help|h|?',
+ 		   'local-only|l',
++		   'config|C=s',
+ 		   'log-rules-hit|rh',
+ 		   'dose',
+ 		   'add-sc-header|ash',  # deprecated
+@@ -884,10 +887,19 @@
+ $host = $tmp[0];
+ if ( $tmp[1] ) { $port = $tmp[1]; }
+ 
+-my $assassin = Mail::SpamAssassin->new({
++my $assassin;
++if ( defined($options{'config'}) ) {
++	$assassin=Mail::SpamAssassin->new({
+ 		'dont_copy_prefs' => 1,
+ 		'debug' => $debug,
++		'userprefs_filename' => $options{'config'},
+ 		'local_tests_only' => $options{'local-only'} || 0 });
++} else {
++	$assassin=Mail::SpamAssassin->new({
++		'dont_copy_prefs' => 1,
++		'debug' => $debug,
++		'local_tests_only' => $options{'local-only'} || 0 });
++};
+ 
+ $options{'auto-whitelist'} and eval {
+    require Mail::SpamAssassin::DBBasedAddrList;
+@@ -897,7 +909,11 @@
+    $assassin->set_persistent_address_list_factory ($addrlistfactory);
+ };
+ 
+-$assassin->compile_now();
++if ( defined($options{'config'}) ) {
++	$assassin->compile_now();
++} else {
++	$assassin->compile_now(0);
++}
+ 
+ # thanks to Kurt Andersen for the 'uname -s' fix
+ if ( !$options{logsock} ) {
+@@ -1087,6 +1103,7 @@
+ [B<--set-envelope-from|sef>]
+ [B<--auto-whitelist|aw>]
+ [B<--local-only|L>]
++[B<--config|C=filename>]
+ [B<--debug|d>]
+ 
+ B<spampd> B<--help>
+@@ -1416,6 +1433,12 @@
+ 
+ Turn off all SA network-based tests (DNS, Razor, etc).
+ 
++=item B<--config=filename> or B<--C filename>
++
++Use the specified filename as the config read by spampd in addition to
++SpamAssassin's normal configuration files, overriding the latter. Defaults
++to not using a spampd specific configuration file.
++
+ =item B<--debug> or B<--d>
+ 
+ Turns on SpamAssassin debug messages which print to the system mail log

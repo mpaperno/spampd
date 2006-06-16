@@ -1,3 +1,14 @@
+spampd (2.30-5) unstable; urgency=low
+
+  * Add special "user" configuration file only accessed by spampd's
+    SpamAssassin Instance (closes: #344373)
+  * Revert postinst to use dh_installinit built-in option to call an error
+    handler if the init script fails.
+  * Move dependencies from build-depends-indep to build-depends 
+    (since they must also be fulfilled when calling the clean target)
+
+ -- Sven Mueller <sven@debian.org>  Fri, 16 Jun 2006 15:26:49 +0200
+
 spampd (2.30-4) unstable; urgency=low
 
   * Fix init script return value when run by non-root

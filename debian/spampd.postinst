@@ -2,10 +2,11 @@
 
 function handle_init_errs ()
 {
-	if [ "$1" = "6" ]; then
+	RET=$?
+	if [ "$RET" = "6" ]; then
 		return 0
 	else
-		exit $1
+		exit $RET
 	fi
 	set -e
 }
@@ -15,19 +16,11 @@ case "$1" in
 		adduser --system --group \
 		        --no-create-home --home /nonexistent \
 			--quiet spampd 
+		dpkg-statoverride --add spampd spampd 775 /var/cache/spampd
+		dpkg-statoverride --add root spampd 640 /etc/spampd.conf
 		;;
 	*)
 		;;
 esac
-# Automatically added by dh_installinit
-if [ -x "/etc/init.d/spampd" ]; then
-	update-rc.d spampd defaults >/dev/null
-	if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-		invoke-rc.d spampd start || handle_init_errs $?
-	else
-		/etc/init.d/spampd start || handle_init_errs $?
-	fi
-fi
-# End automatically added section
 
 #DEBHELPER#

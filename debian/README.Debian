@@ -1,25 +1,32 @@
-spampd for Debian
+SpamPD for Debian
 -----------------
 
-IMPORTANT NOTE: By default, spampd is disabled after installation.
-You need to adjust the configuration in /etc/default/spampd to your
-needs and enable the daemon in there.
+SpamPD configuration takes place in /etc/default/spampd as far as the network
+connections are concerned. Any more advanced configuration of the the
+SpamAssassin part is done in /etc/spamassassin/local.cf as usual with with
+SpamAssassin. Additionally, as of Debian package 2.30-5, it is now now possible
+to specify an additional configuration file which can override any option given
+in the system wide configuration of SpamAssassin.
 
-Spampd configuration takes place in /etc/default/spampd as far as the
-network connections are concerned. Any more advanced configuration of
-the SpamAssassin part is done in /etc/spamassassin/local.cf as usual
-with SpamAssassin.
+Running SpamPD in unintended ways
+---------------------------------
 
-spampd is (like amavisd-new and similar filters) intended to be run
-as a _post-queue_ filter in postfix or in a similar way with other
-MTAs. However, the following hints might help you to use it as a 
-pre-queue filter or even in front of your MTA. Both setups really
-are _not_ recommended though pre-queue filtering seems to work fine.
+SpamPD is (like amavisd-new and similar filters) intended to be run as a
+_post-queue_ filter in postfix or in a similar way with other MTAs. However,
+the following hints might help you to use it as a pre-queue filter or even in
+front of your MTA. Both setups really are _not_ recommended though pre-queue
+filtering seems to work fine. Running SpamPD in front of your MTA can quickly
+turn your mailserver into an open relay if you are not 100% careful with the 
+setup. It also exposes SpamPD to malicious traffic which is normally caught by
+the MTA in front of it. Though SpamPD has no known security holes, it's better
+to be careful especially since SpamPD security relies on SpamAssassin being
+secure. These notes of caution don't necessarily apply when running SpamPD as
+a pre-queue filter though. Anyway, here is as much help as I can give you with
+either setup. It's mostly related to network timeouts.
 
-By default, spampd times out after 5 minutes if no network paket is
+By default, SpamPD times out after 5 minutes if no network paket is
 received or after 6 minutes have gone by since start of the SMTP
-dialogue.
-The first parameter isn't directly adjustable, but that shouldn't be
+dialogue. The first parameter isn't directly adjustable, but that shouldn't be
 a problem in any case. The second one however can pose a problem for
 really slow clients (or extremely large mails).
 If you experience such problems (i.e. a client isn't able to send
@@ -27,4 +34,4 @@ large mails even though it slowly but steadily sends data), try
 passing "--childtimeout=3600" (60 minutes) to spampd using the
 ADDOPTS entry in /etc/default/spampd.
 
- -- Sven Mueller <debian@incase.de>, Wed, 07 Sep 2005 19:49:36 +0200
+ -- Sven Mueller <debian@incase.de>, Tue, 13 Jun 2006 20:22:42 +0200
