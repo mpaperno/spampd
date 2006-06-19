@@ -1,13 +1,13 @@
 Source: spampd
 Section: mail
 Priority: optional
-Maintainer: Sven Mueller <debian@incase.de>
+Maintainer: Sven Mueller <sven@debian.org>
 Build-Depends: debhelper (>= 4.0.0), dpatch
 Standards-Version: 3.6.2.2
 
 Package: spampd
 Architecture: all
-Depends: ${perl:Depends}, spamassassin (>= 2.6), libnet-server-perl, adduser (>= 3.59), dpkg (>= 1.10.23)
+Depends: ${perl:Depends}, spamassassin (>= 2.6), libnet-server-perl, adduser (>= 3.59), dpkg (>= 1.10.23), lsb-base
 Description: spamassassin based SMTP/LMTP proxy daemon
  spampd is an SMTP/LMTP server designed to be hooked into the
  MTA processing chain (e.g. as a content filter). It is

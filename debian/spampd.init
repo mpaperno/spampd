@@ -11,8 +11,8 @@
 # Provides:		spampd
 # Required-Start: 	$syslog $network $named $time
 # Required-Stop:  	$syslog $network $named $time
-# Should-Start: 	2 3 4 5
-# Should-Stop:		1 6
+# Default-Start:	2 3 4 5
+# Default-Stop:		S 0 1 6
 # Short-Description:	spam detection proxy for SMTP and LMTP
 # Description: 		SpamAssassin based perl proxy for SMTP and LMTP
 #			which marks mails as spam/nonspam based on SpamAssassin
@@ -27,12 +27,14 @@ PROGRAM=/usr/sbin/spampd
 EXECUTABLE=/usr/bin/perl
 PIDFILE=/var/run/spampd.pid
 
+. /lib/lsb/init-functions
+
 # set some important defaults (overridable via /etc/default/spampd)
 USERID=spampd
 GRPID=spampd
 
 if [ "$EUID" !=  "0" ]; then
-	echo "ERROR: Insufficient privileges. Retry as root" >&2
+	log_failure_msg "ERROR: Insufficient privileges. Retry as root"
 	# LSB 3.0 says that return value of 4 indicates insufficient privileges
 	exit 4
 fi
@@ -100,20 +102,23 @@ ARGS="${S_LOCALONLY} ${S_AWL} ${S_TAGALL} "
 [ -n "${ADDOPTS}" ] && ARGS="${ARGS} ${ADDOPTS}"
 
 function check_pid () {
+	# $1 : process name
+	# $2 : pid file
+	# $3 : (optional) verbosity
 	[ "$3" = "verbose" ] && VERBOSE=1
 	if [ -f $2 ]; then
 		kill -0 `cat $2` > /dev/null 2>&1
 		RETVAL=$?
 		if [ "$RETVAL" = "0" ]; then
-			[ "$VERBOSE" ] && echo "$1 is running as `cat $2`"
+			[ "$VERBOSE" ] && log_success_msg "$1 is running as `cat $2`"
 			return 0
 		else
-			[ "$VERBOSE" ] && echo "PIDFILE $2 for $1 exists, but $1 is not running."
+			[ "$VERBOSE" ] && log_failure_msg "PIDFILE $2 for $1 exists, but $1 is not running."
 			rm $2
 			return 1
 		fi
 	else
-		[ "$VERBOSE" ] && echo "PIDFILE $2 for $1 doesn't exists."
+		[ "$VERBOSE" ] && log_failure_msg "PIDFILE $2 for $1 doesn't exists."
 		return 4
 	fi
 	return 3
@@ -122,19 +127,21 @@ function check_pid () {
 case "$1" in
 	start)
 		if ! istrue "${STARTSPAMPD}"; then
-			echo "Starting $DESC: $NAME (disabled in /etc/default/$NAME)."
+			log_warning_msg "Starting $DESC: $NAME (disabled in /etc/default/$NAME)."
 			# LSB 2.1: 6 mean unconfigured. This seems appropriate here.
 			exit 6
 		fi
-		echo -n "Starting $DESC: $NAME"
+		log_daemon_msg "Starting $DESC" "$NAME"
 		# if spampd is already running, exit 0 as demanded by LSB 2.1
 		# this also removes the PIDFILE if it exists but has no matching
 		# process
 		if check_pid $PROGRAM $PIDFILE ; then
+			log_end_msg 0
 			exit 0
 		fi
 		# if spampd is not installed, return 5 as demanded by LSB 2.1
 		if [ ! -x $EXECUTABLE ]; then
+			log_error_msg "failed! - executable not found"
 			exit 5
 		fi
 		# start daemon
@@ -142,10 +149,10 @@ case "$1" in
 			--startas $PROGRAM --pidfile $PIDFILE \
 			--user $USERID --group $GRPID -- $ARGS
 		if [ "$?" = '0' ]; then
-			echo '.'
+			log_end_msg 0
 			exit 0
 		else
-			echo ''
+			log_end_msg 7
 			# LSB 2.1 says 7 should be returned when program
 			# isn't running.
 			exit 7
@@ -165,17 +172,18 @@ case "$1" in
 				--pidfile $PIDFILE > /dev/null 2>&1
 		fi
 		if [ "$?" = "0" ]; then
-			echo '.'
+			log_end_msg 0
 			rm $PIDFILE
 			exit 0
 		else
-			echo ''
 			if ! check_pid $PROGRAM $PIDFILE ; then
+				log_end_msg 0
 				exit 0
 			else
 				# if we had not successfully stopped the
 				# program, we can assume the user didn't
 				# have sufficient privileges.
+				log_end_msg 1
 				exit 4
 			fi
 		fi
@@ -185,14 +193,14 @@ case "$1" in
 		exit $?
 		;;
 	reload)
-		echo "reload not implemented, try force-reload/restart instead"
+		log_warning_msg "reload not implemented, try force-reload/restart instead"
 		exit 3
 		;;
 	force-reload|try-restart)
 		if check_pid $PROGRAM $PIDFILE ; then
 			exec $0 restart
 		else
-			echo "$DESC is not running. Try '$0 start' to start it."
+			log_warning_msg "$DESC is not running. Try '$0 start' to start it."
 			# LSB 2.1 says that this should return success, anyhow.
 			exit 0
 		fi
@@ -213,5 +221,5 @@ case "$1" in
 
 esac
 
-echo "This point shouldn't be reached. Some weird thing happened"
+log_error_msg "This point shouldn't be reached. Some weird thing happened"
 exit 1

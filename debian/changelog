@@ -1,3 +1,13 @@
+spampd (2.30-6) unstable; urgency=low
+
+  * Switch maintainer address
+  * Fix init script to use the correct LSB init script tags
+  * Use lsb init-functions log_* subroutines where they seem to make
+    sense
+  * Depend on lsb-base now that I use lsb-base's init-functions
+
+ -- Sven Mueller <sven@debian.org>  Mon, 19 Jun 2006 15:54:35 +0200
+
 spampd (2.30-5) unstable; urgency=low
 
   * Add special "user" configuration file only accessed by spampd's
