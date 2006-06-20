@@ -16,11 +16,27 @@ set -e
 
 case "$1" in
        purge)
-	dpkg-statoverride --remove /var/cache/spampd
-	dpkg-statoverride --remove /etc/spampd.conf
-	rm -rf /var/cache/spampd
+	dpkg-statoverride --remove /var/cache/spampd || true
+	dpkg-statoverride --remove /etc/spampd.conf || true
+	rmdir /var/cache/spampd || echo "Warning: /var/cache/spampd not empty, not removing" >&2
         ;;
-       remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+       upgrade)
+	DOWNGRADE=0
+	dpkg --compare-versions "$2" lt 2.30-5 && DOWNGRADE=1
+	if echo $2 | grep -q bpo; then
+		# special case backports.org versions
+		dpkg-compare-versions "$2" gt 2.30-4 || DOWNGRADE=1
+	fi
+	if [ "$DOWNGRADE" = "1" ]; then
+		# This "upgrade" is actually a downgrade below the 2.30-5
+		# version, so we should remove the statoverrides
+		dpkg-statoverride --remove /var/cache/spampd || true
+		dpkg-statoverride --remove /etc/spampd.conf || true
+	else
+		echo "Not creating statoverrides. Other version: $2"
+	fi
+        ;;
+       remove|failed-upgrade|abort-install|abort-upgrade|disappear)
 	;;
     *)
         echo "postrm called with unknown argument \`$1'" >&2

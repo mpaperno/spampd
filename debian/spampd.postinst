@@ -12,33 +12,41 @@ function handle_init_errs ()
 }
 
 case "$1" in 
-	install)
+	install|configure)
 		adduser --system --group \
 		        --no-create-home --home /nonexistent \
 			--quiet spampd 
-		;;
-	configure)
-		adduser --system --group \
-		        --no-create-home --home /nonexistent \
-			--quiet spampd 
-		MAJOR=`echo $2 | sed -e 's/\..*//'`
-		MINOR=`echo $2 | sed -e 's/.*\.//;s/-.*//'`
-		# Use only the first number of the Debian version, ignore any
-		# non-digit parts as well as NMU numbers
-		DEBVER=`echo $2 | sed -e 's/.*-//;s/[.a-z].*//'`
-		# special case bpo versions
-		# NOTE: SpamPD depends on perl indirectly via SpamAssassin, so
-		# we can be sure to find it.
-		if echo "$2" | sed -e 's/.*-//' | grep -q bpo ; then
-			DEBVER="`perl -e 'print $DEBVER + 1;'`"
+		INSTOVERR=0
+		dpkg --compare-versions "$2" lt 2.30-5 && INSTOVERR=1
+		if echo $2 | grep -q bpo; then
+			# special case backports.org versions
+			dpkg-compare-versions "$2" gt 2.30-4 || INSTOVERR=1
 		fi
-		# Install stat overrides only if no previous version was passed
-		# or it is passed and lower than 2.30-5
-		if [ "$2" = "" ] \
-		   || ( [ $MAJOR -le 2 ] && [ $MINOR -le 30 ] && [ $DEBVER -lt 5 ]);
-		then
-			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd
-			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf
+		if [ "$INSTOVERR" = 1 ]; then
+			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd \
+			|| echo "Warning: statoverride couldn't be created for /var/cache/spampd" >&2
+			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf \
+			|| echo "Warning: statoverride couldn't be created for /etc/spampd.conf" >&2
+		fi
+		;;
+	abort-upgrade)
+		# Aborting an upgrade, check wether it was actually a downgrade
+		# which removed the stat overrides
+		INSTOVERR=0
+		echo "spampd.postinst: Aborting upgrade"
+		dpkg --compare-versions "$2" lt 2.30-5 && INSTOVERR=1
+		if echo $2 | grep -q bpo; then
+			# special case backports.org versions
+			echo "spampd.postinst: Special casing bpo version: $2"
+			dpkg-compare-versions "$2" gt 2.30-4 || INSTOVERR=1
+		fi
+		if [ "$INSTOVERR" = 1 ]; then
+			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd \
+			|| echo "Warning: statoverride couldn't be created for /var/cache/spampd" >&2
+			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf \
+			|| echo "Warning: statoverride couldn't be created for /etc/spampd.conf" >&2
+		else
+			echo "spampd.postinst: Not creating statoverrides on abort-upgrade. other version: $2"
 		fi
 		;;
 	*)
