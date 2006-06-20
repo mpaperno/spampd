@@ -12,12 +12,34 @@ function handle_init_errs ()
 }
 
 case "$1" in 
-	configure|install|upgrade)
+	install)
 		adduser --system --group \
 		        --no-create-home --home /nonexistent \
 			--quiet spampd 
-		dpkg-statoverride --add spampd spampd 775 /var/cache/spampd
-		dpkg-statoverride --add root spampd 640 /etc/spampd.conf
+		;;
+	configure)
+		adduser --system --group \
+		        --no-create-home --home /nonexistent \
+			--quiet spampd 
+		MAJOR=`echo $2 | sed -e 's/\..*//'`
+		MINOR=`echo $2 | sed -e 's/.*\.//;s/-.*//'`
+		# Use only the first number of the Debian version, ignore any
+		# non-digit parts as well as NMU numbers
+		DEBVER=`echo $2 | sed -e 's/.*-//;s/[.a-z].*//'`
+		# special case bpo versions
+		# NOTE: SpamPD depends on perl indirectly via SpamAssassin, so
+		# we can be sure to find it.
+		if echo "$2" | sed -e 's/.*-//' | grep -q bpo ; then
+			DEBVER="`perl -e 'print $DEBVER + 1;'`"
+		fi
+		# Install stat overrides only if no previous version was passed
+		# or it is passed and lower than 2.30-5
+		if [ "$2" = "" ] \
+		   || ( [ $MAJOR -le 2 ] && [ $MINOR -le 30 ] && [ $DEBVER -lt 5 ]);
+		then
+			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd
+			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf
+		fi
 		;;
 	*)
 		;;

@@ -1,3 +1,11 @@
+spampd (2.30-7) unstable; urgency=low
+
+  * Install dpkg-statoverrides only if no previous version was configured or
+    the previous version is lower than 2.30-5 (Closes: #374603)
+  * Fix error handling in prerm
+
+ -- Sven Mueller <sven@debian.org>  Tue, 20 Jun 2006 12:58:26 +0200
+
 spampd (2.30-6) unstable; urgency=low
 
   * Switch maintainer address
