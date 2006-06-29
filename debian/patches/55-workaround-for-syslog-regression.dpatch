@@ -6,9 +6,9 @@
 ## DP: Which started with version 0.89
 
 @DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.s3Xmyu/trunk/spampd
---- trunk/spampd	2006-04-16 18:49:55.000000000 +0200
-+++ /tmp/dpep.s3Xmyu/trunk/spampd	2006-04-16 18:51:19.357204394 +0200
+diff -urNad trunk/spampd /tmp/dpep.TAUjXU/trunk/spampd
+--- trunk/spampd	2006-06-29 16:08:08.000000000 +0200
++++ /tmp/dpep.TAUjXU/trunk/spampd	2006-06-29 16:10:48.095204817 +0200
 @@ -490,7 +490,12 @@
  		
  	    $msgid ||= "(unknown)";
@@ -124,7 +124,7 @@ diff -urNad trunk/spampd /tmp/dpep.s3Xmyu/trunk/spampd
  	      );
  
  usage(1) unless GetOptions(\%options,
-@@ -907,6 +945,7 @@
+@@ -907,11 +945,16 @@
  				instance => 0,
  				envelopeheaders => $envelopeheaders,
  				setenvelopefrom => $setenvelopefrom,
@@ -132,3 +132,13 @@ diff -urNad trunk/spampd /tmp/dpep.s3Xmyu/trunk/spampd
  			   },
     }, 'SpamPD';
  
+ # Redirect all warnings to Server::log 
+-$SIG{__WARN__} = sub { $server->log (2, "%s", $_[0]); };
++if ($pfs_uses_format) {
++	$SIG{__WARN__} = sub { $server->log (2, "%s", $_[0]); };
++} else {
++	$SIG{__WARN__} = sub { $server->log (2, $_[0]); };
++}
+ 	   
+ # call Net::Server to start up the daemon inside
+ $server->run;

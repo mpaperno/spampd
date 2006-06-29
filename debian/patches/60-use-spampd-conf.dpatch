@@ -5,9 +5,9 @@
 ## DP: Dont open user preferences for spamassassin
 
 @DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.IFxtvg/trunk/spampd
---- trunk/spampd	2006-06-13 20:06:05.000000000 +0200
-+++ /tmp/dpep.IFxtvg/trunk/spampd	2006-06-13 20:07:52.078374699 +0200
+diff -urNad trunk/spampd /tmp/dpep.MJGYOf/trunk/spampd
+--- trunk/spampd	2006-06-29 16:15:09.000000000 +0200
++++ /tmp/dpep.MJGYOf/trunk/spampd	2006-06-29 16:28:56.009335675 +0200
 @@ -778,6 +778,7 @@
  my $satimeout = 285; # SpamAssassin timeout in seconds (15s less than Postfix 
                       # default for smtp_data_done_timeout)
@@ -42,7 +42,7 @@ diff -urNad trunk/spampd /tmp/dpep.IFxtvg/trunk/spampd
 +	$assassin=Mail::SpamAssassin->new({
  		'dont_copy_prefs' => 1,
  		'debug' => $debug,
-+		'userprefs_filename' => $options{'config'},
++		'userprefs_filename' => ${$options{'config'}},
  		'local_tests_only' => $options{'local-only'} || 0 });
 +} else {
 +	$assassin=Mail::SpamAssassin->new({
@@ -66,7 +66,7 @@ diff -urNad trunk/spampd /tmp/dpep.IFxtvg/trunk/spampd
  
  # thanks to Kurt Andersen for the 'uname -s' fix
  if ( !$options{logsock} ) {
-@@ -1087,6 +1103,7 @@
+@@ -1091,6 +1107,7 @@
  [B<--set-envelope-from|sef>]
  [B<--auto-whitelist|aw>]
  [B<--local-only|L>]
@@ -74,7 +74,7 @@ diff -urNad trunk/spampd /tmp/dpep.IFxtvg/trunk/spampd
  [B<--debug|d>]
  
  B<spampd> B<--help>
-@@ -1416,6 +1433,12 @@
+@@ -1420,6 +1437,12 @@
  
  Turn off all SA network-based tests (DNS, Razor, etc).
  

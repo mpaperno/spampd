@@ -1,3 +1,13 @@
+spampd (2.30-10) unstable; urgency=low
+
+  * Fix __WARN__ handler to only use a format string when appropriate, i.e.
+    when syslog module is above some version. (Closes: #375939)
+  * Fix missing dereference in patch introducing the optional spampd.conf
+    usage. It now properly dereferences $options{'config'} (Closes: #375938)
+    Thanks go to Tatsuki Sugiura for noticing these two bugs.
+
+ -- Sven Mueller <sven@debian.org>  Thu, 29 Jun 2006 16:32:54 +0200
+
 spampd (2.30-9) unstable; urgency=low
 
   * Fix unintended -8 upload with wrong distribution
