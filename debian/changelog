@@ -1,3 +1,11 @@
+spampd (2.30-11) unstable; urgency=low
+
+  * Remove POSIX-optional "function" preface to shell functions to make dash
+    happy. Did I mention that dash isn't half as POSIX compliant as it is
+    meant to be? (Closes: 376726)
+
+ -- Sven Mueller <sven@debian.org>  Wed,  5 Jul 2006 15:36:02 +0200
+
 spampd (2.30-10) unstable; urgency=low
 
   * Fix __WARN__ handler to only use a format string when appropriate, i.e.

@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-function handle_init_errs ()
+handle_init_errs ()
 {
 	RET=$?
 	if [ "$RET" = "6" ]; then
