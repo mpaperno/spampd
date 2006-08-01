@@ -6,9 +6,9 @@
 ## DP: Which started with version 0.89
 
 @DPATCH@
-diff -urNad sarge-backport/spampd /tmp/dpep.aPWjTb/sarge-backport/spampd
---- sarge-backport/spampd	2006-08-01 19:37:52.000000000 +0200
-+++ /tmp/dpep.aPWjTb/sarge-backport/spampd	2006-08-01 19:41:29.815573797 +0200
+diff -urNad trunk/spampd /tmp/dpep.Yjpg8w/trunk/spampd
+--- trunk/spampd	2006-08-01 22:56:05.000000000 +0200
++++ /tmp/dpep.Yjpg8w/trunk/spampd	2006-08-01 22:56:39.332852200 +0200
 @@ -490,7 +490,12 @@
  		
  	    $msgid ||= "(unknown)";
@@ -104,7 +104,7 @@ diff -urNad sarge-backport/spampd /tmp/dpep.aPWjTb/sarge-backport/spampd
  	  die ($msg . "\n");
    }
    
-@@ -766,6 +797,22 @@
+@@ -766,6 +797,23 @@
  my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
  						 # passing it to spamassassin. Set to 1 to enable this
  my $setenvelopefrom = 0; # Set X-Envelope-From header only
@@ -120,14 +120,15 @@ diff -urNad sarge-backport/spampd /tmp/dpep.aPWjTb/sarge-backport/spampd
 +	$pfs_uses_format = 0;
 +}
 +# Also disable format usage on Debian systems
-+if ( ( -f "/usr/bin/dpkg" ) && ( "`dpkg --compare-versions $( COLUMNS=255 dpkg -l libnet-server-perl |grep libnet-server-perl | awk '{ print $3; }' ) ge 0.87-3sarge1 ; echo $?`" eq "0" ) ) {
++$ENV{PATH}="/usr/bin:/usr/sbin:/bin:/usr/sbin";
++if ( ( -f "/usr/bin/dpkg" ) && ( `dpkg --compare-versions \$( COLUMNS=255 dpkg -l libnet-server-perl |grep libnet-server-perl | awk '{ print \$3; }' ) ge 0.87-3sarge1 ; echo \$?` == 0 ) ) {
 +	# Sarge version with backport fix
 +	$pfs_uses_format = 0;
 +}
  
  my %options = (port => \$port,
  	       host => \$host,
-@@ -783,6 +830,7 @@
+@@ -783,6 +831,7 @@
  	       logsock => \$logsock,
  	       envelopeheaders => \$envelopeheaders,
  	       setenvelopefrom => \$setenvelopefrom,
@@ -135,7 +136,7 @@ diff -urNad sarge-backport/spampd /tmp/dpep.aPWjTb/sarge-backport/spampd
  	      );
  
  usage(1) unless GetOptions(\%options,
-@@ -907,11 +955,16 @@
+@@ -907,11 +956,16 @@
  				instance => 0,
  				envelopeheaders => $envelopeheaders,
  				setenvelopefrom => $setenvelopefrom,
