@@ -1,3 +1,11 @@
+spampd (2.30-12) unstable; urgency=low
+
+  * Add a check to 55-workaround-for-syslog-regression so that an unmodified
+    spampd package from sid will also work on sarge with the fixed
+    libnet-server-perl package installed
+
+ -- Sven Mueller <sven@debian.org>  Tue,  1 Aug 2006 19:44:53 +0200
+
 spampd (2.30-11) unstable; urgency=low
 
   * Remove POSIX-optional "function" preface to shell functions to make dash
