@@ -1,3 +1,12 @@
+spampd (2.30-14) unstable; urgency=medium
+
+  * Change scripts to explicitly use /bin/bash instead of /bin/sh.
+    If anyone wants to submit a patch to make all scripts dash-clean,
+    I welcome it, but I currently have better things to do.
+    (Closes: #391219) Urgency medium to match bug severity.
+
+ -- Sven Mueller <sven@debian.org>  Mon,  9 Oct 2006 23:49:37 +0200
+
 spampd (2.30-13) unstable; urgency=low
 
   * Fix the previous change. It had an unexpected side-effect

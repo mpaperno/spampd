@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 #
 # spampd	SpamPD is a spamdetection proxy daemon for SMTP and LMTP
 #
@@ -33,7 +33,7 @@ PIDFILE=/var/run/spampd.pid
 USERID=spampd
 GRPID=spampd
 
-if [ "$EUID" !=  "0" ]; then
+if [ "`id -u`" !=  "0" ]; then
 	log_failure_msg "ERROR: Insufficient privileges. Retry as root"
 	# LSB 3.0 says that return value of 4 indicates insufficient privileges
 	exit 4

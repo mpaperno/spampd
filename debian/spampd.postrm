@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 set -e
 
 # summary of how this script can be called:
