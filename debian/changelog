@@ -1,3 +1,12 @@
+spampd (2.30-15) unstable; urgency=low
+
+  * Add versioned depend on lsb-base, I'm using log_daemon_msg which
+    isn't supported in earlier versions it seems.
+  * Add notes about the LMTP support and a known problem with it. The
+    problem isn't reproducible for me. (Closes #395355)
+
+ -- Sven Mueller <sven@debian.org>  Thu,  2 Nov 2006 17:27:21 +0100
+
 spampd (2.30-14) unstable; urgency=medium
 
   * Change scripts to explicitly use /bin/bash instead of /bin/sh.

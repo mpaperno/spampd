@@ -34,4 +34,23 @@ large mails even though it slowly but steadily sends data), try
 passing "--childtimeout=3600" (60 minutes) to spampd using the
 ADDOPTS entry in /etc/default/spampd.
 
+SpamPD and LMTP
+---------------
+
+There seems to be a problem with multi-recipient LMTP sessions which might 
+surface if you set up your MTA to deliver to the LMTP destination via SpamPD.
+A fix is difficult to do since neither I nor the upstream author have a test
+system available where we could do debugging of this problem. There are two
+ways to get around the problem though:
+1) The preferred way, especially on postfix installations: Use spampd as an
+   intermediate filter (MTA -> spampd -> MTA -> LMTP). This needs two MTA
+   instances (though no fully functional MTA setups), but it doesn't scan the
+   same mail twice for its spamminess.
+2) Turn the maximum number of recipients to 1 for the LMTP transport. This
+   will cause mails to get scanned multiple times if there is more than one
+   recipient. But it doesn't need a second MTA instance.
+Please note that SpamPD was intended to be a spam checking SMTP proxy. The
+fact that it also supports LMTP is more of a side effect caused by the mere
+similarity of the LMTP and SMTP protocols.
+
  -- Sven Mueller <debian@incase.de>, Tue, 13 Jun 2006 20:22:42 +0200
