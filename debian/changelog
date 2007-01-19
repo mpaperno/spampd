@@ -1,3 +1,10 @@
+spampd (2.30-16) unstable; urgency=low
+
+  * remove Debian specific part of libnet-server-perl syslog regression
+    workaround and add versioned dependency (Closes: #407223)
+
+ -- Sven Mueller <sven@debian.org>  Fri, 19 Jan 2007 17:29:27 +0100
+
 spampd (2.30-15) unstable; urgency=low
 
   * Add versioned depend on lsb-base, I'm using log_daemon_msg which
