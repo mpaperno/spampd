@@ -1,3 +1,16 @@
+spampd (2.30-17) unstable; urgency=low
+
+  * Add patch to fix multi-destination LMTP (Closes: #395355)
+    Thanks for the patch and for testing it go to:
+    Vladislav Kurz <vladki@brno-czfree.net>
+  * Document problems with SpamAssassin's auto-whitelist plugin and
+    the default filesystem storage. (Related to: bug #413753)
+  * Apply patch by Alexander Wirt to introduce a parameter which 
+    sets a proper home directory and also cleans up the environment
+    before backgrounding. (Closes: #421100)
+
+ -- Sven Mueller <sven@debian.org>  Tue, 22 May 2007 19:15:09 +0200
+
 spampd (2.30-16) unstable; urgency=low
 
   * remove Debian specific part of libnet-server-perl syslog regression

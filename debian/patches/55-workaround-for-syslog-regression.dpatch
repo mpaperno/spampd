@@ -6,10 +6,10 @@
 ## DP: Which started with version 0.89
 
 @DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
---- trunk/spampd	2007-01-19 17:27:12.000000000 +0100
-+++ /tmp/dpep.5xMH1B/trunk/spampd	2007-01-19 17:27:27.635415276 +0100
-@@ -490,7 +490,12 @@
+diff -urNad trunk/spampd /tmp/dpep.pMxFJ5/trunk/spampd
+--- trunk/spampd	2007-03-08 12:36:17.000000000 +0100
++++ /tmp/dpep.pMxFJ5/trunk/spampd	2007-03-08 12:41:28.056138004 +0100
+@@ -494,7 +494,12 @@
  		
  	    $msgid ||= "(unknown)";
  	    
@@ -23,7 +23,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  	    
  		eval {
  			
-@@ -574,13 +579,22 @@
+@@ -578,13 +583,22 @@
  		    my $msg_threshold = sprintf("%.2f",$status->get_required_hits);
  		    my $proc_time = sprintf("%.2f", time - $start);
  		    
@@ -50,7 +50,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  		    $status->finish();
       
  		    # set the timeout alarm back to wherever it was at
-@@ -589,7 +603,11 @@
+@@ -593,7 +607,11 @@
  		};
  	
  		if ( $@ ne '' ) {
@@ -63,7 +63,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  	      return 0;
  	    }
  	
-@@ -678,8 +696,13 @@
+@@ -683,8 +701,13 @@
  		}
  		
  		#close the temp file
@@ -78,7 +78,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  
  	    if ( $self->{spampd}->{debug} ) {
  	      $self->log(2, "Finished sending DATA"); }
-@@ -692,7 +715,11 @@
+@@ -697,7 +720,11 @@
  		or die "Error in server->ok(client->hear): $!";
  		
  	  if ( $self->{spampd}->{debug} ) {
@@ -91,7 +91,22 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  	  
  	  # if we're in data state but the response is an error, exit data state.
  	  # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
-@@ -723,7 +750,11 @@
+@@ -717,9 +744,12 @@
+ 			while ( --$rcpt_ok ) {
+ 				$destresp = $client->hear;
+ 				$smtp_server->ok($destresp)
+-				    or die "Error in server->ok(client->hear): $!";
++					or die "Error in server->ok(client->hear): $!";
+ 				if ( $self->{spampd}->{debug} ) {
+-				    $self->log(2, "%s", "Destination response: '" . $destresp . "'");
++	    			if ($self->{spampd}->{pfs_uses_format}) {
++					$self->log(2, "%s", "Destination response: '" . $destresp . "'");
++				} else {
++					$self->log(2, "Destination response: '" . $destresp . "'");
+ 				}
+ 			}
+ 		}
+@@ -746,7 +776,11 @@
    if ($@ ne '') {
  	  chomp($@);
  	  $msg = "WARNING!! Error in process_request eval block: $@";
@@ -104,7 +119,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  	  die ($msg . "\n");
    }
    
-@@ -766,6 +797,17 @@
+@@ -789,6 +823,17 @@
  my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
  						 # passing it to spamassassin. Set to 1 to enable this
  my $setenvelopefrom = 0; # Set X-Envelope-From header only
@@ -122,7 +137,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  
  my %options = (port => \$port,
  	       host => \$host,
-@@ -783,6 +825,7 @@
+@@ -806,6 +851,7 @@
  	       logsock => \$logsock,
  	       envelopeheaders => \$envelopeheaders,
  	       setenvelopefrom => \$setenvelopefrom,
@@ -130,7 +145,7 @@ diff -urNad trunk/spampd /tmp/dpep.5xMH1B/trunk/spampd
  	      );
  
  usage(1) unless GetOptions(\%options,
-@@ -907,11 +950,16 @@
+@@ -930,11 +976,16 @@
  				instance => 0,
  				envelopeheaders => $envelopeheaders,
  				setenvelopefrom => $setenvelopefrom,
