@@ -6,18 +6,42 @@
 ## DP: use a sane environment and a proper homedir
 
 @DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.y27603/trunk/spampd
---- trunk/spampd	2007-05-22 18:51:53.000000000 +0200
-+++ /tmp/dpep.y27603/trunk/spampd	2007-05-22 19:02:20.997755983 +0200
-@@ -853,6 +853,7 @@
+diff -urNad trunk~/spampd trunk/spampd
+--- trunk~/spampd	2007-05-25 16:17:03.907084579 +0200
++++ trunk/spampd	2007-05-25 16:17:23.923128332 +0200
+@@ -746,10 +746,11 @@
+ 				$smtp_server->ok($destresp)
+ 					or die "Error in server->ok(client->hear): $!";
+ 				if ( $self->{spampd}->{debug} ) {
+-	    			if ($self->{spampd}->{pfs_uses_format}) {
+-					$self->log(2, "%s", "Destination response: '" . $destresp . "'");
+-				} else {
+-					$self->log(2, "Destination response: '" . $destresp . "'");
++	    				if ($self->{spampd}->{pfs_uses_format}) {
++						$self->log(2, "%s", "Destination response: '" . $destresp . "'");
++					} else {
++						$self->log(2, "Destination response: '" . $destresp . "'");
++					}
+ 				}
+ 			}
+ 		}
+@@ -809,6 +810,7 @@
+ my $satimeout = 285; # SpamAssassin timeout in seconds (15s less than Postfix 
+                      # default for smtp_data_done_timeout)
+ my $pidfile = '/var/run/spampd.pid'; # write pid to file
++my $home_dir = '/var/cache/spampd'; # default homedir for helpers
+ my $configfile = undef; # file to read spampd specific config from
+ my $user = 'mail'; # user to run as
+ my $group = 'mail'; # group to run as
+@@ -853,6 +855,7 @@
  	       logsock => \$logsock,
  	       envelopeheaders => \$envelopeheaders,
  	       setenvelopefrom => \$setenvelopefrom,
-+	       homedir => \$homedir, 
++	       homedir => \$home_dir, 
  	       pfs_uses_format => \$pfs_uses_format,
  	      );
  
-@@ -879,6 +880,7 @@
+@@ -879,6 +882,7 @@
  		   'help|h|?',
  		   'local-only|l',
  		   'config|C=s',
@@ -25,7 +49,7 @@ diff -urNad trunk/spampd /tmp/dpep.y27603/trunk/spampd
  		   'log-rules-hit|rh',
  		   'dose',
  		   'add-sc-header|ash',  # deprecated
-@@ -910,6 +912,13 @@
+@@ -910,6 +914,13 @@
  # my $min_spare_servers = ($children == $maxchildren) ? 0 : 1;
  # my $max_spare_servers = ($min_spare_servers == 0) ? 0 : $maxchildren-1;
  
@@ -34,12 +58,12 @@ diff -urNad trunk/spampd /tmp/dpep.y27603/trunk/spampd
 +$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin';
 +delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 +
-+my $home_dir = $options{'homedir'} || '/var/cache/spampd'; 
++$home_dir = $options{'homedir'} || '/var/cache/spampd'; 
 +
  my @tmp = split (/:/, $relayhost);
  $relayhost = $tmp[0];
  if ( $tmp[1] ) { $relayport = $tmp[1]; }
-@@ -923,6 +932,8 @@
+@@ -923,6 +934,8 @@
  	$assassin=Mail::SpamAssassin->new({
  		'dont_copy_prefs' => 1,
  		'debug' => $debug,
@@ -48,7 +72,7 @@ diff -urNad trunk/spampd /tmp/dpep.y27603/trunk/spampd
  		'userprefs_filename' => ${$options{'config'}},
  		'local_tests_only' => $options{'local-only'} || 0 });
  } else {
-@@ -930,6 +941,8 @@
+@@ -930,6 +943,8 @@
  		'dont_copy_prefs' => 1,
  		'debug' => $debug,
  		'local_tests_only' => $options{'local-only'} || 0 });
@@ -57,15 +81,15 @@ diff -urNad trunk/spampd /tmp/dpep.y27603/trunk/spampd
  };
  
  $options{'auto-whitelist'} and eval {
-@@ -992,6 +1005,7 @@
+@@ -992,6 +1007,7 @@
  				instance => 0,
  				envelopeheaders => $envelopeheaders,
  				setenvelopefrom => $setenvelopefrom,
-+				homedir => \$homedir, 
++				homedir => \$home_dir, 
  	       			pfs_uses_format => $pfs_uses_format,
  			   },
     }, 'SpamPD';
-@@ -1474,6 +1488,11 @@
+@@ -1474,6 +1490,11 @@
  SpamAssassin's normal configuration files, overriding the latter. Defaults
  to not using a spampd specific configuration file.
  
