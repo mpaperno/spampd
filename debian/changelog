@@ -1,3 +1,10 @@
+spampd (2.30-19) unstable; urgency=low
+
+  * The "Shame again" release
+  * Fix missing dereference (Closes: #425802)
+
+ -- Sven Mueller <sven@debian.org>  Wed, 30 May 2007 18:58:55 +0200
+
 spampd (2.30-18) unstable; urgency=low
 
   * The "Shame On Me" release

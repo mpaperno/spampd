@@ -7,8 +7,8 @@
 
 @DPATCH@
 diff -urNad trunk~/spampd trunk/spampd
---- trunk~/spampd	2007-05-25 16:17:03.907084579 +0200
-+++ trunk/spampd	2007-05-25 16:17:23.923128332 +0200
+--- trunk~/spampd	2007-05-30 18:33:45.639246150 +0200
++++ trunk/spampd	2007-05-30 18:56:26.233537774 +0200
 @@ -746,10 +746,11 @@
  				$smtp_server->ok($destresp)
  					or die "Error in server->ok(client->hear): $!";
@@ -49,7 +49,7 @@ diff -urNad trunk~/spampd trunk/spampd
  		   'log-rules-hit|rh',
  		   'dose',
  		   'add-sc-header|ash',  # deprecated
-@@ -910,6 +914,13 @@
+@@ -910,6 +914,15 @@
  # my $min_spare_servers = ($children == $maxchildren) ? 0 : 1;
  # my $max_spare_servers = ($min_spare_servers == 0) ? 0 : $maxchildren-1;
  
@@ -57,13 +57,15 @@ diff -urNad trunk~/spampd trunk/spampd
 +
 +$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin';
 +delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
-+
-+$home_dir = $options{'homedir'} || '/var/cache/spampd'; 
++$home_dir = ${$options{'homedir'}} || '/var/cache/spampd'; 
++if ($debug) {
++	print "got from options: $home_dir\n";
++}
 +
  my @tmp = split (/:/, $relayhost);
  $relayhost = $tmp[0];
  if ( $tmp[1] ) { $relayport = $tmp[1]; }
-@@ -923,6 +934,8 @@
+@@ -923,6 +936,8 @@
  	$assassin=Mail::SpamAssassin->new({
  		'dont_copy_prefs' => 1,
  		'debug' => $debug,
@@ -72,7 +74,7 @@ diff -urNad trunk~/spampd trunk/spampd
  		'userprefs_filename' => ${$options{'config'}},
  		'local_tests_only' => $options{'local-only'} || 0 });
  } else {
-@@ -930,6 +943,8 @@
+@@ -930,6 +945,8 @@
  		'dont_copy_prefs' => 1,
  		'debug' => $debug,
  		'local_tests_only' => $options{'local-only'} || 0 });
@@ -81,15 +83,15 @@ diff -urNad trunk~/spampd trunk/spampd
  };
  
  $options{'auto-whitelist'} and eval {
-@@ -992,6 +1007,7 @@
+@@ -992,6 +1009,7 @@
  				instance => 0,
  				envelopeheaders => $envelopeheaders,
  				setenvelopefrom => $setenvelopefrom,
-+				homedir => \$home_dir, 
++				homedir => $home_dir, 
  	       			pfs_uses_format => $pfs_uses_format,
  			   },
     }, 'SpamPD';
-@@ -1474,6 +1490,11 @@
+@@ -1474,6 +1492,11 @@
  SpamAssassin's normal configuration files, overriding the latter. Defaults
  to not using a spampd specific configuration file.
  
