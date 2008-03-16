@@ -1,0 +1,10 @@
+--- spampd.orig
++++ spampd
+@@ -1502,5 +1502,5 @@
+ 
+ =head1 See Also
+ 
+-perl(1), Spam::Assassin(3), L<http://www.spamassassin.org/>, 
+-L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>
++perl(1), Mail::SpamAssassin(3pm), L<http://www.spamassassin.org/>, 
++L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>, spamassassin(1p)

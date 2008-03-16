@@ -1,13 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 52-fix-multidest-lmtp.dpatch by Vladislav Kurz <vladki@brno-czfree.net>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Fix LMTP for multiple destinations (has multiple 250 OK replies)
-
-@DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.tGgV1c/trunk/spampd
---- trunk/spampd	2007-03-08 12:35:17.000000000 +0100
-+++ /tmp/dpep.tGgV1c/trunk/spampd	2007-03-08 12:35:17.727473996 +0100
+--- spampd.orig
++++ spampd
 @@ -166,14 +166,18 @@
  		return 0 unless defined($_ = $self->_getline);
  		s/[\r\n]*$//;

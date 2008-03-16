@@ -9,10 +9,10 @@
 #
 ### BEGIN INIT INFO
 # Provides:		spampd
-# Required-Start: 	$syslog $network $named $time
-# Required-Stop:  	$syslog $network $named $time
+# Required-Start: 	$remote_fs $syslog $network $named $time
+# Required-Stop:  	$remote_fs $syslog $network $named $time
 # Default-Start:	2 3 4 5
-# Default-Stop:		S 0 1 6
+# Default-Stop:		0 1 6
 # Short-Description:	spam detection proxy for SMTP and LMTP
 # Description: 		SpamAssassin based perl proxy for SMTP and LMTP
 #			which marks mails as spam/nonspam based on SpamAssassin

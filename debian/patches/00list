@@ -1,7 +1,0 @@
-30-fix-Makefile.dpatch
-45-fix-man-references.dpatch
-50-fix-fd-usage.dpatch
-52-fix-multidest-lmtp.dpatch
-55-workaround-for-syslog-regression.dpatch
-60-use-spampd-conf.dpatch
-65-use-proper-environent.dpatch

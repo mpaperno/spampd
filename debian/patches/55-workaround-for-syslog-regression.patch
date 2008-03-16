@@ -1,14 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 55-workaround-for-syslog-regression.dpatch by Sven Mueller <debian@incase.de>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Work aroung the changed behaviour of Net::Server's log() implementation
-## DP: Which started with version 0.89
-
-@DPATCH@
-diff -urNad trunk/spampd /tmp/dpep.pMxFJ5/trunk/spampd
---- trunk/spampd	2007-03-08 12:36:17.000000000 +0100
-+++ /tmp/dpep.pMxFJ5/trunk/spampd	2007-03-08 12:41:28.056138004 +0100
+--- spampd.orig
++++ spampd
 @@ -494,7 +494,12 @@
  		
  	    $msgid ||= "(unknown)";

@@ -5,6 +5,8 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+include /usr/share/quilt/quilt.make
+
 ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
 	CFLAGS += -g
 endif
@@ -13,14 +15,14 @@ ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
 endif
 
 configure: configure-stamp
-configure-stamp:
+configure-stamp: $(QUILT_STAMPFN)
 	dh_testdir
 	# Add here commands to configure the package.
 
 	touch configure-stamp
 
 
-build: patch build-stamp
+build: build-stamp
 
 build-stamp: configure-stamp 
 	dh_testdir
@@ -42,15 +44,6 @@ clean-patched:
 
 clean: clean-patched unpatch
 	rm -f spampd.orig
-
-patch: patch-stamp
-patch-stamp:
-	dpatch apply-all
-	touch patch-stamp
-
-unpatch:
-	dpatch deapply-all
-	rm -rf patch-stamp debian/patched
 
 install: build
 	dh_testdir

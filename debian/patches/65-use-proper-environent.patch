@@ -1,14 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 65-use-proper-environent.dpatch by Sven Mueller <sven@debian.org>
-##    most parts originally by Alexander Wirt <formorer@formorer.de>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: use a sane environment and a proper homedir
-
-@DPATCH@
-diff -urNad trunk~/spampd trunk/spampd
---- trunk~/spampd	2007-05-30 18:33:45.639246150 +0200
-+++ trunk/spampd	2007-05-30 18:56:26.233537774 +0200
+--- spampd.orig
++++ spampd
 @@ -746,10 +746,11 @@
  				$smtp_server->ok($destresp)
  					or die "Error in server->ok(client->hear): $!";

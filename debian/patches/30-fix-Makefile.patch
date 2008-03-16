@@ -1,13 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 30-fix-Makefile.dpatch by Sven Mueller <debian@incase.de>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Adjust Makefile to Debian's needs
-
-@DPATCH@
-diff -urNad trunk/Makefile /tmp/dpep.g7kFlz/trunk/Makefile
---- trunk/Makefile	2005-11-03 20:24:21.000000000 +0100
-+++ /tmp/dpep.g7kFlz/trunk/Makefile	2005-11-03 20:29:10.154385505 +0100
+--- Makefile.orig
++++ Makefile
 @@ -14,43 +14,39 @@
  INSTALL:="/usr/bin/install"
  LN:="ln"
