@@ -1,5 +1,5 @@
---- spampd.orig
-+++ spampd
+--- a/spampd.orig
++++ b/spampd
 @@ -746,10 +746,11 @@
  				$smtp_server->ok($destresp)
  					or die "Error in server->ok(client->hear): $!";

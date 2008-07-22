@@ -1,5 +1,5 @@
---- spampd.orig
-+++ spampd
+--- a/spampd.orig
++++ b/spampd
 @@ -1502,5 +1502,5 @@
  
  =head1 See Also

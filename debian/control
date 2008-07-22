@@ -3,7 +3,10 @@ Section: mail
 Priority: optional
 Maintainer: Sven Mueller <sven@debian.org>
 Build-Depends: debhelper (>= 4.0.0), quilt
-Standards-Version: 3.6.2.2
+Standards-Version: 3.7.3
+Vcs-Browser: https://mail.incase.de/viewcvs/trunk/?root=spampd
+Vcs-Svn: https://mail.incase.de/svn/spampd
+Homepage: http://www.worlddesign.com/index.cfm/rd/mta/spampd.htm
 
 Package: spampd
 Architecture: all
@@ -21,7 +24,7 @@ Description: spamassassin based SMTP/LMTP proxy daemon
  all needed perl modules on every invocation or spawn
  a C programme for every mail it receives. Compared to using
  spamc/spamd, spampd can usually provide a 25% performance
- with local-only tests.
+ increase with local-only tests.
  .
  The advantage of spampd over amavisd-new is that it uses the
  original SpamAssassin header tags, which are more verbose than

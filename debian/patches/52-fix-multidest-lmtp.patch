@@ -1,5 +1,5 @@
---- spampd.orig
-+++ spampd
+--- a/spampd.orig
++++ b/spampd
 @@ -166,14 +166,18 @@
  		return 0 unless defined($_ = $self->_getline);
  		s/[\r\n]*$//;

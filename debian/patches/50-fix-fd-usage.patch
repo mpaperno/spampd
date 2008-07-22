@@ -1,5 +1,5 @@
---- spampd.orig
-+++ spampd
+--- a/spampd.orig
++++ b/spampd
 @@ -881,7 +881,9 @@
  				syslog_ident => 'spampd',
  				syslog_facility => 'mail',
