@@ -105,6 +105,7 @@ function check_pid () {
 	# $1 : process name
 	# $2 : pid file
 	# $3 : (optional) verbosity
+	VERBOSE=""
 	[ "$3" = "verbose" ] && VERBOSE=1
 	if [ -f $2 ]; then
 		kill -0 `cat $2` > /dev/null 2>&1
@@ -118,7 +119,7 @@ function check_pid () {
 			return 1
 		fi
 	else
-		[ "$VERBOSE" ] && log_failure_msg "PIDFILE $2 for $1 doesn't exists."
+		[ "$VERBOSE" ] && log_failure_msg "PIDFILE $2 for $1 doesn't exist."
 		return 4
 	fi
 	return 3

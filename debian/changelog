@@ -1,3 +1,11 @@
+spampd (2.30-22) unstable; urgency=low
+
+  * Fix typo in init script
+  * Fix check_pid in init script to not take any pre-set VERBOSE environment
+    variable into account (closes: #505430)
+
+ -- Sven Mueller <sven@debian.org>  Wed, 12 Nov 2008 14:17:30 +0100
+
 spampd (2.30-21) unstable; urgency=low
 
   * upgrade policy version
