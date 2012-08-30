@@ -1,7 +1,10 @@
 SpamPD Change Log
 -----------------
+2.41 (11-Aug-10) (experimental)
 
-2.40 (10-Jan-09)
+- Added setting of user name at SA init time.
+
+2.40 (10-Jan-09) (experimental)
 
 - New config option to load a specific configuration file after the default
   local.cf file, thereby overriding any settings therein.  The new option is

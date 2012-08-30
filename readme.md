@@ -1,6 +1,8 @@
 # SpamPD
 
-<span style="color: red">NOTE: please see Download section for official release versions.  The repository version IS NOT THOUROUGHLY TESTED.</span>
+__NOTE: please see Download section for official release versions.  The repository version IS NOT THOUROUGHLY TESTED.__
+
+__Testers wanted!__
 
 spampd is a program used within an e-mail delivery system to scan messages for possible Unsolicited Commercial E-mail (UCE, aka spam) content. 
 It uses an excellent program called SpamAssassin (SA) to do the actual message scanning. spampd acts as a transparent SMTP/LMTP proxy between 
