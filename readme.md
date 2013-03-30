@@ -1,6 +1,6 @@
 # SpamPD
 
-__NOTE: please see Download section for official release versions.  The repository version IS NOT THOUROUGHLY TESTED.__
+__NOTE: please see <a href="https://github.com/mpaperno/spampd/downloads">Download section</a> for official release versions.  The repository version IS NOT THOUROUGHLY TESTED.__
 
 __Testers wanted!__
 
