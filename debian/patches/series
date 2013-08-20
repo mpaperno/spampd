@@ -5,3 +5,4 @@
 55-workaround-for-syslog-regression.patch
 60-use-spampd-conf.patch
 65-use-proper-environent.patch
+70-fix-pod.patch

@@ -1,3 +1,12 @@
+spampd (2.30-22.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix "FTBFS with perl 5.18: POD errors":
+    add patch 70-fix-pod.patch to fix POD syntax.
+    (Closes: #719505)
+
+ -- gregor herrmann <gregoa@debian.org>  Tue, 20 Aug 2013 16:58:25 +0200
+
 spampd (2.30-22) unstable; urgency=low
 
   * Fix typo in init script
