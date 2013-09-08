@@ -1156,9 +1156,9 @@ L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>.
 
 =head1 Requires
 
-=over 5
-
 Perl modules:
+
+=over 5
 
 =item B<Mail::SpamAssassin>
 
@@ -1487,10 +1487,10 @@ Prints usage information.
 
 =head2 Deprecated Options
 
-=over 5
-
 The following options are no longer used but still accepted for backwards
 compatibility with prevoius I<spampd> versions:
+
+=over 5
 
 =item  B<--dead-letters>
 
