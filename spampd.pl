@@ -870,6 +870,16 @@ if ( $logsock !~ /^(unix|inet)$/ ) {
 	usage(0);
 }
 
+# Untaint some options provided by admin command line.
+if($options{pid}) {
+	$options{pid} =~ /^(.*)$/; 
+	$options{pid} = $1;
+}
+if($options{logsock}) {
+	$options{logsock} =~ /^(.*)$/; 
+	$options{logsock} = $1;
+}
+
 if ( $options{tagall} ) { $tagall = 1; }
 if ( $options{'log-rules-hit'} ) { $rh = 1; }
 if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
@@ -909,7 +919,6 @@ if ( $saconfigfile != "" ) {
 	$sa_options->{ 'userprefs_filename' } = $saconfigfile; 
 	$use_user_prefs = 1;
 }
-
 
 #cleanup environment before starting SA (thanks to Alexander Wirt)
 $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin';
