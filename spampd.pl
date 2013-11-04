@@ -871,14 +871,24 @@ if ( $logsock !~ /^(unix|inet)$/ ) {
 }
 
 # Untaint some options provided by admin command line.
-if($options{pid}) {
-	$options{pid} =~ /^(.*)$/; 
-	$options{pid} = $1;
-}
-if($options{logsock}) {
-	$options{logsock} =~ /^(.*)$/; 
-	$options{logsock} = $1;
-}
+$logsock =~ /^(.)$/;
+$logsock = $1;
+
+$pidfile =~ /^(.)$/;
+$pidfile = $1;
+
+$relayhost =~ /^(.)$/;
+$relayhost = $1;
+
+$relayport =~ /^(.)$/;
+$relayport = $1;
+
+$host =~ /^(.)$/;
+$host = $1;
+
+$port =~ /^(.*)$/;
+$port = $1;
+#
 
 if ( $options{tagall} ) { $tagall = 1; }
 if ( $options{'log-rules-hit'} ) { $rh = 1; }
