@@ -3,10 +3,11 @@
 ######################
 # SpamPD - spam proxy daemon
 #
-# v2.41	- 11-Aug-10
-# v2.40	- 10-Jan-09
-# v2.32	 - 02-Feb-06
-# v2.30	 - 31-Oct-05
+# v2.42  - 08-Dec-13
+# v2.41  - 11-Aug-10
+# v2.40  - 10-Jan-09
+# v2.32  - 02-Feb-06
+# v2.30  - 31-Oct-05
 # v2.21  - 23-Oct-05
 # v2.20  - 05-Oct-04
 # v2.13  - 24-Nov-03
@@ -424,7 +425,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.30';
+our $VERSION = '2.42';
 
 sub process_message {
 	my ($self, $fh) = @_;
@@ -871,23 +872,17 @@ if ( $logsock !~ /^(unix|inet)$/ ) {
 }
 
 # Untaint some options provided by admin command line.
-$logsock =~ /^(.)$/;
-$logsock = $1;
+$logsock = $1 if $logsock =~ /^(.*)$/;
 
-$pidfile =~ /^(.)$/;
-$pidfile = $1;
+$pidfile = $1 if $pidfile =~ /^(.*)$/;
 
-$relayhost =~ /^(.)$/;
-$relayhost = $1;
+$relayhost = $1 if $relayhost =~ /^(.*)$/;
 
-$relayport =~ /^(.)$/;
-$relayport = $1;
+$relayport = $1 if $relayport =~ /^(.*)$/;
 
-$host =~ /^(.)$/;
-$host = $1;
+$host = $1 if $host =~ /^(.*)$/;
 
-$port =~ /^(.*)$/;
-$port = $1;
+$port = $1 if $port =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
