@@ -1,5 +1,9 @@
 SpamPD Change Log
 -----------------
+2.42 (08-Dec-13) (experimental)
+
+- Untaint some params for compatibility with Perl 5.18.
+
 2.41 (11-Aug-10) (experimental)
 
 - Added setting of user name at SA init time.
