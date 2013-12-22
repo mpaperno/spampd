@@ -1,3 +1,11 @@
+spampd (2.30-22.2) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Make program run with perl 5.18 by untainting several options.
+    (Closes: #722159)
+
+ -- Michael Meskes <meskes@debian.org>  Sun, 22 Dec 2013 10:26:53 +0100
+
 spampd (2.30-22.1) unstable; urgency=low
 
   * Non-maintainer upload.

@@ -1,0 +1,25 @@
+--- a/spampd	2013-11-04 16:03:52.000000000 +0100
++++ b/spampd	2013-11-04 16:05:05.000000000 +0100
+@@ -900,6 +900,22 @@
+ 	usage(0);
+ }
+ 
++# Untaint some options provided by admin command line.
++$pidfile =~ /^(.*)$/; 
++$pidfile = $1;
++
++$relayhost =~ /^(.*)$/; 
++$relayhost = $1;
++
++$relayport =~ /^(.*)$/;
++$relayport = $1;
++
++$host =~ /^(.*)$/; 
++$host = $1;
++
++$port =~ /^(.*)$/;
++$port = $1;
++
+ if ( $options{tagall} ) { $tagall = 1; }
+ if ( $options{'log-rules-hit'} ) { $rh = 1; }
+ if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
