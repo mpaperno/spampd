@@ -307,19 +307,19 @@ package SpamPD::Client;
 # =cut
 
 use strict;
-use IO::Socket;
+use IO::Socket::IP;
 
 # =item new(interface => $interface, port => $port[, timeout = 300]);
 #
 # The interface and port to talk to must be specified. The interface
 # must be a valid numeric IP address; the port must be numeric. If
 # this call succeeds, it returns a client structure with an open
-# IO::Socket::INET in it, ready to talk to. If it fails it dies,
+# IO::Socket::IP in it, ready to talk to. If it fails it dies,
 # so if you want anything other than an exit with an explanatory
 # error message, wrap the constructor call in an eval block and pull
 # the error out of $@ as usual. This is also the case for all other
 # methods; they succeed or they die. The timeout parameter is passed
-# on into the IO::Socket::INET constructor.
+# on into the IO::Socket::IP constructor.
 #
 # =cut
 
@@ -327,7 +327,7 @@ sub new {
     my ($this, @opts) = @_;
     my $class = ref($this) || $this;
     my $self = bless { timeout => 300, @opts }, $class;
-    $self->{sock} = IO::Socket::INET->new(
+    $self->{sock} = IO::Socket::IP->new(
 			PeerAddr => $self->{interface},
 			PeerPort => $self->{port},
 			Timeout => $self->{timeout},
@@ -1171,7 +1171,7 @@ Perl modules:
 
 =item B<IO::File>
 
-=item B<IO::Socket>
+=item B<IO::Socket::IP>
 
 =item B<Time::HiRes> (not actually required but recommended)
 
