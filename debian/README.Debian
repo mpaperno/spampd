@@ -2,9 +2,9 @@ SpamPD for Debian
 -----------------
 
 SpamPD configuration takes place in /etc/default/spampd as far as the network
-connections are concerned. Any more advanced configuration of the the
-SpamAssassin part is done in /etc/spamassassin/local.cf as usual with with
-SpamAssassin. Additionally, as of Debian package 2.30-5, it is now now possible
+connections are concerned. Any more advanced configuration of the
+SpamAssassin part is done in /etc/spamassassin/local.cf as usual with
+SpamAssassin. Additionally, as of Debian package 2.30-5, it is now possible
 to specify an additional configuration file which can override any option given
 in the system wide configuration of SpamAssassin.
 

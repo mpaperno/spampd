@@ -1,3 +1,13 @@
+spampd (2.30-22.3) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Updated to debhelper 9. (Closes: #817675)
+  * Bumped Standards-Version to 3.9.8, no updates needed.
+  * Fixed typos in README.Debian.
+  * Cleaned up lintian warnings.
+
+ -- Michael Meskes <meskes@debian.org>  Thu, 07 Jul 2016 16:55:02 +0200
+
 spampd (2.30-22.2) unstable; urgency=high
 
   * Non-maintainer upload.
