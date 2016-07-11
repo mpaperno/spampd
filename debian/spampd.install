@@ -1,0 +1,4 @@
+#!/usr/bin/dh-exec
+debian/spampd.paranoid.logcheck    =>  /etc/logcheck/ignore.d.paranoid/spampd
+debian/spampd.server.logcheck      =>  /etc/logcheck/ignore.d.server/spampd
+

@@ -65,6 +65,7 @@ binary-arch: build install
 # Build architecture-dependent files here.
 binary-indep: build install
 	dh_testdir
+	dh_install
 	dh_installdocs
 	dh_installinit --error-handler handle_init_errs
 	dh_installman
