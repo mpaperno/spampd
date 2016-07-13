@@ -2,3 +2,4 @@ usr/sbin
 var/cache/spampd
 etc/logcheck/ignore.d.paranoid
 etc/logcheck/ignore.d.server
+etc/spamassassin/sa-update-hooks.d

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+service spampd restart
+
+exit 0
+
