@@ -3,11 +3,15 @@
 
 # On boolean options, 0 means off/no/false, 1 means on/yes/true
 
-# Wether or not to start spampd (0/1)
+# The following options are used by SysV Init only, for Systemd please configure in service file.
+
+# Whether or not to start spampd (0/1) 
 STARTSPAMPD=1
 
 # where to put the PID file
 PIDFILE=/var/run/spampd.pid
+
+# Generic options start here
 
 # The IP to listen on
 LISTENHOST=127.0.0.1
@@ -30,18 +34,18 @@ USERID=spampd
 # group ID to run as
 GRPID=spampd
 
-# Wether or not to tag all messages (0/1)
+# Whether or not to tag all messages (0/1)
 TAGALL=1
 
-# Wether or not to use auto-whitelisting (0/1)
+# Whether or not to use auto-whitelisting (0/1)
 AUTOWHITELIST=0
 
-# Wether or not to do only local checks 
+# Whether or not to do only local checks 
 # if this is turned on, no network based checks
 # (like DNS-Blacklists) are done. (0/1)
 LOCALONLY=1
 
-# Wether to prefer INET (network,1) for syslog logging
+# Whether to prefer INET (network,1) for syslog logging
 # instead of UNIX (unix domain socket,0) (0/1)
 LOGINET=0
 

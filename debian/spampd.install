@@ -2,4 +2,6 @@
 debian/spampd.paranoid.logcheck => /etc/logcheck/ignore.d.paranoid/spampd
 debian/spampd.server.logcheck   => /etc/logcheck/ignore.d.server/spampd
 debian/spampd.sa-update-hook	=> /etc/spamassassin/sa-update-hooks.d/spampd
+debian/process_arguments.sh	=> /usr/share/spampd/process_arguments.sh
+
 

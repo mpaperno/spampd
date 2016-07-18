@@ -49,12 +49,12 @@ istrue () {
 }
 
 #
-# find out wether to start spampd or not
+# find out whether to start spampd or not
 #
 istrue ${STARTSPAMPD} && STARTSPAMPD='true'
 
 #
-# Check wether the program is actually there
+# Check whether the program is actually there
 #
 # return 5 as demanded by LSB 2.1 when program isn't installed.
 [  -x $PROGRAM ] || exit 5

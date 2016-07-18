@@ -1,3 +1,15 @@
+spampd (2.30-23) unstable; urgency=medium
+
+  * Took over as new maintainer.
+  * Moved source format to version 3.0.
+  * Restored original spampd.html.
+  * Added logcheck rules to filter log messages.
+    Thanks to Kevin Locke <kevin@kevinlocke.name> (Closes: #642467)
+  * Added hook so spampd is restarted after sa-update runs. (Closes: #800611)
+  * Added systemd service file.
+
+ -- Michael Meskes <meskes@debian.org>  Mon, 18 Jul 2016 17:20:29 +0200
+
 spampd (2.30-22.3) unstable; urgency=medium
 
   * Non-maintainer upload.
