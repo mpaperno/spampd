@@ -44,7 +44,7 @@ clean-patched:
 	dh_clean
 
 clean: clean-patched unpatch
-	rm -f spampd.orig
+	[ ! -f spampd.html.bck ] || mv -f spampd.html.bck spampd.html
 
 install: build
 	dh_testdir

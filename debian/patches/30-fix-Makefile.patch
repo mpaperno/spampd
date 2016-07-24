@@ -1,6 +1,6 @@
---- a/Makefile.orig
-+++ b/Makefile
-@@ -14,43 +14,39 @@
+--- a/Makefile.orig	2016-07-24 18:39:53.860605497 +0200
++++ b/Makefile	2016-07-24 18:41:11.120608675 +0200
+@@ -14,32 +14,13 @@
  INSTALL:="/usr/bin/install"
  LN:="ln"
  
@@ -17,13 +17,6 @@
 -	for i in ${RUNLEVELDIRS}; do \
 -		$(LN) -sf ${INITDIR}/spampd $i/S20spampd ; \
 -	done
-+#	$(INSTALL) -D -m 644 defaults ${ETCDIR}/default/spampd	
-+#	$(INSTALL) -D -m 755 spampd-init.sh $(DESTDIR)${INITDIR}/spampd
-+#	$(INSTALL) -D -m 644 spampd.html ${DOCDIR}/spampd.html
-+#	$(INSTALL) -D -m 644 changelog.txt ${DOCDIR}/changelog.txt
-+#	for i in ${RUNLEVELDIRS}; do \
-+#		$(LN) -sf ${INITDIR}/spampd $i/S20spampd ; \
-+#	done
  	$(INSTALL) -D -m 644 spampd.8.gz ${MANDIR}/man8/spampd.8.gz
  
 -uninstall:
@@ -41,22 +34,16 @@
  spampd.8.gz: spampd.8
  	gzip -9 < spampd.8 > spampd.8.gz
  
- spampd.8: spampd
-+	if [ -f spampd.8 ] && [ ! -f spampd.8.orig ] ; then mv -f spampd.8 spampd.8.orig ; fi
+@@ -47,10 +28,11 @@
  	pod2man --section=8 --center="Spam Proxy Daemon" spampd > spampd.8
  
  spampd.html: spampd
-+	if [ -f spampd.html ] && [ ! -f spampd.html.orig ] ; then mv -f spampd.html spampd.html.orig ; fi
++	if [ -f spampd.html ] && [ ! -f spampd.html.bck ] ; then mv -f spampd.html spampd.html.bck ; fi
  	pod2html --outfile spampd.html --header --norecurse --backlink '[Back to top]' --infile spampd
  	rm -f pod2htm?.tmp
  
  clean:
  	rm -f spampd.8.gz
-+	[ -f spampd.html.orig] && mv -f spampd.html.orig spampd.html
-+	[ -f spampd.8.orig] && mv -f spampd.8.orig spampd.8
-+
-+realclean:
-+	rm -f spampd.8.gz
  	rm -f spampd.8
- 	rm -f spampd.html
-+	rm -f spampd*.orig
+-	rm -f spampd.html
++	[ -f spampd.html.bck] && mv -f spampd.html.bck spampd.html
