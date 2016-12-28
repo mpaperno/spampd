@@ -913,10 +913,13 @@ my $sa_options = {
 		'dont_copy_prefs' => 1,
 		'debug' => $debug,
 		'local_tests_only' => $options{'local-only'} || 0,
-		'home_dir_for_helpers' => $sa_home_dir, 
-		'userstate_dir' => $sa_home_dir, 
 		'username' => $user
 };
+
+if($sa_home_dir) {
+	$sa_options->{ 'home_dir_for_helpers' } = $sa_home_dir;
+	$sa_options->{ 'userstate_dir' } = $sa_home_dir;
+}
 
 my $use_user_prefs = 0;
 
