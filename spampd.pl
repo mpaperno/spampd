@@ -327,13 +327,21 @@ sub new {
     my ($this, @opts) = @_;
     my $class = ref($this) || $this;
     my $self = bless { timeout => 300, @opts }, $class;
-    $self->{sock} = IO::Socket::IP->new(
+	if (defined $self->{unix_socket}) {
+		$self->{sock} = IO::Socket::UNIX->new(
+			Peer => $self->{unix_socket},
+			Timeout => $self->{timeout},
+			Type => SOCK_STREAM,
+		);
+	} else {
+		$self->{sock} = IO::Socket::IP->new(
 			PeerAddr => $self->{interface},
 			PeerPort => $self->{port},
 			Timeout => $self->{timeout},
 			Proto => 'tcp',
 			Type => SOCK_STREAM,
-	    );
+		);
+	}
     die "$0: socket connect failure: $!\n" unless defined $self->{sock};
     return $self;
 }
@@ -638,7 +646,8 @@ sub process_request {
 	    
 	# start an smtp "client" (really a sending server)
 	my $client = SpamPD::Client->new(interface => $self->{spampd}->{relayhost}, 
-					   port => $self->{spampd}->{relayport});
+					   port => $self->{spampd}->{relayport},
+					   unix_socket => $self->{spampd}->{unix_relaysocket});
 	unless ( defined $client ) {
 	  die "Failed to create sending Client: $!"; }
 
@@ -973,7 +982,7 @@ if (defined $socket) {
 my $server = bless {
     server => {host => $host,
 				port => \@ports,
-				socket => $socket,
+				unix_socket => $socket,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
@@ -993,7 +1002,7 @@ my $server = bless {
 		      },
     spampd => { relayhost => $relayhost,
 				relayport => $relayport,
-				relaysocket => $relaysocket,
+				unix_relaysocket => $relaysocket,
 				tagall => $tagall,
 				maxsize => $maxsize,
 				assassin => $assassin,
