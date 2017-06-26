@@ -782,8 +782,10 @@ sub mylog($$$) {
 
 my $relayhost = '127.0.0.1'; # relay to ip
 my $relayport = 25; # relay to port
+my $relaysocket;
 my $host = '127.0.0.1'; # listen on ip
 my $port = 10025; # listen on port
+my $socket;
 my $children = 5; # number of child processes (servers) to spawn at start
 # my $maxchildren = $children; # max. number of child processes (servers) to spawn
 my $maxrequests = 20; # max requests handled by child b4 dying
@@ -812,8 +814,10 @@ my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA file
 
 my %options = (port => \$port,
 	       host => \$host,
+	       socket => \$socket,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
+	       relaysocket => \$relaysocket,
 	       pid => \$pidfile,
 	       user => \$user,
 	       group => \$group,
@@ -833,8 +837,10 @@ my %options = (port => \$port,
 usage(1) unless GetOptions(\%options,
 		   'port=i',
 		   'host=s',
+		   'socket=s',
 		   'relayhost=s',
 		   'relayport=i',
+		   'relaysocket=s',
 		   'children|c=i',
 		   # 'maxchildren|mc=i',
 		   'maxrequests|mr=i',
@@ -880,9 +886,13 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
+$relaysocket = $1 if $relaysocket =~ /^(.*)$/;
+
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
+
+$socket = $1 if $socket =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -951,10 +961,19 @@ if ( !$options{logsock} ) {
 	};
 }
 
+# Net::Server wants UNIX sockets passed via port too. This part
+# decides what we want to pass.
+my @ports;
+if (defined $socket) {
+	@ports = ($socket . '|unix');
+} else {
+	@ports = ($port);
+}
 
 my $server = bless {
     server => {host => $host,
-				port => [ $port ],
+				port => \@ports,
+				socket => $socket,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
@@ -974,6 +993,7 @@ my $server = bless {
 		      },
     spampd => { relayhost => $relayhost,
 				relayport => $relayport,
+				relaysocket => $relaysocket,
 				tagall => $tagall,
 				maxsize => $maxsize,
 				assassin => $assassin,
