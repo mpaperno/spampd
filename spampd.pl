@@ -770,6 +770,17 @@ sub process_request {
 }
 
 # Net::Server hook
+# After binding listening sockets
+sub post_bind_hook {
+	my $self = shift;
+	my $server = $self->{server};
+	if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
+		my $mode = oct($server->{unix_socket_perms});
+		chmod $mode, $server->{unix_socket} or die $@;
+	}
+}
+
+# Net::Server hook
 # about to exit child process
 sub child_finish_hook {
     my($self) = shift;
@@ -795,6 +806,7 @@ my $relaysocket;
 my $host = '127.0.0.1'; # listen on ip
 my $port = 10025; # listen on port
 my $socket;
+my $socket_perms;
 my $children = 5; # number of child processes (servers) to spawn at start
 # my $maxchildren = $children; # max. number of child processes (servers) to spawn
 my $maxrequests = 20; # max requests handled by child b4 dying
@@ -824,6 +836,7 @@ my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA file
 my %options = (port => \$port,
 	       host => \$host,
 	       socket => \$socket,
+	       'socket-perms' => \$socket_perms,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
 	       relaysocket => \$relaysocket,
@@ -847,6 +860,7 @@ usage(1) unless GetOptions(\%options,
 		   'port=i',
 		   'host=s',
 		   'socket=s',
+		   'socket-perms=s',
 		   'relayhost=s',
 		   'relayport=i',
 		   'relaysocket=s',
@@ -902,6 +916,8 @@ $host = $1 if $host =~ /^(.*)$/;
 $port = $1 if $port =~ /^(.*)$/;
 
 $socket = $1 if $socket =~ /^(.*)$/;
+
+$socket_perms = $1 if $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -983,6 +999,7 @@ my $server = bless {
     server => {host => $host,
 				port => \@ports,
 				unix_socket => $socket,
+				unix_socket_perms => $socket_perms,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
