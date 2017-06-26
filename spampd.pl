@@ -327,13 +327,21 @@ sub new {
     my ($this, @opts) = @_;
     my $class = ref($this) || $this;
     my $self = bless { timeout => 300, @opts }, $class;
-    $self->{sock} = IO::Socket::IP->new(
+	if (defined $self->{unix_socket}) {
+		$self->{sock} = IO::Socket::UNIX->new(
+			Peer => $self->{unix_socket},
+			Timeout => $self->{timeout},
+			Type => SOCK_STREAM,
+		);
+	} else {
+		$self->{sock} = IO::Socket::IP->new(
 			PeerAddr => $self->{interface},
 			PeerPort => $self->{port},
 			Timeout => $self->{timeout},
 			Proto => 'tcp',
 			Type => SOCK_STREAM,
-	    );
+		);
+	}
     die "$0: socket connect failure: $!\n" unless defined $self->{sock};
     return $self;
 }
@@ -638,7 +646,8 @@ sub process_request {
 	    
 	# start an smtp "client" (really a sending server)
 	my $client = SpamPD::Client->new(interface => $self->{spampd}->{relayhost}, 
-					   port => $self->{spampd}->{relayport});
+					   port => $self->{spampd}->{relayport},
+					   unix_socket => $self->{spampd}->{unix_relaysocket});
 	unless ( defined $client ) {
 	  die "Failed to create sending Client: $!"; }
 
@@ -761,6 +770,17 @@ sub process_request {
 }
 
 # Net::Server hook
+# After binding listening sockets
+sub post_bind_hook {
+	my $self = shift;
+	my $server = $self->{server};
+	if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
+		my $mode = oct($server->{unix_socket_perms});
+		chmod $mode, $server->{unix_socket} or die $@;
+	}
+}
+
+# Net::Server hook
 # about to exit child process
 sub child_finish_hook {
     my($self) = shift;
@@ -782,8 +802,11 @@ sub mylog($$$) {
 
 my $relayhost = '127.0.0.1'; # relay to ip
 my $relayport = 25; # relay to port
+my $relaysocket;
 my $host = '127.0.0.1'; # listen on ip
 my $port = 10025; # listen on port
+my $socket;
+my $socket_perms;
 my $children = 5; # number of child processes (servers) to spawn at start
 # my $maxchildren = $children; # max. number of child processes (servers) to spawn
 my $maxrequests = 20; # max requests handled by child b4 dying
@@ -812,8 +835,11 @@ my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA file
 
 my %options = (port => \$port,
 	       host => \$host,
+	       socket => \$socket,
+	       'socket-perms' => \$socket_perms,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
+	       relaysocket => \$relaysocket,
 	       pid => \$pidfile,
 	       user => \$user,
 	       group => \$group,
@@ -833,8 +859,11 @@ my %options = (port => \$port,
 usage(1) unless GetOptions(\%options,
 		   'port=i',
 		   'host=s',
+		   'socket=s',
+		   'socket-perms=s',
 		   'relayhost=s',
 		   'relayport=i',
+		   'relaysocket=s',
 		   'children|c=i',
 		   # 'maxchildren|mc=i',
 		   'maxrequests|mr=i',
@@ -880,9 +909,15 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
+$relaysocket = $1 if $relaysocket =~ /^(.*)$/;
+
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
+
+$socket = $1 if $socket =~ /^(.*)$/;
+
+$socket_perms = $1 if $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -951,10 +986,20 @@ if ( !$options{logsock} ) {
 	};
 }
 
+# Net::Server wants UNIX sockets passed via port too. This part
+# decides what we want to pass.
+my @ports;
+if (defined $socket) {
+	@ports = ($socket . '|unix');
+} else {
+	@ports = ($port);
+}
 
 my $server = bless {
     server => {host => $host,
-				port => [ $port ],
+				port => \@ports,
+				unix_socket => $socket,
+				unix_socket_perms => $socket_perms,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
@@ -974,6 +1019,7 @@ my $server = bless {
 		      },
     spampd => { relayhost => $relayhost,
 				relayport => $relayport,
+				unix_relaysocket => $relaysocket,
 				tagall => $tagall,
 				maxsize => $maxsize,
 				assassin => $assassin,
