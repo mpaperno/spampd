@@ -1050,10 +1050,13 @@ Options:
   --host=host[:port]       Hostname/IP and optional port to listen on. 
 	                          Default is 127.0.0.1 port 10025
   --port=n                 Port to listen on (alternate syntax to above).
+  --socket=socketpath      UNIX socket to listen on. Alternative to
+                                  --host and --port.
   --relayhost=host[:port]  Host to relay mail to. 
 	                          Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
-  
+  --relaysocket            UNIX socket to relay to. Alternative to
+                                  --relayhost and --relayport.
   --children=n             Number of child processes (servers) to start and
                                keep running. Default is 5 (plus 1 parent proc).
   --maxrequests=n          Maximum requests that each child can process before
@@ -1159,6 +1162,8 @@ SpamPD - Spam Proxy Daemon (version 2.2)
 B<spampd>
 [B<--host=host[:port]>]
 [B<--relayhost=hostname[:port]>]
+[B<--socket>]
+[B<--relaysocket>]
 [B<--user|u=username>]
 [B<--group|g=groupname>]
 [B<--children|c=n>]
@@ -1365,6 +1370,11 @@ public interface (IP address) unless you know exactly what you're doing!
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
 
+=item B<--socket=socketpath>
+
+Specifies what UNIX socket I<spampd> listens on. If this is specified,
+--host and --port are ignored.
+
 =item B<--relayhost=ip[:port] or hostname[:port]>
 
 Specifies the hostname/IP where I<spampd> will relay all
@@ -1375,6 +1385,11 @@ defaults to 25.
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an 
 alternate to using the above --relayhost=ip:port notation.
+
+=item B<--relaysocket=socketpath>
+
+Spevifies what UNIX socket spampd will relay to. If this is specified
+--relayhost and --relayport will be ignored.
 
 =item B<--user=username> or B<--u=username>
 
