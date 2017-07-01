@@ -1052,6 +1052,8 @@ Options:
   --port=n                 Port to listen on (alternate syntax to above).
   --socket=socketpath      UNIX socket to listen on. Alternative to
                                   --host and --port.
+  --socket-perms=perms     The file mode to set on the created UNIX
+                                  socket in octal format.
   --relayhost=host[:port]  Host to relay mail to. 
 	                          Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
@@ -1163,6 +1165,7 @@ B<spampd>
 [B<--host=host[:port]>]
 [B<--relayhost=hostname[:port]>]
 [B<--socket>]
+[B<--socket-perms>]
 [B<--relaysocket>]
 [B<--user|u=username>]
 [B<--group|g=groupname>]
@@ -1374,6 +1377,11 @@ port 10025. This is an alternate to using the above --host=ip:port notation.
 
 Specifies what UNIX socket I<spampd> listens on. If this is specified,
 --host and --port are ignored.
+
+=item B<--socket-perms=mode>
+
+The file mode fo the created UNIX socket (see --socket) in octal
+format, e.g. 700 to specify acces only for the user spampd is run as.
 
 =item B<--relayhost=ip[:port] or hostname[:port]>
 
@@ -1591,6 +1599,20 @@ on another host.
 and the SA auto-whitelist feature
 
   spampd --port=10025 --relayhost=127.0.0.1:10026 --auto-whitelist
+
+=item Using UNIX sockets instead if INET ports
+
+Spampd listens on the UNIX socket /var/run/spampd.socket with
+persmissions 700 instead of a TCP port:
+
+spampd --socket /var/run/spampd.socket --socket-perms 700
+
+Spampd will relay mail to /var/run/dovecot/lmtp instead of a TCP port:
+
+spampd --relaysocket /var/run/dovecot/lmtp
+
+Remember that the user spampd runs as needs to have read AND write
+permissions on the relaysocket!
 
 =back
 
