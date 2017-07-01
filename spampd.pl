@@ -327,13 +327,21 @@ sub new {
     my ($this, @opts) = @_;
     my $class = ref($this) || $this;
     my $self = bless { timeout => 300, @opts }, $class;
-    $self->{sock} = IO::Socket::IP->new(
+	if (defined $self->{unix_socket}) {
+		$self->{sock} = IO::Socket::UNIX->new(
+			Peer => $self->{unix_socket},
+			Timeout => $self->{timeout},
+			Type => SOCK_STREAM,
+		);
+	} else {
+		$self->{sock} = IO::Socket::IP->new(
 			PeerAddr => $self->{interface},
 			PeerPort => $self->{port},
 			Timeout => $self->{timeout},
 			Proto => 'tcp',
 			Type => SOCK_STREAM,
-	    );
+		);
+	}
     die "$0: socket connect failure: $!\n" unless defined $self->{sock};
     return $self;
 }
@@ -638,7 +646,8 @@ sub process_request {
 	    
 	# start an smtp "client" (really a sending server)
 	my $client = SpamPD::Client->new(interface => $self->{spampd}->{relayhost}, 
-					   port => $self->{spampd}->{relayport});
+					   port => $self->{spampd}->{relayport},
+					   unix_socket => $self->{spampd}->{unix_relaysocket});
 	unless ( defined $client ) {
 	  die "Failed to create sending Client: $!"; }
 
@@ -761,6 +770,17 @@ sub process_request {
 }
 
 # Net::Server hook
+# After binding listening sockets
+sub post_bind_hook {
+	my $self = shift;
+	my $server = $self->{server};
+	if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
+		my $mode = oct($server->{unix_socket_perms});
+		chmod $mode, $server->{unix_socket} or die $@;
+	}
+}
+
+# Net::Server hook
 # about to exit child process
 sub child_finish_hook {
     my($self) = shift;
@@ -782,8 +802,11 @@ sub mylog($$$) {
 
 my $relayhost = '127.0.0.1'; # relay to ip
 my $relayport = 25; # relay to port
+my $relaysocket;
 my $host = '127.0.0.1'; # listen on ip
 my $port = 10025; # listen on port
+my $socket;
+my $socket_perms;
 my $children = 5; # number of child processes (servers) to spawn at start
 # my $maxchildren = $children; # max. number of child processes (servers) to spawn
 my $maxrequests = 20; # max requests handled by child b4 dying
@@ -812,8 +835,11 @@ my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA file
 
 my %options = (port => \$port,
 	       host => \$host,
+	       socket => \$socket,
+	       'socket-perms' => \$socket_perms,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
+	       relaysocket => \$relaysocket,
 	       pid => \$pidfile,
 	       user => \$user,
 	       group => \$group,
@@ -833,8 +859,11 @@ my %options = (port => \$port,
 usage(1) unless GetOptions(\%options,
 		   'port=i',
 		   'host=s',
+		   'socket=s',
+		   'socket-perms=s',
 		   'relayhost=s',
 		   'relayport=i',
+		   'relaysocket=s',
 		   'children|c=i',
 		   # 'maxchildren|mc=i',
 		   'maxrequests|mr=i',
@@ -880,9 +909,15 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
+$relaysocket = $1 if $relaysocket =~ /^(.*)$/;
+
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
+
+$socket = $1 if $socket =~ /^(.*)$/;
+
+$socket_perms = $1 if $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -951,10 +986,20 @@ if ( !$options{logsock} ) {
 	};
 }
 
+# Net::Server wants UNIX sockets passed via port too. This part
+# decides what we want to pass.
+my @ports;
+if (defined $socket) {
+	@ports = ($socket . '|unix');
+} else {
+	@ports = ($port);
+}
 
 my $server = bless {
     server => {host => $host,
-				port => [ $port ],
+				port => \@ports,
+				unix_socket => $socket,
+				unix_socket_perms => $socket_perms,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
@@ -974,6 +1019,7 @@ my $server = bless {
 		      },
     spampd => { relayhost => $relayhost,
 				relayport => $relayport,
+				unix_relaysocket => $relaysocket,
 				tagall => $tagall,
 				maxsize => $maxsize,
 				assassin => $assassin,
@@ -1004,10 +1050,15 @@ Options:
   --host=host[:port]       Hostname/IP and optional port to listen on. 
 	                          Default is 127.0.0.1 port 10025
   --port=n                 Port to listen on (alternate syntax to above).
+  --socket=socketpath      UNIX socket to listen on. Alternative to
+                                  --host and --port.
+  --socket-perms=perms     The file mode to set on the created UNIX
+                                  socket in octal format.
   --relayhost=host[:port]  Host to relay mail to. 
 	                          Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
-  
+  --relaysocket            UNIX socket to relay to. Alternative to
+                                  --relayhost and --relayport.
   --children=n             Number of child processes (servers) to start and
                                keep running. Default is 5 (plus 1 parent proc).
   --maxrequests=n          Maximum requests that each child can process before
@@ -1113,6 +1164,9 @@ SpamPD - Spam Proxy Daemon (version 2.2)
 B<spampd>
 [B<--host=host[:port]>]
 [B<--relayhost=hostname[:port]>]
+[B<--socket>]
+[B<--socket-perms>]
+[B<--relaysocket>]
 [B<--user|u=username>]
 [B<--group|g=groupname>]
 [B<--children|c=n>]
@@ -1319,6 +1373,16 @@ public interface (IP address) unless you know exactly what you're doing!
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
 
+=item B<--socket=socketpath>
+
+Specifies what UNIX socket I<spampd> listens on. If this is specified,
+--host and --port are ignored.
+
+=item B<--socket-perms=mode>
+
+The file mode fo the created UNIX socket (see --socket) in octal
+format, e.g. 700 to specify acces only for the user spampd is run as.
+
 =item B<--relayhost=ip[:port] or hostname[:port]>
 
 Specifies the hostname/IP where I<spampd> will relay all
@@ -1329,6 +1393,11 @@ defaults to 25.
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an 
 alternate to using the above --relayhost=ip:port notation.
+
+=item B<--relaysocket=socketpath>
+
+Spevifies what UNIX socket spampd will relay to. If this is specified
+--relayhost and --relayport will be ignored.
 
 =item B<--user=username> or B<--u=username>
 
@@ -1530,6 +1599,20 @@ on another host.
 and the SA auto-whitelist feature
 
   spampd --port=10025 --relayhost=127.0.0.1:10026 --auto-whitelist
+
+=item Using UNIX sockets instead if INET ports
+
+Spampd listens on the UNIX socket /var/run/spampd.socket with
+persmissions 700 instead of a TCP port:
+
+spampd --socket /var/run/spampd.socket --socket-perms 700
+
+Spampd will relay mail to /var/run/dovecot/lmtp instead of a TCP port:
+
+spampd --relaysocket /var/run/dovecot/lmtp
+
+Remember that the user spampd runs as needs to have read AND write
+permissions on the relaysocket!
 
 =back
 
