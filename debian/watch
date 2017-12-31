@@ -1,7 +1,3 @@
-# Example watch control file for uscan
-version=2
-# Rename this file to "watch" and then you can run the "uscan" command
-# to check for upstream updates and more.
-# Site		Directory		Pattern			Version	Script
-#sunsite.unc.edu	/pub/Linux/Incoming	spampd-(.*)\.tar\.gz	debian	uupdate
-http://www.worlddesign.com/index.cfm/rd/mta/spampd.htm .*\/spampd\/spampd-([\d\.]*).tar.gz	debian uupdate
+version=4
+opts=filenamemangle=s/.+\/v?(\d\S+)\.tar\.gz/spampd-$1\.tar\.gz/ \
+  https://github.com/mpaperno/spampd/tags .*/v?(\d\S+)\.tar\.gz
