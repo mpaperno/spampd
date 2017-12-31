@@ -1,6 +1,43 @@
 SpamPD Change Log
 -----------------
+2.42 (08-Dec-13) (experimental)
 
+- Untaint some params for compatibility with Perl 5.18.
+
+2.41 (11-Aug-10) (experimental)
+
+- Added setting of user name at SA init time.
+
+2.40 (10-Jan-09) (experimental)
+
+- New config option to load a specific configuration file after the default
+  local.cf file, thereby overriding any settings therein.  The new option is
+  --saconfig=filename. Thanks to Sven Mueller for code and Bernd Zeimetz for 
+  bringing it up. (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=344373)
+  
+- Integrated code by Alexander Wirt to introduce a parameter which
+  sets a proper home directory (--homedir=path) and also cleans up the 
+  environment before backgrounding. 
+  (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=421100)
+  * NOTE: * default homedir is /var/spool/spamassassin/spampd which needs to be 
+  writable by the user spampd is running as.  Previously, some files like the
+  auto-whitelist were written to the .spamassassin folder inside the users home
+  directory who started spampd, typically root.
+  
+- Integrated fix from Vladislav Kurz for LMTP multi-line response after DATA
+  is sent. (http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=395355)
+  
+- Yet another fix for older Net::Server versions (<= 0.87) dying when logging 
+  a % character to Sys::Syslog. This also fixes the bug in 2.30 that logs "%s"
+  instead of the actual messages on some system.
+  
+- Fixed bug with temp files sticking around until spampd child exists, 
+  introduced when SA 3.0 was released 
+  (https://issues.apache.org/SpamAssassin/show_bug.cgi?id=5444).
+  Thanks to Simon Matter for bringing this to my attention.
+
+########
+  
 2.30 (31-Oct-05)
 - Another, hopefully final, fix for the Sys::Syslog issue of % signs in the log
   string. Fixes possible DoS vulnerability. Thanks to Sven Mueller and Florian 

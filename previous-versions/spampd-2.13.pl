@@ -1,11 +1,8 @@
-#!/usr/bin/perl -T
+#! /usr/bin/perl -T
 
 ######################
 # SpamPD - spam proxy daemon
 #
-# v2.30	 - 31-Oct-05
-# v2.21  - 23-Oct-05
-# v2.20  - 05-Oct-04
 # v2.13  - 24-Nov-03
 # v2.12  - 15-Nov-03
 # v2.11  - 15-Jul-03
@@ -399,6 +396,7 @@ use Net::Server::PreForkSimple;
 use IO::File;
 use Getopt::Long;
 use Mail::SpamAssassin;
+use Mail::SpamAssassin::NoMailAudit;
 
 BEGIN {
   # Load Time::HiRes if it's available
@@ -413,7 +411,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.30';
+our $VERSION = '2.12';
 
 sub process_message {
 	my ($self, $fh) = @_;
@@ -425,10 +423,6 @@ sub process_message {
 	my $start = time;
     # use the assassin object created during startup
     my $assassin = $self->{spampd}->{assassin};
-    my $sa_version = Mail::SpamAssassin::Version();
-    # $sa_version can have a non-numeric value if version_tag is
-    # set in local.cf. Only take first numeric value
-    $sa_version =~ s/([0-9]*\.[0-9]*).*/$1/;
 
     # this gets info about the message temp file
     (my $dev,my $ino,my $mode,my $nlink,my $uid,
@@ -439,58 +433,30 @@ sub process_message {
     # Only process message under --maxsize KB
     if ( $size < ($self->{spampd}->{maxsize} * 1024) ) {
 	    
-	    my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
-	    
-	    my $inhdr = 1;
-	    my $envfrom = 0;
-	    my $envto = 0;
-	    my $addedenvto = 0;
-	    
-		$recips = "@{$self->{smtp_server}->{to}}";
-		if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/ ) {$sender = $1;}
-	    $recips ||= "(unknown)";
-		$sender ||= "(unknown)";
-	    
-		## read message into array of lines to feed to SA
-	    
-	    # loop over message file content
+		# read message into array of lines to feed to SA
+		# notes in the SA::NoMailAudit code indicate it should take a
+		# filehandle... but that doesn't seem to work  :-/
+	    my (@msglines, $msgid, $tmp);
+	    my $inhdr=1;
 	    $fh->seek(0,0) or die "Can't rewind message file: $!";
 		while (<$fh>) { 
-			$envto = 1 if (/^(?:X-)?Envelope-To: /);
-			$envfrom = 1 if (/^(?:X-)?Envelope-From: /);
-			if ( (/^\r?\n$/) && ($inhdr ==1) ) {
-    	    	$inhdr = 0; # outside of msg header after first blank line
-    	    	if ( ( $self->{spampd}->{envelopeheaders} || 
-	    				$self->{spampd}->{setenvelopefrom} ) && 
-	    				$envfrom == 0 ) {
-		    		push(@msglines, "X-Envelope-From: $sender\r\n");
-					if ( $self->{spampd}->{debug} ) {
-					  $self->log(2, "Added X-Envelope-From"); }
-	    		}
-    	    	if ( $self->{spampd}->{envelopeheaders} && $envto == 0 ) {
-	       	 		push(@msglines, "X-Envelope-To: $recips\r\n");
-	        		$addedenvto = 1;
-					if ( $self->{spampd}->{debug} ) {
-					  $self->log(2, "Added X-Envelope-To"); }
-				}
-    	    }
 			push(@msglines, $_);
-			# find the Message-ID for logging (code is mostly from spamd)
+            $inhdr = 0 if (/^\r?\n$/); # outside of msg header after first blank line
+			# find the Message-ID for logging (code is from spamd)
             if ( $inhdr && /^Message-Id:\s+(.*?)\s*$/i ) {
                 $msgid = $1;
-                while ( $msgid =~ s/\([^\(\)]*\)// ) { } # remove comments and
-				$msgid =~ s/^\s+|\s+$//g;          # leading and trailing spaces
-				$msgid =~ s/\s+/ /g;               # collapse whitespaces
-				$msgid =~ s/^.*?<(.*?)>.*$/$1/;    # keep only the id itself
-				$msgid =~ s/[^\x21-\x7e]/?/g;      # replace all weird chars
-				$msgid =~ s/[<>]/?/g;              # plus all dangling angle brackets
-				$msgid =~ s/^(.+)$/<$1>/;          # re-bracket the id (if not empty)
+                while($msgid =~ s/\([^\(\)]*\)//) {};    # remove comments and
+                $msgid =~ s/^\s+|\s+$//g;                # leading and trailing spaces
+                $msgid =~ s/\s.*$//;                     # keep only the first token
+                $msgid =~ s/%/%%/g;	   # escape % because Sys::Syslog uses sprintf()
             }
 		}
 		
-	    $msgid ||= "(unknown)";
+		my $recips = "@{$self->{smtp_server}->{to}}";
+	    $msgid  ||= "(unknown)";
+	    $recips ||= "(unknown)";
 	    
-	    $self->log(2, "%s", "processing message $msgid for ". $recips);
+	    $self->log(2, "processing message $msgid for ". $recips);
 	    
 		eval {
 			
@@ -499,69 +465,47 @@ sub process_message {
 			my $previous_alarm = alarm($self->{spampd}->{satimeout}); 
 			
 			# Audit the message
-			if ($sa_version >= 3) {
-				$mail = $assassin->parse(\@msglines, 0);
-				undef @msglines;  #clear some memory-- this screws up SA < v3
-			} elsif ($sa_version >= 2.70) {
-				$mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
-			} else {
-		   		$mail = Mail::SpamAssassin::NoMailAudit->new (
+		    my $mail = Mail::SpamAssassin::NoMailAudit->new (
 		                            data => \@msglines );
-			}
 	
-			
-		    # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
+		    # Check spamminess
 		    my $status = $assassin->check($mail);
 		    
 			if ( $self->{spampd}->{debug} ) {
 			  $self->log(2, "Returned from checking by SpamAssassin"); }
-
-			#  Rewrite mail if high spam factor or options --tagall
-			if ( $status->is_spam || $self->{spampd}->{tagall} ) { 
+			  
+			my $addingHeader = 0;
+		    if ( $self->{spampd}->{addheader} && length($self->{spampd}->{myhostname}) ) {
+	        	$mail->put_header("X-Spam-Checked-By", $self->{spampd}->{myhostname});
+	        	$addingHeader = 1;
+        	}
+	        	
+			#  Rewrite mail if high spam factor or options --tagall or --add-sc-header
+			if ( $status->is_spam || $self->{spampd}->{tagall} || $addingHeader ) { 
 				
-				if ( $self->{spampd}->{debug} ) {
-				  $self->log(2, "Rewriting mail using SpamAssassin"); }
-		    
-				# use Mail::SpamAssassin:PerMsgStatus object to rewrite message
-				if ( $sa_version >= 3 ) {
-					$msg_resp = $status->rewrite_mail; 
-				} else {
-				# SA versions prior to 3 need to get the response in a different manner
+				# if spam or --tagall, have SA put in its report/headers.
+				if ( $status->is_spam || $self->{spampd}->{tagall} ) {
+					if ( $self->{spampd}->{debug} ) {
+					  $self->log(2, "Rewriting mail using SpamAssassin"); }
+			    
 					$status->rewrite_mail; 
-			    	$msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
+					
 				}
 				
+			    my $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
+			    my @resplines = split(/\r?\n/, $msg_resp);
+				    
 			    # Build the new message to relay
 			    # pause the timeout alarm while we do this (no point in timing
 			    # out here and leaving a half-written file).
-			    my @resplines = split(/\r?\n/, $msg_resp);
 			    my $pause_alarm = alarm(0);
-			    my $inhdr = 1;
-			    my $skipline = 0;
 			    $fh->seek(0,0) or die "Can't rewind message file: $!";
 			    $fh->truncate(0) or die "Can't truncate message file: $!";
 			    my $arraycont = @resplines; 
-			    
-				for ( 0..($arraycont-1) ) {  
-					$inhdr=0 if ($resplines[$_] =~ m/^\r?\n$/);
-					
-					# if we are still in the header, skip over any
-					# "X-Envelope-To: " line if we have previously added it.
-					if ( $inhdr == 1 && 
-						 	$addedenvto == 1 &&
-						 	$resplines[$_] =~ m/^X-Envelope-To: .*$/) {
-						$skipline = 1;
-						if ( $self->{spampd}->{debug} ) {
-						  $self->log(2, "Removing X-Envelope-To"); }
-					}
-					
-					if (! $skipline) {
-						$fh->print($resplines[$_] . "\r\n") 
-					    	or die "Can't print to message file: $!"; 
-					} else { 
-						$skipline = 0; }
+				for ( 0..$arraycont ) {  
+					$fh->print($resplines[$_] . "\r\n") 
+						or die "Can't print to message file: $!"; 
 				}
-				
 				#restart the alarm
 				alarm($pause_alarm);
 	    
@@ -574,12 +518,12 @@ sub process_message {
 		    my $msg_threshold = sprintf("%.2f",$status->get_required_hits);
 		    my $proc_time = sprintf("%.2f", time - $start);
 		    
-			$self->log(2, "%s", "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
-							"$recips in ". $proc_time . "s, $size bytes.");
+			$self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) for ".
+							"$recips in $proc_time seconds, $size bytes.");
 			
 			# thanks to Kurt Andersen for this idea
 			if ( $self->{spampd}->{rh} ) {			
-				$self->log(2, "%s", "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
+				$self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
 	
 		    $status->finish();
      
@@ -589,7 +533,7 @@ sub process_message {
 		};
 	
 		if ( $@ ne '' ) {
-		  $self->log(1, "%s", "WARNING!! SpamAssassin error on message $msgid: $@");
+		  $self->log(1, "WARNING!! SpamAssassin error on message $msgid: $@");
 	      return 0;
 	    }
 	
@@ -679,7 +623,7 @@ sub process_request {
 		
 		#close the temp file
 		$smtp_server->{data}->close
-			or $self->log(1, "%s", "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+			or $self->log(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
 
 	    if ( $self->{spampd}->{debug} ) {
 	      $self->log(2, "Finished sending DATA"); }
@@ -692,7 +636,7 @@ sub process_request {
 		or die "Error in server->ok(client->hear): $!";
 		
 	  if ( $self->{spampd}->{debug} ) {
-	    $self->log(2, "%s", "Destination response: '" . $destresp . "'"); }
+	    $self->log(2, "Destination response: '" . $destresp . "'"); }
 	  
 	  # if we're in data state but the response is an error, exit data state.
 	  # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
@@ -723,12 +667,22 @@ sub process_request {
   if ($@ ne '') {
 	  chomp($@);
 	  $msg = "WARNING!! Error in process_request eval block: $@";
-	  $self->log(0, "%s", $msg);
+	  $self->log(0, $msg);
 	  die ($msg . "\n");
   }
   
   $self->{spampd}->{instance}++;
   
+#  if ( $self->{spampd}->{instance}++ > $self->{spampd}->{maxrequests} ) {
+	  
+#	 if ( $self->{spampd}->{debug} ) {
+#	   $self->log(2, "Exiting child process after handling ". 
+#	                  $self->{spampd}->{maxrequests} ." requests"); }
+	  
+#	 exit 0;
+	
+#  };
+
 }
 
 # Net::Server hook
@@ -759,30 +713,32 @@ my $maxsize = 64; # max. msg size to scan with SA, in KB.
 my $rh = 0; # log which rules were hit
 my $debug = 0; # debug flag
 my $dose = 0; # die-on-sa-errors flag
+my $addheader = 0; # add X-Spam-Checked-By header to all messages
+# hostname to use in X-Spam-Checked-By header:
+my $myhostname = ( length($ENV{HOSTNAME}) ) ? $ENV{HOSTNAME} : "localhost"; 
 my $logsock = "unix";  # default log socket (some systems like 'inet')
-my $nsloglevel = 2; # default log level for Net::Server (in the range 0-4)
-my $background = 1; # specifies whether to 'daemonize' and fork into background;
-					# apparently useful under Win32/cygwin to disable this via --nodetach option;
-my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
-						 # passing it to spamassassin. Set to 1 to enable this
-my $setenvelopefrom = 0; # Set X-Envelope-From header only
+
+# the following are deprecated as of v.2
+my $heloname = '';
+my $dead_letters = '';
 
 my %options = (port => \$port,
 	       host => \$host,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
+	       'dead-letters' => \$dead_letters,
 	       pid => \$pidfile,
 	       user => \$user,
 	       group => \$group,
 	       maxrequests => \$maxrequests,
 	       maxsize => \$maxsize,
+	       heloname => \$heloname,
 	       childtimeout => \$childtimeout,
 	       satimeout => \$satimeout,
 	       children => \$children,
 	       # maxchildren => \$maxchildren,
-	       logsock => \$logsock,
-	       envelopeheaders => \$envelopeheaders,
-	       setenvelopefrom => \$setenvelopefrom,
+	       hostname => \$myhostname,
+	       logsock => \$logsock
 	      );
 
 usage(1) unless GetOptions(\%options,
@@ -795,30 +751,26 @@ usage(1) unless GetOptions(\%options,
 		   'maxrequests|mr=i',
 		   'childtimeout=i',
 		   'satimeout=i',
-		   'dead-letters=s',  # deprecated
+		   'dead-letters=s',
 		   'user|u=s',
 		   'group|g=s',
 		   'pid|p=s',
 		   'maxsize=i',
-		   'heloname=s',  # deprecated
+		   'heloname=s',
 		   'tagall|a',
 		   'auto-whitelist|aw',
-		   'stop-at-threshold',  # deprecated
+		   'stop-at-threshold',
 		   'debug|d',
-		   'help|h|?',
+		   'help|h',
 		   'local-only|l',
 		   'log-rules-hit|rh',
 		   'dose',
-		   'add-sc-header|ash',  # deprecated
-		   'hostname=s',  # deprecated
-		   'logsock=s',
-		   'nodetach',
-		   'set-envelope-headers|seh',
-		   'set-envelope-from|sef',
+		   'add-sc-header|ash',
+		   'hostname=s',
+		   'logsock=s'
 		   );
 
 usage(0) if $options{help};
-
 if ( $logsock !~ /^(unix|inet)$/ ) {
 	print "--logsock parameter needs to be either unix or inet\n\n";
 	usage(0);
@@ -826,11 +778,9 @@ if ( $logsock !~ /^(unix|inet)$/ ) {
 
 if ( $options{tagall} ) { $tagall = 1; }
 if ( $options{'log-rules-hit'} ) { $rh = 1; }
-if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
+if ( $options{debug} ) { $debug = 1; }
 if ( $options{dose} ) { $dose = 1; }
-if ( $options{'nodetach'} ) { $background = undef; }
-if ( $options{'set-envelope-headers'} ) { $envelopeheaders = 1; }
-if ( $options{'set-envelope-from'} ) { $setenvelopefrom = 1; }
+if ( $options{'add-sc-header'} ) { $addheader = 1; }
 # if ( !$options{maxchildren} or $maxchildren < $children ) { $maxchildren = $children; }
 
 if ( $children < 1 ) { print "Option --children must be greater than zero!\n"; exit shift; }
@@ -851,6 +801,8 @@ my $assassin = Mail::SpamAssassin->new({
 		'debug' => $debug,
 		'local_tests_only' => $options{'local-only'} || 0 });
 
+# 'stop_at_threshold' => $options{'stop_at_threshold'} || 0,
+			
 $options{'auto-whitelist'} and eval {
    require Mail::SpamAssassin::DBBasedAddrList;
 
@@ -876,11 +828,10 @@ my $server = bless {
     server => {host => $host,
 				port => [ $port ],
 				log_file => 'Sys::Syslog',
-				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
 				syslog_ident => 'spampd',
 				syslog_facility => 'mail',
-				background => $background,
+				background => 1,
 				# setsid => 1,
 				pid_file => $pidfile,
 				user => $user,
@@ -902,14 +853,14 @@ my $server = bless {
 				rh => $rh,
 				debug => $debug,
 				dose => $dose,
+				addheader => $addheader,
+				myhostname => $myhostname,
 				instance => 0,
-				envelopeheaders => $envelopeheaders,
-				setenvelopefrom => $setenvelopefrom,
 			   },
    }, 'SpamPD';
 
 # Redirect all warnings to Server::log 
-$SIG{__WARN__} = sub { $server->log (2, "%s", $_[0]); };
+$SIG{__WARN__} = sub { $server->log (2, $_[0]); };
 	   
 # call Net::Server to start up the daemon inside
 $server->run;
@@ -940,15 +891,11 @@ Options:
                                Default is 285 seconds.
                                
   --pid=filename           Store the daemon's process ID in this file. 
-                               Default is /var/run/spampd.pid
+                              Default is /var/run/spampd.pid
   --user=username          Specifies the user that the daemon runs as.
                                Default is mail.
   --group=groupname        Specifies the group that the daemon runs as.
                                Default is mail.
-  --nodetach               Don't detach from the console and fork into
-                               background. Useful for some daemon control
-                               tools or when running as a win32 service
-                               under cygwin.
                                
   --logsock=inet or unix   Allows specifying the syslog socket type. Default is 
                                'unix' except on HPUX and SunOS which prefer 'inet'.
@@ -961,24 +908,20 @@ Options:
                                error message. Default is to pass through email
                                even in the event of an SA problem.
   --tagall                 Tag all messages with SA headers, not just spam.
-  --log-rules-hit          Log the name of each SA test which matched the
-    or --rh                    current message.
-                          	   
-  --set-envelope-headers   Set X-Envelope-From and X-Envelope-To headers before
-    or --seh                   passing the mail to SpamAssassin. This is 
-                               disabled by default because it potentially leaks
-                               information. NOTE: Please read the manpage before
-                               enabling this!
-  --set-envelope-from      Same as above but only sets X-Envelope-From, for
-    or --sef                   those that don't feel comfortable with the
-                               potential information leak.
- 					     
-  --auto-whitelist         Use the SA global auto-whitelist feature 
-    or --aw                   (SA versions => 3.0 now control this via local.cf).
-  --local-only or -L       Turn off all SA network-based tests (RBL, Razor, etc).
-  --debug or -d            Turn on SA debugging (sent to log file).
+  --log-rules-hit or --rh  Log the name of each SA test which matched the
+                               current message.
+  --add-sc-header or --ash Add a 'X-Spam-Checked-By: {hostname}' header to each
+                               scanned message.  By default no header is added.
+  --hostname=hostname      Hostname to use in the X-Spam-Checked-By header.
+                               By default the value of the environmen variable
+                               HOSTNAME is used, or if undefined/blank then
+                               'localhost' is used as the hostname.
+ 
+  --auto-whitelist or --aw Use the SA global auto-whitelist feature.
+  --local-only or --L      Turn off all SA network-based tests (RBL, Razor, etc).
+  --debug or --d           Turn on SA debugging (sent to STDERR).
 						   
-  --help or -h or -?       This message
+  --help or --h            This message
   
 Deprecated Options (still accepted for backwards compatibility):
   --heloname=hostname      No longer used in spampd v.2
@@ -997,7 +940,7 @@ __END__
 # Some commented-out documentation.  POD doesn't have a way to comment 
 # out sections!?  This documents a feature which may be implemented later.
 #
-# =item B<--maxchildren=n> or B<--mc=n>
+# =item B<--maxchildren=n> or B<--mc=n> C<(new in v2)>
 #
 # Maximum number of children to spawn if needed (where n >= --children).  When 
 # I<spampd> starts it will spawn a number of child servers as specified by 
@@ -1021,7 +964,7 @@ __END__
 
 =head1 NAME
 
-SpamPD - Spam Proxy Daemon (version 2.2)
+SpamPD - Spam Proxy Daemon (version 2.11)
 
 =head1 Synopsis
 
@@ -1036,14 +979,11 @@ B<spampd>
 [B<--childtimeout=n>]
 [B<--satimeout=n>]
 [B<--pid|p=filename>]
-[B<--nodetach>]
 [B<--logsock=inet|unix>]
 [B<--maxsize=n>]
 [B<--dose>]
 [B<--tagall|a>]
 [B<--log-rules-hit|rh>]
-[B<--set-envelope-headers|seh>]
-[B<--set-envelope-from|sef>]
 [B<--auto-whitelist|aw>]
 [B<--local-only|L>]
 [B<--debug|d>]
@@ -1148,10 +1088,6 @@ I<spampd>.
 
 =head1 Upgrading
 
-If upgrading from a version prior to 2.2, please note that the --add-sc-header
-option is no longer supported.  Use SAs built-in header manipulation features
-instead (as of SA v2.6).
-
 Upgrading from version 1 simply involves replacing the F<spampd> program file
 with the latest one.  Note that the I<dead-letters> folder is no longer being
 used and the --dead-letters option is no longer needed (though no errors are
@@ -1220,7 +1156,7 @@ I<spampd> is set up for the default Postfix timeout values.
 
 =over 5
 
-=item B<--host=ip[:port] or hostname[:port]>
+=item B<--host=ip[:port] or hostname[:port]> C<(changed in v2)>
 
 Specifies what hostname/IP and port I<spampd> listens on. By default, it listens
 on 127.0.0.1 (localhost) on port 10025. 
@@ -1239,7 +1175,7 @@ Specifies the hostname/IP where I<spampd> will relay all
 messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
 defaults to 25.
 
-=item B<--relayport=n>
+=item B<--relayport=n> C<(new in v2)>
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an 
 alternate to using the above --relayhost=ip:port notation.
@@ -1251,7 +1187,7 @@ alternate to using the above --relayhost=ip:port notation.
 Specifies the user and group that the proxy will run as. Default is
 I<mail>/I<mail>.
 
-=item B<--children=n> or B<--c=n>
+=item B<--children=n> or B<--c=n> C<(new in v2)>
 
 Number of child servers to start and maintain (where n > 0). Each child will 
 process up to --maxrequests (below) before exiting and being replaced by 
@@ -1273,7 +1209,7 @@ before the child exits. Since a child never gives back memory, a large
 message can cause it to become quite bloated; the only way to reclaim
 the memory is for the child to exit. The default is 20.
 
-=item B<--childtimeout=n>
+=item B<--childtimeout=n> C<(new in v2)>
 
 This is the number of seconds to allow each child server before it times out
 a transaction. In an S/LMTP transaction the timer is reset for every command. 
@@ -1282,7 +1218,7 @@ not be too short.  Note that it's more likely the origination or destination
 mail servers will timeout first, which is fine.  This is just a "sane" failsafe.
 Default is 360 seconds (6 minutes).
 
-=item B<--satimeout=n>
+=item B<--satimeout=n> C<(new in v2)>
 
 This is the number of seconds to allow for processing a message with
 SpamAssassin (including feeding it the message, analyzing it, and adding 
@@ -1302,17 +1238,10 @@ that it is easy to kill it later. The directory that will contain this
 file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
-=item B<--logsock=unix or inet> C<(new in v2.20)>
+=item B<--logsock=unix or inet> C<(new in v2.2)>
 
 Syslog socket to use.  May be either "unix" of "inet".  Default is "unix"
 except on HP-UX and SunOS (Solaris) systems which seem to prefer "inet".
-
-=item B<--nodetach> C<(new in v2.20)>
-
-If this option is given spampd won't detach from the console and fork into the
-background. This can be useful for running under control of some daemon
-management tools or when configured as a win32 service under cygrunsrv's
-control.
 
 =item B<--maxsize=n>
 
@@ -1320,7 +1249,7 @@ The maximum message size to send to SpamAssassin, in KBytes. By default messages
 over 64KB are not scanned at all, and an appropriate message is logged
 indicating this.  The size includes headers and attachments (if any).
 
-=item B<--dose>
+=item B<--dose> C<(new in v2)>
 
 Acronym for (d)ie (o)n (s)pamAssassin (e)rrors.  By default if I<spampd>
 encounters a problem with processing the message through Spam Assassin (timeout 
@@ -1338,49 +1267,38 @@ for this option to work as of SA-2.50, the I<always_add_report> and/or
 I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be 
 set to 1/true.
 
-=item B<--log-rules-hit> or B<--rh>
+=item B<--log-rules-hit> or B<--rh> C<(new in v2)>
 
 Logs the names of each SpamAssassin rule which matched the message being 
 processed.  This list is returned by SA.
 
-=item B<--set-envelope-headers> or B<--seh> C<(new in v2.30)>
+=item B<--add-sc-header> or B<--ash> C<(new in v2.1)>
 
-Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
-being scanned before it is passed to SpamAssassin. The idea is to help SA 
-process any blacklist/whitelist to/from directives on the actual 
-sender/recipients instead of the possibly bogus envelope headers. This 
-potentially exposes the list of all recipients of that mail (even BCC'ed ones). 
-Therefore usage of this option is discouraged. 
+Add a 'X-Spam-Checked-By: {hostname}' header to each scanned message.  By 
+default no such header is added. This can be useful in tracking which server
+in a pool did the scanning.  See below for how to specify a hostname.
 
-I<NOTE>: Even though spampd tries to prevent this leakage by removing the
-X-Envelope-To header after scanning, SpamAssassin itself might add headers
-itself which report one or more of the recipients which had been listed in
-this header.
+=item B<--hostname=hostname> C<(new in v2.1)>
 
-=item B<--set-envelope-from> or B<--sef> C<(new in v2.30)>
-
-Same as above option but only enables the addition of X-Envelope-From header.
-For those that don't feel comfortable with the possible information exposure
-of X-Envelope-To.  The above option overrides this one.
+Hostname to use in the X-Spam-Checked-By header. By default the value of the 
+environmental variable $HOSTNAME is used, or if that is undefined/blank then
+'localhost' is used as the hostname.  Only relevant if the --add-sc-header 
+option is specified.
 
 =item B<--auto-whitelist> or B<--aw>
 
-This option is no longer relevant with SA version 3.0 and above, which
-controls auto whitelist use via local.cf settings. 
+Turns on the SpamAssassin global whitelist feature.  See the SA docs. Note
+that per-user whitelists are not available.
 
-For SA version < 3.0, turns on the SpamAssassin global whitelist feature.  
-See the SA docs. Note that per-user whitelists are not available.
-
-=item B<--local-only> or B<--L>
+=item B<--local-only> or B<--L> C<(new in v2)>
 
 Turn off all SA network-based tests (DNS, Razor, etc).
 
-=item B<--debug> or B<--d>
+=item B<--debug> or B<--d> C<(changed in v2)>
 
-Turns on SpamAssassin debug messages which print to the system mail log
-(same log as spampd will log to).  Also turns on more verbose logging of 
-what spampd is doing (new in v2).  Also increases log level of Net::Server
-to 4 (debug), adding yet more info (but not too much) (new in v2.2).
+Turns on SpamAssassin debug messages which print to STDERR (usually the 
+console).  Also turns on more verbose logging of what spampd is doing (new in
+v2).
 
 =item B<--help> or B<--h>
 
@@ -1393,17 +1311,13 @@ Prints usage information.
 =over 5
 
 The following options are no longer used but still accepted for backwards
-compatibility with prevoius I<spampd> versions:
+compatibility with I<spampd> v1:
 
 =item  B<--dead-letters>
 
 =item  B<--heloname>
 
 =item  B<--stop-at-threshold>
-
-=item  B<--add-sc-header>
-
-=item  B<--hostname>
 
 =back
 
@@ -1451,20 +1365,9 @@ original inspiration and code. See http://www.rudedog.org/assassind/ .
 Also thanks to I<spamd> (included with SpamAssassin) and 
 I<amavisd-new> (http://www.ijs.si/software/amavisd/) for some tricks.
 
-Various people have contributed patches, bug reports, and ideas, all of whom
-I would like to thank.  I have tried to include credits in code comments and
-in the change log, as appropriate.
-
-=head2 Code Contributors (in order of appearance):
-
- Kurt Andersen
- Roland Koeckel
- Urban Petry
- Sven Mueller
-
 =head1 Copyright, License, and Disclaimer
 
-I<spampd> is Copyright (c) 2002 by World Design Group, Inc. and Maxim Paperno.
+I<spampd> is Copyright (c) 2002 by World Design Group and Maxim Paperno.
 
 Portions are Copyright (C) 2001 Morgan Stanley Dean Witter as mentioned above
 in the Credits section.
@@ -1499,6 +1402,14 @@ server such as Postfix and be able to reject mail before it enters our systems.
 The only real problem is that Postfix will see localhost as the connecting
 client, so that disables any client-based checks Postfix can do and creates a 
 possible relay hole if localhost is trusted.
+
+Per-user preferences: The jury is still out on this one.  I'm thinking more
+and more that most per-user prefs should be specified on the final mailbox
+server.  Why? Because SMTP isn't designed with per-user preferences in mind.
+On a relay server, the same message body can go to multiple recipients who
+may have wildly different preferences when it comes to handilng junk mail.  The
+exception here might be the use of LMTP protocol, which bears further
+investigation.
 
 =head1 See Also
 
