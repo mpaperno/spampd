@@ -1,8 +1,9 @@
-spampd (2.42-1) UNRELEASED; urgency=medium
+spampd (2.42-1) unstable; urgency=medium
 
   * Updated watch file for new github location.
-  * New upstream version 2.42
+  * New upstream version 2.42 (Closes: #826159)
   * Removed special handling of updates from very old versions.
+  * Set homedir to Debian standard.
 
  -- Michael Meskes <meskes@debian.org>  Sun, 31 Dec 2017 15:32:54 +0100
 
