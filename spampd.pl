@@ -480,12 +480,12 @@ sub process_message {
     	    	if ( ( $self->{spampd}->{envelopeheaders} || 
 	    				$self->{spampd}->{setenvelopefrom} ) && 
 	    				$envfrom == 0 ) {
-		    		push(@msglines, "X-Envelope-From: $sender\r\n");
+		    		unshift(@msglines, "X-Envelope-From: $sender\r\n");
 					if ( $self->{spampd}->{debug} ) {
 					  $self->mylog(2, "Added X-Envelope-From"); }
 	    		}
     	    	if ( $self->{spampd}->{envelopeheaders} && $envto == 0 ) {
-	       	 		push(@msglines, "X-Envelope-To: $recips\r\n");
+	       	 		unshift(@msglines, "X-Envelope-To: $recips\r\n");
 	        		$addedenvto = 1;
 					if ( $self->{spampd}->{debug} ) {
 					  $self->mylog(2, "Added X-Envelope-To"); }
