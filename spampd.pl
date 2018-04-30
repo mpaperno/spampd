@@ -961,7 +961,7 @@ if ( $saconfigfile != "" ) {
 }
 
 #cleanup environment before starting SA (thanks to Alexander Wirt)
-$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin';
+$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 
 my $assassin = Mail::SpamAssassin->new($sa_options);
