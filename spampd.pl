@@ -415,6 +415,7 @@ sub yammer {
 package SpamPD;
 
 use strict;
+use File::HomeDir;
 use Net::Server::PreForkSimple;
 use IO::File;
 use Getopt::Long;
@@ -949,7 +950,7 @@ my $sa_options = {
 		'debug' => $debug,
 		'local_tests_only' => $options{'local-only'} || 0,
 		'home_dir_for_helpers' => $sa_home_dir, 
-		'user_dir' => (getpwnam($user))[7],
+		'user_dir' => File::HomeDir->users_home($user),
 		'userstate_dir' => $sa_home_dir, 
 		'username' => $user
 };
@@ -1223,6 +1224,8 @@ Perl modules:
 =item B<Mail::SpamAssassin>
 
 =item B<Net::Server::PreForkSimple>
+
+=item B<File::HomeDir>
 
 =item B<IO::File>
 
