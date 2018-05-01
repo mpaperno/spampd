@@ -3,6 +3,8 @@
 ######################
 # SpamPD - spam proxy daemon
 #
+# v2.51  - 01-May-18
+# v2.50  - 30-Apr-18
 # v2.42  - 08-Dec-13
 # v2.41  - 11-Aug-10
 # v2.40  - 10-Jan-09
@@ -415,7 +417,6 @@ sub yammer {
 package SpamPD;
 
 use strict;
-use File::HomeDir;
 use Net::Server::PreForkSimple;
 use IO::File;
 use Getopt::Long;
@@ -953,7 +954,6 @@ my $sa_options = {
 		'debug' => $debug,
 		'local_tests_only' => $options{'local-only'} || 0,
 		'home_dir_for_helpers' => $sa_home_dir, 
-		'user_dir' => File::HomeDir->users_home($user),
 		'userstate_dir' => $sa_home_dir, 
 		'username' => $user
 };
@@ -1232,8 +1232,6 @@ Perl modules:
 =item B<Mail::SpamAssassin>
 
 =item B<Net::Server::PreForkSimple>
-
-=item B<File::HomeDir>
 
 =item B<IO::File>
 
