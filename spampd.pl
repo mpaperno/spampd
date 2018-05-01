@@ -433,7 +433,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.42';
+our $VERSION = '2.51';
 
 sub process_message {
 	my ($self, $fh) = @_;
@@ -909,15 +909,15 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
-$relaysocket = $1 if $relaysocket =~ /^(.*)$/;
+$relaysocket = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
 
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
 
-$socket = $1 if $socket =~ /^(.*)$/;
+$socket = $1 if defined($socket) && $socket =~ /^(.*)$/;
 
-$socket_perms = $1 if $socket_perms =~ /^(.*)$/;
+$socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -949,6 +949,7 @@ my $sa_options = {
 		'debug' => $debug,
 		'local_tests_only' => $options{'local-only'} || 0,
 		'home_dir_for_helpers' => $sa_home_dir, 
+		'user_dir' => (getpwnam($user))[7],
 		'userstate_dir' => $sa_home_dir, 
 		'username' => $user
 };
@@ -1006,7 +1007,7 @@ my $server = bless {
 				syslog_ident => 'spampd',
 				syslog_facility => 'mail',
 				background => $background,
-				# setsid => 1,
+				setsid => $background,
 				pid_file => $pidfile,
 				user => $user,
 				group => $group,
