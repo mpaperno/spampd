@@ -3,6 +3,8 @@
 ######################
 # SpamPD - spam proxy daemon
 #
+# v2.51  - 01-May-18
+# v2.50  - 30-Apr-18
 # v2.42  - 08-Dec-13
 # v2.41  - 11-Aug-10
 # v2.40  - 10-Jan-09
@@ -433,7 +435,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.42';
+our $VERSION = '2.51';
 
 sub process_message {
 	my ($self, $fh) = @_;
@@ -826,6 +828,7 @@ my $nsloglevel = 2; # default log level for Net::Server (in the range 0-4)
 my $background = 1; # specifies whether to 'daemonize' and fork into background;
 					# apparently useful under Win32/cygwin to disable this via 
 					# --nodetach option;
+my $setsid = 0; # specifies wheter to use POSIX::setsid() command to truly daemonize.
 my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
 						 # passing it to spamassassin. Set to 1 to enable this.
 my $setenvelopefrom = 0; # Set X-Envelope-From header only
@@ -887,6 +890,7 @@ usage(1) unless GetOptions(\%options,
 		   'hostname=s',  # deprecated
 		   'logsock=s',
 		   'nodetach',
+		   'setsid',
 		   'set-envelope-headers|seh',
 		   'set-envelope-from|sef',
 		   'saconfig=s',
@@ -909,15 +913,15 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
-$relaysocket = $1 if $relaysocket =~ /^(.*)$/;
+$relaysocket = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
 
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
 
-$socket = $1 if $socket =~ /^(.*)$/;
+$socket = $1 if defined($socket) && $socket =~ /^(.*)$/;
 
-$socket_perms = $1 if $socket_perms =~ /^(.*)$/;
+$socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -925,6 +929,7 @@ if ( $options{'log-rules-hit'} ) { $rh = 1; }
 if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
 if ( $options{dose} ) { $dose = 1; }
 if ( $options{'nodetach'} ) { $background = undef; }
+if ( $options{'setsid'} && defined($background)) { $setsid = 1; }
 if ( $options{'set-envelope-headers'} ) { $envelopeheaders = 1; }
 if ( $options{'set-envelope-from'} ) { $setenvelopefrom = 1; }
 if ( $options{'saconfig'} ) { $saconfigfile = $options{'saconfig'}; }
@@ -1006,7 +1011,7 @@ my $server = bless {
 				syslog_ident => 'spampd',
 				syslog_facility => 'mail',
 				background => $background,
-				# setsid => 1,
+				setsid => $setsid,
 				pid_file => $pidfile,
 				user => $user,
 				group => $group,
@@ -1080,6 +1085,10 @@ Options:
                                background. Useful for some daemon control
                                tools or when running as a win32 service
                                under cygwin.
+  --setsid                 Fork after the bind method to release itself
+                               from the command line and then run the
+                               POSIX::setsid() command to truly daemonize.
+                               Only used if --nodetach isn't specified.
                                
   --logsock=inet or unix   Allows specifying the syslog socket type. Default is 
                                'unix' except on HPUX and SunOS which prefer 'inet'.
@@ -1176,6 +1185,7 @@ B<spampd>
 [B<--satimeout=n>]
 [B<--pid|p=filename>]
 [B<--nodetach>]
+[B<--setsid>]
 [B<--logsock=inet|unix>]
 [B<--maxsize=n>]
 [B<--dose>]
@@ -1468,6 +1478,12 @@ If this option is given spampd won't detach from the console and fork into the
 background. This can be useful for running under control of some daemon
 management tools or when configured as a win32 service under cygrunsrv's
 control.
+
+=item B<--setsid> C<(new in v2.51)>
+
+If this option is given spampd will fork after the bind method to release
+itself from the command line and then run the POSIX::setsid() command to truly
+daemonize. Only used if --nodetach isn't specified.
 
 =item B<--maxsize=n>
 
