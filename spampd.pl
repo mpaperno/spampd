@@ -3,6 +3,8 @@
 ######################
 # SpamPD - spam proxy daemon
 #
+# v2.51  - 01-May-18
+# v2.50  - 30-Apr-18
 # v2.42  - 08-Dec-13
 # v2.41  - 11-Aug-10
 # v2.40  - 10-Jan-09
@@ -307,19 +309,19 @@ package SpamPD::Client;
 # =cut
 
 use strict;
-use IO::Socket;
+use IO::Socket::IP;
 
 # =item new(interface => $interface, port => $port[, timeout = 300]);
 #
 # The interface and port to talk to must be specified. The interface
 # must be a valid numeric IP address; the port must be numeric. If
 # this call succeeds, it returns a client structure with an open
-# IO::Socket::INET in it, ready to talk to. If it fails it dies,
+# IO::Socket::IP in it, ready to talk to. If it fails it dies,
 # so if you want anything other than an exit with an explanatory
 # error message, wrap the constructor call in an eval block and pull
 # the error out of $@ as usual. This is also the case for all other
 # methods; they succeed or they die. The timeout parameter is passed
-# on into the IO::Socket::INET constructor.
+# on into the IO::Socket::IP constructor.
 #
 # =cut
 
@@ -327,13 +329,21 @@ sub new {
     my ($this, @opts) = @_;
     my $class = ref($this) || $this;
     my $self = bless { timeout => 300, @opts }, $class;
-    $self->{sock} = IO::Socket::INET->new(
+	if (defined $self->{unix_socket}) {
+		$self->{sock} = IO::Socket::UNIX->new(
+			Peer => $self->{unix_socket},
+			Timeout => $self->{timeout},
+			Type => SOCK_STREAM,
+		);
+	} else {
+		$self->{sock} = IO::Socket::IP->new(
 			PeerAddr => $self->{interface},
 			PeerPort => $self->{port},
 			Timeout => $self->{timeout},
 			Proto => 'tcp',
 			Type => SOCK_STREAM,
-	    );
+		);
+	}
     die "$0: socket connect failure: $!\n" unless defined $self->{sock};
     return $self;
 }
@@ -425,7 +435,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.42';
+our $VERSION = '2.51';
 
 sub process_message {
 	my ($self, $fh) = @_;
@@ -472,12 +482,12 @@ sub process_message {
     	    	if ( ( $self->{spampd}->{envelopeheaders} || 
 	    				$self->{spampd}->{setenvelopefrom} ) && 
 	    				$envfrom == 0 ) {
-		    		push(@msglines, "X-Envelope-From: $sender\r\n");
+		    		unshift(@msglines, "X-Envelope-From: $sender\r\n");
 					if ( $self->{spampd}->{debug} ) {
 					  $self->mylog(2, "Added X-Envelope-From"); }
 	    		}
     	    	if ( $self->{spampd}->{envelopeheaders} && $envto == 0 ) {
-	       	 		push(@msglines, "X-Envelope-To: $recips\r\n");
+	       	 		unshift(@msglines, "X-Envelope-To: $recips\r\n");
 	        		$addedenvto = 1;
 					if ( $self->{spampd}->{debug} ) {
 					  $self->mylog(2, "Added X-Envelope-To"); }
@@ -638,7 +648,8 @@ sub process_request {
 	    
 	# start an smtp "client" (really a sending server)
 	my $client = SpamPD::Client->new(interface => $self->{spampd}->{relayhost}, 
-					   port => $self->{spampd}->{relayport});
+					   port => $self->{spampd}->{relayport},
+					   unix_socket => $self->{spampd}->{unix_relaysocket});
 	unless ( defined $client ) {
 	  die "Failed to create sending Client: $!"; }
 
@@ -761,6 +772,17 @@ sub process_request {
 }
 
 # Net::Server hook
+# After binding listening sockets
+sub post_bind_hook {
+	my $self = shift;
+	my $server = $self->{server};
+	if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
+		my $mode = oct($server->{unix_socket_perms});
+		chmod $mode, $server->{unix_socket} or die $@;
+	}
+}
+
+# Net::Server hook
 # about to exit child process
 sub child_finish_hook {
     my($self) = shift;
@@ -782,8 +804,11 @@ sub mylog($$$) {
 
 my $relayhost = '127.0.0.1'; # relay to ip
 my $relayport = 25; # relay to port
+my $relaysocket;
 my $host = '127.0.0.1'; # listen on ip
 my $port = 10025; # listen on port
+my $socket;
+my $socket_perms;
 my $children = 5; # number of child processes (servers) to spawn at start
 # my $maxchildren = $children; # max. number of child processes (servers) to spawn
 my $maxrequests = 20; # max requests handled by child b4 dying
@@ -803,6 +828,7 @@ my $nsloglevel = 2; # default log level for Net::Server (in the range 0-4)
 my $background = 1; # specifies whether to 'daemonize' and fork into background;
 					# apparently useful under Win32/cygwin to disable this via 
 					# --nodetach option;
+my $setsid = 0; # specifies wheter to use POSIX::setsid() command to truly daemonize.
 my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
 						 # passing it to spamassassin. Set to 1 to enable this.
 my $setenvelopefrom = 0; # Set X-Envelope-From header only
@@ -812,8 +838,11 @@ my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA file
 
 my %options = (port => \$port,
 	       host => \$host,
+	       socket => \$socket,
+	       'socket-perms' => \$socket_perms,
 	       relayhost => \$relayhost,
 	       relayport => \$relayport,
+	       relaysocket => \$relaysocket,
 	       pid => \$pidfile,
 	       user => \$user,
 	       group => \$group,
@@ -833,8 +862,11 @@ my %options = (port => \$port,
 usage(1) unless GetOptions(\%options,
 		   'port=i',
 		   'host=s',
+		   'socket=s',
+		   'socket-perms=s',
 		   'relayhost=s',
 		   'relayport=i',
+		   'relaysocket=s',
 		   'children|c=i',
 		   # 'maxchildren|mc=i',
 		   'maxrequests|mr=i',
@@ -858,6 +890,7 @@ usage(1) unless GetOptions(\%options,
 		   'hostname=s',  # deprecated
 		   'logsock=s',
 		   'nodetach',
+		   'setsid',
 		   'set-envelope-headers|seh',
 		   'set-envelope-from|sef',
 		   'saconfig=s',
@@ -880,9 +913,15 @@ $relayhost = $1 if $relayhost =~ /^(.*)$/;
 
 $relayport = $1 if $relayport =~ /^(.*)$/;
 
+$relaysocket = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
+
 $host = $1 if $host =~ /^(.*)$/;
 
 $port = $1 if $port =~ /^(.*)$/;
+
+$socket = $1 if defined($socket) && $socket =~ /^(.*)$/;
+
+$socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
 #
 
 if ( $options{tagall} ) { $tagall = 1; }
@@ -890,6 +929,7 @@ if ( $options{'log-rules-hit'} ) { $rh = 1; }
 if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
 if ( $options{dose} ) { $dose = 1; }
 if ( $options{'nodetach'} ) { $background = undef; }
+if ( $options{'setsid'} && defined($background)) { $setsid = 1; }
 if ( $options{'set-envelope-headers'} ) { $envelopeheaders = 1; }
 if ( $options{'set-envelope-from'} ) { $setenvelopefrom = 1; }
 if ( $options{'saconfig'} ) { $saconfigfile = $options{'saconfig'}; }
@@ -926,7 +966,7 @@ if ( $saconfigfile != "" ) {
 }
 
 #cleanup environment before starting SA (thanks to Alexander Wirt)
-$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin';
+$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 
 my $assassin = Mail::SpamAssassin->new($sa_options);
@@ -951,17 +991,27 @@ if ( !$options{logsock} ) {
 	};
 }
 
+# Net::Server wants UNIX sockets passed via port too. This part
+# decides what we want to pass.
+my @ports;
+if (defined $socket) {
+	@ports = ($socket . '|unix');
+} else {
+	@ports = ($port);
+}
 
 my $server = bless {
     server => {host => $host,
-				port => [ $port ],
+				port => \@ports,
+				unix_socket => $socket,
+				unix_socket_perms => $socket_perms,
 				log_file => 'Sys::Syslog',
 				log_level => $nsloglevel,
 				syslog_logsock => $logsock,
 				syslog_ident => 'spampd',
 				syslog_facility => 'mail',
 				background => $background,
-				# setsid => 1,
+				setsid => $setsid,
 				pid_file => $pidfile,
 				user => $user,
 				group => $group,
@@ -974,6 +1024,7 @@ my $server = bless {
 		      },
     spampd => { relayhost => $relayhost,
 				relayport => $relayport,
+				unix_relaysocket => $relaysocket,
 				tagall => $tagall,
 				maxsize => $maxsize,
 				assassin => $assassin,
@@ -1004,10 +1055,15 @@ Options:
   --host=host[:port]       Hostname/IP and optional port to listen on. 
 	                          Default is 127.0.0.1 port 10025
   --port=n                 Port to listen on (alternate syntax to above).
+  --socket=socketpath      UNIX socket to listen on. Alternative to
+                                  --host and --port.
+  --socket-perms=perms     The file mode to set on the created UNIX
+                                  socket in octal format.
   --relayhost=host[:port]  Host to relay mail to. 
 	                          Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
-  
+  --relaysocket            UNIX socket to relay to. Alternative to
+                                  --relayhost and --relayport.
   --children=n             Number of child processes (servers) to start and
                                keep running. Default is 5 (plus 1 parent proc).
   --maxrequests=n          Maximum requests that each child can process before
@@ -1029,6 +1085,10 @@ Options:
                                background. Useful for some daemon control
                                tools or when running as a win32 service
                                under cygwin.
+  --setsid                 Fork after the bind method to release itself
+                               from the command line and then run the
+                               POSIX::setsid() command to truly daemonize.
+                               Only used if --nodetach isn't specified.
                                
   --logsock=inet or unix   Allows specifying the syslog socket type. Default is 
                                'unix' except on HPUX and SunOS which prefer 'inet'.
@@ -1113,6 +1173,9 @@ SpamPD - Spam Proxy Daemon (version 2.2)
 B<spampd>
 [B<--host=host[:port]>]
 [B<--relayhost=hostname[:port]>]
+[B<--socket>]
+[B<--socket-perms>]
+[B<--relaysocket>]
 [B<--user|u=username>]
 [B<--group|g=groupname>]
 [B<--children|c=n>]
@@ -1122,6 +1185,7 @@ B<spampd>
 [B<--satimeout=n>]
 [B<--pid|p=filename>]
 [B<--nodetach>]
+[B<--setsid>]
 [B<--logsock=inet|unix>]
 [B<--maxsize=n>]
 [B<--dose>]
@@ -1171,7 +1235,7 @@ Perl modules:
 
 =item B<IO::File>
 
-=item B<IO::Socket>
+=item B<IO::Socket::IP>
 
 =item B<Time::HiRes> (not actually required but recommended)
 
@@ -1319,6 +1383,16 @@ public interface (IP address) unless you know exactly what you're doing!
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
 
+=item B<--socket=socketpath>
+
+Specifies what UNIX socket I<spampd> listens on. If this is specified,
+--host and --port are ignored.
+
+=item B<--socket-perms=mode>
+
+The file mode fo the created UNIX socket (see --socket) in octal
+format, e.g. 700 to specify acces only for the user spampd is run as.
+
 =item B<--relayhost=ip[:port] or hostname[:port]>
 
 Specifies the hostname/IP where I<spampd> will relay all
@@ -1329,6 +1403,11 @@ defaults to 25.
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an 
 alternate to using the above --relayhost=ip:port notation.
+
+=item B<--relaysocket=socketpath>
+
+Spevifies what UNIX socket spampd will relay to. If this is specified
+--relayhost and --relayport will be ignored.
 
 =item B<--user=username> or B<--u=username>
 
@@ -1399,6 +1478,12 @@ If this option is given spampd won't detach from the console and fork into the
 background. This can be useful for running under control of some daemon
 management tools or when configured as a win32 service under cygrunsrv's
 control.
+
+=item B<--setsid> C<(new in v2.51)>
+
+If this option is given spampd will fork after the bind method to release
+itself from the command line and then run the POSIX::setsid() command to truly
+daemonize. Only used if --nodetach isn't specified.
 
 =item B<--maxsize=n>
 
@@ -1530,6 +1615,20 @@ on another host.
 and the SA auto-whitelist feature
 
   spampd --port=10025 --relayhost=127.0.0.1:10026 --auto-whitelist
+
+=item Using UNIX sockets instead if INET ports
+
+Spampd listens on the UNIX socket /var/run/spampd.socket with
+persmissions 700 instead of a TCP port:
+
+spampd --socket /var/run/spampd.socket --socket-perms 700
+
+Spampd will relay mail to /var/run/dovecot/lmtp instead of a TCP port:
+
+spampd --relaysocket /var/run/dovecot/lmtp
+
+Remember that the user spampd runs as needs to have read AND write
+permissions on the relaysocket!
 
 =back
 
