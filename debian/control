@@ -3,7 +3,7 @@ Section: mail
 Priority: optional
 Maintainer: Michael Meskes <meskes@debian.org>
 Build-Depends: debhelper (>= 11), quilt, dh-exec
-Standards-Version: 4.1.2
+Standards-Version: 4.1.4
 Homepage: https://github.com/mpaperno/spampd
 
 Package: spampd
@@ -28,4 +28,3 @@ Description: spamassassin based SMTP/LMTP proxy daemon
  original SpamAssassin header tags, which are more verbose than
  the tags which amavisd-new provides. This allows easier
  filtering in the mail client and easier tuning of SpamAssassin.
-

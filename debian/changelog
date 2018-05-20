@@ -1,6 +1,7 @@
 spampd (2.51-1) unstable; urgency=medium
 
   * New upstream version 2.51
+  * Bumped Standards-Version, no changes needed.
 
  -- Michael Meskes <meskes@debian.org>  Sun, 20 May 2018 13:07:24 +0200
 
@@ -461,4 +462,3 @@ spampd (2.12-1) unstable; urgency=low
   * Initial Release.
 
  -- Sven Mueller <debian@incase.de>  Mon, 13 Sep 2004 17:00:16 +0200
-
