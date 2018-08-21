@@ -798,6 +798,11 @@ sub mylog($$$) {
     $self->log($level, $msg);
 }
 
+# Override Net::Server's HUP handling - just gracefully restart all the children.
+sub sig_hup {
+	my $self = shift;
+	$self->hup_children;
+}
 
 ##################   SETUP   ######################
 
