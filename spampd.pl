@@ -798,6 +798,11 @@ sub mylog($$$) {
     $self->log($level, $msg);
 }
 
+# Override Net::Server's HUP handling - just gracefully restart all the children.
+sub sig_hup {
+	my $self = shift;
+	$self->hup_children;
+}
 
 ##################   SETUP   ######################
 
@@ -1591,6 +1596,28 @@ compatibility with prevoius I<spampd> versions:
 =item  B<--add-sc-header>
 
 =item  B<--hostname>
+
+=back
+
+=head1 Signals
+
+=over 5
+
+=item HUP
+
+Sending HUP signal to the master process will restart all the children
+gracefully (meaning the currently running requests will shut down once
+the request is complete).  SpamAssassin configuration is NOT reloaded.
+
+=item TTIN, TTOU
+
+Sending TTIN signal to the master process will dynamically increase
+the number of children by one, and TTOU signal will decrease it by one.
+
+=item INT, TERM
+
+Sending INT or TERM signal to the master process will kill all the
+children immediately and shut down the daemon.
 
 =back
 
