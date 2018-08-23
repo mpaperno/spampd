@@ -1451,13 +1451,19 @@ Same as above option but only enables the addition of X-Envelope-From header.
 For those that don't feel comfortable with the possible information exposure
 of X-Envelope-To.  The above option overrides this one.
 
-=item B<--auto-whitelist> or B<--aw>
+=item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
 
 This option is no longer relevant with SA version 3.0 and above, which
-controls auto whitelist use via local.cf settings. 
+controls auto whitelist use via config file settings. This option is likely to
+be removed in the future.  Do not use it unless you must use an older SA
+version.
 
 For SA version < 3.0, turns on the SpamAssassin global whitelist feature.  
 See the SA docs. Note that per-user whitelists are not available.
+
+B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
+a different mechanism (such as SQLBasedAddrList), the I<spampd> code will 
+need to be modified in 2 instances (search the source for DBBasedAddrList).
 
 =item B<--local-only> or B<-L>
 

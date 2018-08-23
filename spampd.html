@@ -312,12 +312,14 @@
 <p>Same as above option but only enables the addition of X-Envelope-From header. For those that don&#39;t feel comfortable with the possible information exposure of X-Envelope-To. The above option overrides this one.</p>
 
 </dd>
-<dt id="auto-whitelist-or---aw"><b>--auto-whitelist</b> or <b>--aw</b></dt>
+<dt id="auto-whitelist-or---aw-deprecated-with-SpamAssassin-v3"><b>--auto-whitelist</b> or <b>--aw</b> <code><code>(deprecated with SpamAssassin v3+)</code></code></dt>
 <dd>
 
-<p>This option is no longer relevant with SA version 3.0 and above, which controls auto whitelist use via local.cf settings.</p>
+<p>This option is no longer relevant with SA version 3.0 and above, which controls auto whitelist use via config file settings. This option is likely to be removed in the future. Do not use it unless you must use an older SA version.</p>
 
 <p>For SA version &lt; 3.0, turns on the SpamAssassin global whitelist feature. See the SA docs. Note that per-user whitelists are not available.</p>
+
+<p><b>NOTE</b>: <b>DBBasedAddrList</b> is used as the storage mechanism. If you wish to use a different mechanism (such as SQLBasedAddrList), the <i>spampd</i> code will need to be modified in 2 instances (search the source for DBBasedAddrList).</p>
 
 </dd>
 <dt id="local-only-or--L"><b>--local-only</b> or <b>-L</b></dt>
