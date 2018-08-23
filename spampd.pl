@@ -412,7 +412,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA     = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.51';
+our $VERSION = '2.52';
 
 sub process_message {
   my ($self, $fh) = @_;
@@ -827,6 +827,7 @@ GetOptions(
   'local-only|l'             => \$sa_local_only,
   'auto-whitelist|aw'        => \$sa_awl,
   'help|h|?'                 => sub { usage(0) },
+  'version'                  => \&version,
   'dead-letters=s'           => \&deprecated_opt,
   'heloname=s'               => \&deprecated_opt,
   'stop-at-threshold'        => \&deprecated_opt,
@@ -954,6 +955,14 @@ $server->run;
 
 exit 1;  # shouldn't get here
 
+sub version {
+  print "SpamPD version $VERSION\n";
+  print "  using Net::Server $Net::Server::VERSION\n";
+  print "  using SpamAssassin " . Mail::SpamAssassin::Version() . "\n";
+  print "  using Perl " . join(".", map(0+($_||0), ($] =~ /(\d)\.(\d{3})(\d{3})?/))) . "\n\n";
+  exit 0;
+}
+
 sub usage {
   print <<EOF ;
 usage: $0 [ options ]
@@ -988,6 +997,7 @@ Options:
     or -u username           Default is mail.
   --group=groupname        Specifies the group that the daemon runs as.
     or -g groupname          Default is mail.
+
   --nodetach               Don't detach from the console and fork into
                              background. Useful for some daemon control
                              tools or when running as a win32 service
@@ -1027,9 +1037,10 @@ Options:
                              Default is /var/spool/spamassassin/spampd
   --saconfig=filename      Use the specified file for loading SA configuration
                              options after the default local.cf file.
-  --debug or -d            Turn on SA debugging (sent to log file).
 
-  --help or -h or -?       This message
+  --debug or -d            Turn on extra debugging details (sent to log file).
+  --version                Print version information and exit.
+  --help or -h or -?       Show this help text.
 
 Deprecated Options (still accepted for backwards compatibility):
   --heloname=hostname      No longer used in spampd v.2
@@ -1474,6 +1485,10 @@ Turns on SpamAssassin debug messages which print to the system mail log
 (same log as spampd will log to).  Also turns on more verbose logging of 
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
+
+=item B<--version>
+
+Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
 =item B<--help> or B<-h> or B<-?>
 
