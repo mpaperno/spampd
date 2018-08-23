@@ -758,13 +758,13 @@ sub sig_hup {
 
 ##################   SETUP   ######################
 
-my $relayhost       = '127.0.0.1';                       # relay to ip
-my $relayport       = 25;                                # relay to port
-my $relaysocket     = undef;                             # relay to socket
 my $host            = '127.0.0.1';                       # listen on ip
 my $port            = 10025;                             # listen on port
 my $socket          = undef;                             # listen on socket
 my $socket_perms    = undef;                             # listening socket permissions (octal)
+my $relayhost       = '127.0.0.1';                       # relay to ip
+my $relayport       = 25;                                # relay to port
+my $relaysocket     = undef;                             # relay to socket
 my $children        = 5;                                 # number of child processes (servers) to spawn at start
 my $maxrequests     = 20;                                # max requests handled by child b4 dying
 my $childtimeout    = 6 * 60;                            # child process per-command timeout in seconds
@@ -778,127 +778,99 @@ my $maxsize         = 64;                                # max. msg size to scan
 my $rh              = 0;                                 # log which rules were hit
 my $debug           = 0;                                 # debug flag
 my $dose            = 0;                                 # die-on-sa-errors flag
-my $logsock         = "unix";                            # default log socket (some systems like 'inet')
+my $logsock         = 'unix';                            # default log socket (some systems like 'inet')
 my $nsloglevel      = 2;                                 # default log level for Net::Server (in the range 0-4)
 my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background;
                                                          #   apparently useful under Win32/cygwin to disable this via --nodetach;
-my $setsid          = 0;                                 # specifies wheter to use POSIX::setsid() command to truly daemonize.
+my $setsid          = 0;                                 # specifies whether to use POSIX::setsid() command to truly daemonize.
 my $envelopeheaders = 0;                                 # Set X-Envelope-To and X-Envelope-From headers in the mail before
-                                                         # passing it to spamassassin. Set to 1 to enable this.
+                                                         #   passing it to spamassassin. Set to 1 to enable this.
 my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only
-my $saconfigfile    = "";                                # use this config file for SA settings (blank uses default local.cf)
-my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files
-                                                         # (auto-whitelist, plugin helpers)
+my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
+my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
+my $sa_local_only   = 0;                                 # disable SA network tests
+my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
 
-my %options = (
-  port            => \$port,
-  host            => \$host,
-  socket          => \$socket,
-  'socket-perms'  => \$socket_perms,
-  relayhost       => \$relayhost,
-  relayport       => \$relayport,
-  relaysocket     => \$relaysocket,
-  pid             => \$pidfile,
-  user            => \$user,
-  group           => \$group,
-  maxrequests     => \$maxrequests,
-  maxsize         => \$maxsize,
-  childtimeout    => \$childtimeout,
-  satimeout       => \$satimeout,
-  children        => \$children,
-  logsock         => \$logsock,
-  envelopeheaders => \$envelopeheaders,
-  setenvelopefrom => \$setenvelopefrom,
-  saconfigfile    => \$saconfigfile,
-  sa_home_dir     => \$sa_home_dir,
-);
+# log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
+eval {
+  my $osname = `uname -s`;
+  $logsock = "inet" if ($osname =~ 'HP-UX' || $osname =~ 'SunOS');
+};
 
 GetOptions(
-  \%options,
-  'port=i',
-  'host=s',
-  'socket=s',
-  'socket-perms=s',
-  'relayhost=s',
-  'relayport=i',
-  'relaysocket=s',
-  'children|c=i',
-  'maxrequests|mr=i',
-  'childtimeout=i',
-  'satimeout=i',
-  'dead-letters=s',  # deprecated
-  'user|u=s',
-  'group|g=s',
-  'pid|p=s',
-  'maxsize=i',
-  'heloname=s',      # deprecated
-  'tagall|a',
-  'auto-whitelist|aw',
-  'stop-at-threshold',  # deprecated
-  'debug|d',
-  'help|h|?',
-  'local-only|l',
-  'log-rules-hit|rh',
-  'dose',
-  'add-sc-header|ash',  # deprecated
-  'hostname=s',         # deprecated
-  'logsock=s',
-  'nodetach',
-  'setsid',
-  'set-envelope-headers|seh',
-  'set-envelope-from|sef',
-  'saconfig=s',
-  'homedir=s',
+  'host=s'                   => \$host,
+  'port=i'                   => \$port,
+  'socket=s'                 => \$socket,
+  'socket-perms=s'           => \$socket_perms,
+  'relayhost=s'              => \$relayhost,
+  'relayport=i'              => \$relayport,
+  'relaysocket=s'            => \$relaysocket,
+  'children|c=i'             => \$children,
+  'maxrequests|mr=i'         => \$maxrequests,
+  'childtimeout=i'           => \$childtimeout,
+  'satimeout=i'              => \$satimeout,
+  'pid|p=s'                  => \$pidfile,
+  'user|u=s'                 => \$user,
+  'group|g=s'                => \$group,
+  'maxsize=i'                => \$maxsize,
+  'tagall|a'                 => \$tagall,
+  'log-rules-hit|rh'         => \$rh,
+  'debug|d'                  => \$debug,
+  'dose'                     => \$dose,
+  'logsock=s'                => \$logsock,
+  'detach!'                  => \$background,
+  'setsid'                   => \$setsid,
+  'set-envelope-headers|seh' => \$envelopeheaders,
+  'set-envelope-from|sef'    => \$setenvelopefrom,
+  'saconfig=s'               => \$sa_config,
+  'homedir=s'                => \$sa_home_dir,
+  'local-only|l'             => \$sa_local_only,
+  'auto-whitelist|aw'        => \$sa_awl,
+  'help|h|?'                 => sub { usage(0) },
+  'dead-letters=s'           => \&deprecated_opt,
+  'heloname=s'               => \&deprecated_opt,
+  'stop-at-threshold'        => \&deprecated_opt,
+  'add-sc-header|ash'        => \&deprecated_opt,
+  'hostname=s'               => \&deprecated_opt,
 ) or usage(1);
-
-usage(0) if $options{help};
 
 if ($logsock !~ /^(unix|inet)$/) {
   print "--logsock parameter needs to be either unix or inet\n\n";
-  usage(0);
+  exit 1; 
+}
+
+if ($children < 1) { 
+  print "Option --children must be greater than zero!\n";
+  exit 1;
 }
 
 # Untaint some options provided by admin command line.
-$logsock      = $1 if $logsock =~ /^(.*)$/;
-$pidfile      = $1 if $pidfile =~ /^(.*)$/;
-$relayhost    = $1 if $relayhost =~ /^(.*)$/;
-$relayport    = $1 if $relayport =~ /^(.*)$/;
-$relaysocket  = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
 $host         = $1 if $host =~ /^(.*)$/;
 $port         = $1 if $port =~ /^(.*)$/;
 $socket       = $1 if defined($socket) && $socket =~ /^(.*)$/;
 $socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
+$relayhost    = $1 if $relayhost =~ /^(.*)$/;
+$relayport    = $1 if $relayport =~ /^(.*)$/;
+$relaysocket  = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
+$pidfile      = $1 if $pidfile =~ /^(.*)$/;
+$logsock      = $1 if $logsock =~ /^(.*)$/;
 #
 
-if ($options{tagall})                  { $tagall     = 1; }
-if ($options{'log-rules-hit'})         { $rh         = 1; }
-if ($options{debug})                   { $debug      = 1; $nsloglevel = 4; }
-if ($options{dose})                    { $dose       = 1; }
-if ($options{'nodetach'})              { $background = 0; }
-if ($options{'setsid'} && $background) { $setsid = 1; }
-if ($options{'set-envelope-headers'})  { $envelopeheaders = 1; }
-if ($options{'set-envelope-from'})     { $setenvelopefrom = 1; }
-if ($options{'saconfig'})              { $saconfigfile    = $options{'saconfig'}; }
-if ($options{'homedir'})               { $sa_home_dir     = $options{'homedir'}; }
-# if ( !$options{maxchildren} or $maxchildren < $children ) { $maxchildren = $children; }
-
-if ($children < 1) { 
-  print "Option --children must be greater than zero!\n"; 
-  exit 1; 
-}
+$nsloglevel = 4 if $debug;
+$setsid     = 0 if !$background;
 
 my @tmp = split(/:/, $relayhost);
 $relayhost = $tmp[0];
-if ($tmp[1]) { $relayport = $tmp[1]; }
+$relayport = $tmp[1] if $tmp[1];
 
 @tmp = split(/:/, $host);
 $host = $tmp[0];
-if ($tmp[1]) { $port = $tmp[1]; }
+$port = $tmp[1] if $tmp[1];
 
 my $sa_options = {
   'dont_copy_prefs'      => 1,
   'debug'                => $debug,
-  'local_tests_only'     => $options{'local-only'} || 0,
+  'local_tests_only'     => $sa_local_only,
   'home_dir_for_helpers' => $sa_home_dir,
   'userstate_dir'        => $sa_home_dir,
   'username'             => $user
@@ -906,8 +878,8 @@ my $sa_options = {
 
 my $use_user_prefs = 0;
 
-if ($saconfigfile ne '') {
-  $sa_options->{'userprefs_filename'} = $saconfigfile;
+if ($sa_config ne '') {
+  $sa_options->{'userprefs_filename'} = $sa_config;
   $use_user_prefs = 1;
 }
 
@@ -917,7 +889,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 
 my $assassin = Mail::SpamAssassin->new($sa_options);
 
-$options{'auto-whitelist'} and eval {
+$sa_awl and eval {
   require Mail::SpamAssassin::DBBasedAddrList;
 
   # create a factory for the persistent address list
@@ -926,16 +898,6 @@ $options{'auto-whitelist'} and eval {
 };
 
 $assassin->compile_now($use_user_prefs);
-
-# thanks to Kurt Andersen for the 'uname -s' fix
-if (!$options{logsock}) {
-  eval {
-    my $osname = `uname -s`;
-    if (($osname =~ 'HP-UX') || ($osname =~ 'SunOS')) {
-      $logsock = "inet";
-    }
-  };
-}
 
 # Net::Server wants UNIX sockets passed via port too. This part
 # decides what we want to pass.
@@ -1076,6 +1038,11 @@ Deprecated Options (still accepted for backwards compatibility):
 EOF
 
   exit shift;
+}
+
+sub deprecated_opt {
+  my $opt_name = shift;
+  print "Note: option '$opt_name' is deprecated and will be ignored.\n";
 }
 
 __END__
