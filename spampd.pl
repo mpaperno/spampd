@@ -21,7 +21,7 @@
 # v1.0.1 - 03-Feb-03
 # v1.0.0 - May 2002
 #
-# spampd is Copyright (c) 2002 by World Design Group and Maxim Paperno
+# spampd is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018 by World Design Group and Maxim Paperno
 #  (see http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm)
 #
 # Written and maintained by Maxim Paperno (MPaperno@WorldDesign.com)
@@ -36,7 +36,8 @@
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
-#    The GNU GPL can be found at http://www.fsf.org/copyleft/gpl.html
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see L<https://www.gnu.org/licenses/>.
 #
 # spampd v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan
 #   Stanley Dean Witter. These are also distributed under the GNU GPL (see
@@ -81,16 +82,15 @@ package SpamPD::Server;
 # =cut
 
 use strict;
+use warnings;
 use IO::File;
-#use IO::Socket;
 
-# =item new(interface => $interface, port => $port);
-
-# The #interface and port to listen on must be specified. The interface
-# must be a valid numeric IP address (0.0.0.0 to listen on all
-# interfaces, as usual); the port must be numeric. If this call
-# succeeds, it returns a server structure with an open
-# IO::Socket::INET in it, ready to listen on. If it fails it dies, so
+# =item new(socket => $socket);
+#
+# Changed by MP: This now emulates Net::SMTP::Server::Client for use with 
+#   Net::Server which passes an already open socket.
+# The #socket listen on must be specified. If this call
+# succeeds, it returns a server structure. If it fails it dies, so
 # if you want anything other than an exit with an explanatory error
 # message, wrap the constructor call in an eval block and pull the
 # error out of $@ as usual. This is also the case for all other
@@ -99,10 +99,6 @@ use IO::File;
 # =cut
 
 sub new {
-
-  # This now emulates Net::SMTP::Server::Client for use with Net::Server which
-  # passes an already open socket.
-
   my ($this, $socket) = @_;
 
   my $class = ref($this) || $this;
@@ -114,31 +110,7 @@ sub new {
   die "$0: socket bind failure: $!\n" unless defined $self->{sock};
   $self->{state} = 'started';
   return $self;
-
-  #    Original code, removed by MP for spampd use
-  #
-  #     my ($this, @opts) = @_;
-  #     my $class = ref($this) || $this;
-  #     my $self = bless { @opts }, $class;
-  #     $self->{sock} = IO::Socket::INET->new(
-  # 	LocalAddr => $self->{interface},
-  # 	LocalPort => $self->{port},
-  # 	Proto => 'tcp',
-  # 	Type => SOCK_STREAM,
-  # 	Listen => 65536,
-  # 	Reuse => 1,
-  #     );
-  #     die "$0: socket bind failure: $!\n" unless defined $self->{sock};
-  #     $self->{state} = 'just bound',
-  #     return $self;
-
 }
-
-# sub accept { }
-#
-# Removed by MP; not needed for spampd use
-#
-
 
 # =item chat;
 #
@@ -173,7 +145,7 @@ sub chat {
     s/[\r\n]*$//;
     $self->{state} = $_;
     if (s/^(l|h)?he?lo\s+//i) {  # mp: find helo|ehlo|lhlo
-      # mp: determine protocol (for future use)
+      # mp: determine protocol
       if (s/^helo\s+//i) {
         $self->{proto} = "smtp";
       }
@@ -184,12 +156,6 @@ sub chat {
         $self->{proto} = "lmtp";
       }
 
-      #			if ( /^L/i ) {
-      #				$self->{proto} = "lmtp";
-      #			} elsif ( /^E/i ) {
-      #    			$self->{proto} = "esmtp";
-      #			} else {
-      #    			$self->{proto} = "smtp"; }
       s/\s*$//;
       s/\s+/ /g;
       $self->{helo} = $_;
@@ -231,7 +197,7 @@ sub chat {
       s/^\.\./\./;
       $self->{data}->print($_) or die "$0: write error saving data\n";
     }
-    return (0);
+    return 0;
   }
   return $self->{state};
 }
@@ -317,19 +283,20 @@ package SpamPD::Client;
 # =cut
 
 use strict;
+use warnings;
 use IO::Socket::IP;
+use IO::Socket::UNIX;
 
-# =item new(interface => $interface, port => $port[, timeout = 300]);
+# =item new([interface => $interface, port => $port] | [unix_socket => $unix_socket] [, timeout = 300]);
 #
-# The interface and port to talk to must be specified. The interface
-# must be a valid numeric IP address; the port must be numeric. If
+# The interface and port, OR a unix socket to talk to must be specified. If
 # this call succeeds, it returns a client structure with an open
-# IO::Socket::IP in it, ready to talk to. If it fails it dies,
-# so if you want anything other than an exit with an explanatory
-# error message, wrap the constructor call in an eval block and pull
+# IO::Socket::IP or IO::Socket::UNIX in it, ready to talk to. 
+# If it fails it dies, so if you want anything other than an exit with an 
+# explanatory error message, wrap the constructor call in an eval block and pull
 # the error out of $@ as usual. This is also the case for all other
 # methods; they succeed or they die. The timeout parameter is passed
-# on into the IO::Socket::IP constructor.
+# on into the IO::Socket::IP/UNIX constructor.
 #
 # =cut
 
@@ -426,6 +393,7 @@ sub yammer {
 package SpamPD;
 
 use strict;
+use warnings;
 use Net::Server::PreForkSimple;
 use IO::File;
 use Getopt::Long;
@@ -465,260 +433,223 @@ sub process_message {
   my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
 
   # Only process message under --maxsize KB
-  if ($size < ($self->{spampd}->{maxsize} * 1024)) {
+  if ($size >= ($self->{spampd}->{maxsize} * 1024)) {
+    $self->mylog(2, "skipped large message (" . $size / 1024 . "KB)");
+    return 1;
+  }
 
-    my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
+  my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
+  my $inhdr      = 1;
+  my $envfrom    = 0;
+  my $envto      = 0;
+  my $addedenvto = 0;
 
-    my $inhdr      = 1;
-    my $envfrom    = 0;
-    my $envto      = 0;
-    my $addedenvto = 0;
+  $recips = "@{$self->{smtp_server}->{to}}";
+  if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/) { $sender = $1; }
+  $recips ||= "(unknown)";
+  $sender ||= "(unknown)";
 
-    $recips = "@{$self->{smtp_server}->{to}}";
-    if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/) { $sender = $1; }
-    $recips ||= "(unknown)";
-    $sender ||= "(unknown)";
+  ## read message into array of lines to feed to SA
 
-    ## read message into array of lines to feed to SA
-
-    # loop over message file content
-    $fh->seek(0, 0) or die "Can't rewind message file: $!";
-    while (<$fh>) {
-      $envto   = 1 if (/^(?:X-)?Envelope-To: /);
-      $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
+  # loop over message file content
+  $fh->seek(0, 0) or die "Can't rewind message file: $!";
+  while (<$fh>) {
+    $envto   = 1 if (/^(?:X-)?Envelope-To: /);
+    $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
       if (/^\r?\n$/ && $inhdr) {
-        $inhdr = 0;  # outside of msg header after first blank line
-        if (($self->{spampd}->{envelopeheaders} || $self->{spampd}->{setenvelopefrom}) && !$envfrom) {
-          unshift(@msglines, "X-Envelope-From: $sender\r\n");
-          if ($self->{spampd}->{debug}) {
-            $self->mylog(2, "Added X-Envelope-From");
-          }
-        }
-        if ($self->{spampd}->{envelopeheaders} && !$envto) {
-          unshift(@msglines, "X-Envelope-To: $recips\r\n");
-          $addedenvto = 1;
-          if ($self->{spampd}->{debug}) {
-            $self->mylog(2, "Added X-Envelope-To");
-          }
-        }
+      $inhdr = 0;  # outside of msg header after first blank line
+      if (($self->{spampd}->{envelopeheaders} || $self->{spampd}->{setenvelopefrom}) && !$envfrom) {
+        unshift(@msglines, "X-Envelope-From: $sender\r\n");
+        $self->dbg("Added X-Envelope-From") ;
       }
-      push(@msglines, $_);
-      # find the Message-ID for logging (code is mostly from spamd)
-      if ($inhdr && /^Message-Id:\s+(.*?)\s*$/i) {
-        $msgid = $1;
-        while ($msgid =~ s/\([^\(\)]*\)//) { }  # remove comments and
-        $msgid =~ s/^\s+|\s+$//g;               # leading and trailing spaces
-        $msgid =~ s/\s+/ /g;                    # collapse whitespaces
-        $msgid =~ s/^.*?<(.*?)>.*$/$1/;         # keep only the id itself
-        $msgid =~ s/[^\x21-\x7e]/?/g;           # replace all weird chars
-        $msgid =~ s/[<>]/?/g;                   # plus all dangling angle brackets
-        $msgid =~ s/^(.+)$/<$1>/;               # re-bracket the id (if not empty)
+      if ($self->{spampd}->{envelopeheaders} && !$envto) {
+        unshift(@msglines, "X-Envelope-To: $recips\r\n");
+        $addedenvto = 1;
+        $self->dbg("Added X-Envelope-To");
       }
     }
+    push(@msglines, $_);
 
-    $msgid ||= "(unknown)";
+    # find the Message-ID for logging (code is mostly from spamd)
+    if ($inhdr && /^Message-Id:\s+(.*?)\s*$/i) {
+      $msgid = $1;
+      while ($msgid =~ s/\([^\(\)]*\)//) { }  # remove comments and
+      $msgid =~ s/^\s+|\s+$//g;               # leading and trailing spaces
+      $msgid =~ s/\s+/ /g;                    # collapse whitespaces
+      $msgid =~ s/^.*?<(.*?)>.*$/$1/;         # keep only the id itself
+      $msgid =~ s/[^\x21-\x7e]/?/g;           # replace all weird chars
+      $msgid =~ s/[<>]/?/g;                   # plus all dangling angle brackets
+      $msgid =~ s/^(.+)$/<$1>/;               # re-bracket the id (if not empty)
+    }
+  }
 
-    $self->mylog(2, "processing message $msgid for " . $recips);
+  $msgid ||= "(unknown)";
 
-    eval {
+  $self->mylog(2, "processing message $msgid for " . $recips);
 
-      local $SIG{ALRM} = sub { die "Timed out!\n" };
-      # save previous timer and start new
-      my $previous_alarm = alarm($self->{spampd}->{satimeout});
+  eval {
 
-      # Audit the message
+    local $SIG{ALRM} = sub { die "Timed out!\n" };
+
+    # save previous timer and start new
+    my $previous_alarm = alarm($self->{spampd}->{satimeout});
+
+    # Audit the message
+    if ($sa_version >= 3) {
+      $mail = $assassin->parse(\@msglines, 0);
+      undef @msglines;  #clear some memory-- this screws up SA < v3
+    }
+    elsif ($sa_version >= 2.70) {
+      $mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
+    }
+    else {
+      $mail = Mail::SpamAssassin::NoMailAudit->new(data => \@msglines);
+    }
+
+    # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
+    my $status = $assassin->check($mail);
+
+    $self->dbg("Returned from checking by SpamAssassin");
+
+    #  Rewrite mail if high spam factor or options --tagall
+    if ($status->is_spam || $self->{spampd}->{tagall}) {
+
+      $self->dbg("Rewriting mail using SpamAssassin");
+
+      # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
       if ($sa_version >= 3) {
-        $mail = $assassin->parse(\@msglines, 0);
-        undef @msglines;  #clear some memory-- this screws up SA < v3
-      }
-      elsif ($sa_version >= 2.70) {
-        $mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
+        $msg_resp = $status->rewrite_mail;
       }
       else {
-        $mail = Mail::SpamAssassin::NoMailAudit->new(data => \@msglines);
+        # SA versions prior to 3 need to get the response in a different manner
+        $status->rewrite_mail;
+        $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
       }
 
-      # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
-      my $status = $assassin->check($mail);
+      # Build the new message to relay.
+      # Pause the timeout alarm while we do this (no point in timing
+      # out here and leaving a half-written file).
+      my @resplines   = split(/\r?\n/, $msg_resp);
+      my $arraycont   = @resplines;
+      my $pause_alarm = alarm(0);
+      my $skipline    = 0;
+      $inhdr = 1;
+      $fh->seek(0, 0) or die "Can't rewind message file: $!";
+      $fh->truncate(0) or die "Can't truncate message file: $!";
 
-      if ($self->{spampd}->{debug}) {
-        $self->mylog(2, "Returned from checking by SpamAssassin");
-      }
+      for (0 .. ($arraycont - 1)) {
+        $inhdr = 0 if ($resplines[$_] =~ m/^\r?\n$/);
 
-      #  Rewrite mail if high spam factor or options --tagall
-      if ($status->is_spam || $self->{spampd}->{tagall}) {
-
-        if ($self->{spampd}->{debug}) {
-          $self->mylog(2, "Rewriting mail using SpamAssassin");
+        # if we are still in the header, skip over any
+        # "X-Envelope-To: " line if we have previously added it.
+        if ($inhdr && $addedenvto && $resplines[$_] =~ m/^X-Envelope-To: .*$/) {
+          $skipline = 1;
+          $self->dbg("Removing X-Envelope-To");
         }
 
-        # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
-        if ($sa_version >= 3) {
-          $msg_resp = $status->rewrite_mail;
+        if (!$skipline) {
+          $fh->print($resplines[$_] . "\r\n")
+            or die "Can't print to message file: $!";
         }
         else {
-          # SA versions prior to 3 need to get the response in a different manner
-          $status->rewrite_mail;
-          $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
+          $skipline = 0;
         }
-
-        # Build the new message to relay
-        # pause the timeout alarm while we do this (no point in timing
-        # out here and leaving a half-written file).
-        my @resplines   = split(/\r?\n/, $msg_resp);
-        my $pause_alarm = alarm(0);
-        my $inhdr       = 1;
-        my $skipline    = 0;
-        $fh->seek(0, 0) or die "Can't rewind message file: $!";
-        $fh->truncate(0) or die "Can't truncate message file: $!";
-        my $arraycont = @resplines;
-
-        for (0 .. ($arraycont - 1)) {
-          $inhdr = 0 if ($resplines[$_] =~ m/^\r?\n$/);
-
-          # if we are still in the header, skip over any
-          # "X-Envelope-To: " line if we have previously added it.
-          if ($inhdr && $addedenvto && $resplines[$_] =~ m/^X-Envelope-To: .*$/) {
-            $skipline = 1;
-            if ($self->{spampd}->{debug}) {
-              $self->mylog(2, "Removing X-Envelope-To");
-            }
-          }
-
-          if (!$skipline) {
-            $fh->print($resplines[$_] . "\r\n")
-              or die "Can't print to message file: $!";
-          }
-          else {
-            $skipline = 0;
-          }
-        }
-
-        #restart the alarm
-        alarm($pause_alarm);
-
       }
+      #restart the alarm
+      alarm($pause_alarm);
+    }  # end rewrite mail
 
-      # Log what we did
-      my $was_it_spam = 'clean message';
-      if ($status->is_spam) { $was_it_spam = 'identified spam'; }
-      my $msg_score     = sprintf("%.2f", $status->get_hits);
-      my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
-      my $proc_time     = sprintf("%.2f", time - $start);
+    # Log what we did
+    my $was_it_spam = 'clean message';
+    if ($status->is_spam) { $was_it_spam = 'identified spam'; }
+    my $msg_score     = sprintf("%.2f", $status->get_hits);
+    my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
+    my $proc_time     = sprintf("%.2f", time - $start);
 
-      $self->mylog(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
-                      "$recips in " . $proc_time . "s, $size bytes.");
+    $self->mylog(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
+                    "$recips in " . $proc_time . "s, $size bytes.");
 
-      # thanks to Kurt Andersen for this idea
-      if ($self->{spampd}->{rh}) {
-        $self->mylog(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit);
-      }
+    # thanks to Kurt Andersen for this idea
+    $self->mylog(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($self->{spampd}->{rh});
 
-      $status->finish();
-      $mail->finish();
+    $status->finish();
+    $mail->finish();
 
-      # set the timeout alarm back to wherever it was at
-      alarm($previous_alarm);
+    # set the timeout alarm back to wherever it was at
+    alarm($previous_alarm);
 
-    };
+  };  # end eval block
 
-    if ($@ ne '') {
-      $self->mylog(1, "WARNING!! SpamAssassin error on message $msgid: $@");
-      return 0;
-    }
-
-  }
-  else {
-
-    $self->mylog(2, "skipped large message (" . $size / 1024 . "KB)");
-
+  if ($@ ne '') {
+    $self->mylog(1, "WARNING!! SpamAssassin error on message $msgid: $@");
+    return 0;
   }
 
   return 1;
-
 }
 
 sub process_request {
   my $self = shift;
-  my $msg;
-  my $rcpt_ok;
 
   eval {
 
     local $SIG{ALRM} = sub { die "Child server process timed out!\n" };
     my $timeout = $self->{spampd}->{childtimeout};
+    my $rcpt_ok = 0;
 
     # start a timeout alarm
     alarm($timeout);
 
     # start an smtp server
     my $smtp_server = SpamPD::Server->new($self->{server}->{client});
-    unless (defined $smtp_server) {
-      die "Failed to create listening Server: $!";
-    }
+    die "Failed to create listening Server: $!" unless (defined $smtp_server);
 
     $self->{smtp_server} = $smtp_server;
 
-    if ($self->{spampd}->{debug}) {
-      $self->mylog(2, "Initiated Server");
-    }
+    $self->dbg("Initiated Server");
 
     # start an smtp "client" (really a sending server)
     my $client = SpamPD::Client->new(
       interface   => $self->{spampd}->{relayhost},
       port        => $self->{spampd}->{relayport},
-      unix_socket => $self->{spampd}->{unix_relaysocket});
-    unless (defined $client) {
-      die "Failed to create sending Client: $!";
-    }
+      unix_socket => $self->{spampd}->{unix_relaysocket}
+    );
+    die "Failed to create sending Client: $!" unless (defined $client);
 
-    if ($self->{spampd}->{debug}) {
-      $self->mylog(2, "Initiated Client");
-    }
+    $self->dbg("Initiated Client");
 
     # pass on initial client response
     # $client->hear can handle multiline responses so no need to loop
     $smtp_server->ok($client->hear)
       or die "Error in initial server->ok(client->hear): $!";
 
-    if ($self->{spampd}->{debug}) {
-      $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'");
-    }
+    $self->dbg("smtp_server state: '" . $smtp_server->{state} . "'");
 
     # while loop over incoming data from the server
     while (my $what = $smtp_server->chat) {
 
-      if ($self->{spampd}->{debug}) {
-        $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'");
-      }
+      $self->dbg("smtp_server state: '" . $smtp_server->{state} . "'");
 
       # until end of DATA is sent, just pass the commands on transparently
       if ($what ne '.') {
-
         $client->say($what)
           or die "Failure in client->say(what): $!";
-
-        # but once the data is sent now we want to process it
       }
+      # but once the data is sent now we want to process it
       else {
-
         # spam checking routine - message might be rewritten here
         my $pmrescode = $self->process_message($smtp_server->{data});
 
         # pass on the messsage if exit code <> 0 or die-on-sa-errors flag is off
         if ($pmrescode or !$self->{spampd}->{dose}) {
-
           # need to give the client a rewound file
           $smtp_server->{data}->seek(0, 0)
             or die "Can't rewind mail file: $!";
-
           # now send the data on through the client
           $client->yammer($smtp_server->{data})
             or die "Failure in client->yammer(smtp_server->{data}): $!";
-
         }
         else {
-
           $smtp_server->ok("450 Temporary failure processing message, please try again later");
           last;
         }
@@ -727,9 +658,7 @@ sub process_request {
         $smtp_server->{data}->close
           or $self->mylog(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
 
-        if ($self->{spampd}->{debug}) {
-          $self->mylog(2, "Finished sending DATA");
-        }
+        $self->dbg("Finished sending DATA");
       }
 
       # pass on whatever the relayhost said in response
@@ -738,17 +667,13 @@ sub process_request {
       $smtp_server->ok($destresp)
         or die "Error in server->ok(client->hear): $!";
 
-      if ($self->{spampd}->{debug}) {
-        $self->mylog(2, "Destination response: '" . $destresp . "'");
-      }
+      $self->dbg("Destination response: '" . $destresp . "'");
 
       # if we're in data state but the response is an error, exit data state.
       # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
       if ($smtp_server->{state} =~ /^data/i and $destresp =~ /^[45]\d{2} /) {
         $smtp_server->{state} = "err_after_data";
-        if ($self->{spampd}->{debug}) {
-          $self->mylog(2, "Destination response indicates error after DATA command");
-        }
+        $self->dbg("Destination response indicates error after DATA command");
       }
 
       # patch for LMTP - multiple responses after . after DATA, done by Vladislav Kurz
@@ -762,9 +687,7 @@ sub process_request {
             $destresp = $client->hear;
             $smtp_server->ok($destresp)
               or die "Error in server->ok(client->hear): $!";
-            if ($self->{spampd}->{debug}) {
-              $self->mylog(2, "Destination response: '" . $destresp . "'");
-            }
+            $self->dbg("Destination response: '" . $destresp . "'");
           }
         }
       }
@@ -780,23 +703,20 @@ sub process_request {
     $smtp_server->{sock}->close
       or die "Couldn't close smtp_server->{sock}: $!";
 
-    if ($self->{spampd}->{debug}) {
-      $self->mylog(2, "Closed connections");
-    }
+    $self->dbg("Closed connections");
 
   };  # end eval block
 
   alarm(0);  # stop the timer
-             # check for error in eval block
+  # check for error in eval block
   if ($@ ne '') {
     chomp($@);
-    $msg = "WARNING!! Error in process_request eval block: $@";
+    my $msg = "WARNING!! Error in process_request eval block: $@";
     $self->mylog(0, $msg);
     die($msg . "\n");
   }
 
   $self->{spampd}->{instance}++;
-
 }
 
 # Net::Server hook
@@ -813,10 +733,8 @@ sub post_bind_hook {
 # Net::Server hook
 # about to exit child process
 sub child_finish_hook {
-  my ($self) = shift;
-  if ($self->{spampd}->{debug}) {
-    $self->mylog(2, "Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
-  }
+  my $self = shift;
+  $self->dbg("Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
 }
 
 # older Net::Server versions (<= 0.87) die when logging a % character to Sys::Syslog
@@ -826,14 +744,19 @@ sub mylog($$$) {
   $self->log($level, $msg);
 }
 
+sub dbg($$) {
+  my ($self, $msg) = @_;
+  $self->mylog(2, $msg) if $self->{spampd}->{debug};
+}
+
 # Override Net::Server's HUP handling - just gracefully restart all the children.
 sub sig_hup {
   my $self = shift;
   $self->hup_children;
 }
 
-##################   SETUP   ######################
 
+##################   SETUP   ######################
 
 my $relayhost       = '127.0.0.1';                       # relay to ip
 my $relayport       = 25;                                # relay to port
@@ -1086,10 +1009,10 @@ Options:
   --relayport=n            Port to relay to (alternate syntax to above).
   --relaysocket            UNIX socket to relay to. Alternative to
                              --relayhost and --relayport.
-  --children=n             Number of child processes (servers) to start and
+  --children=n or -c n     Number of child processes (servers) to start and
                              keep running. Default is 5 (plus 1 parent proc).
   --maxrequests=n          Maximum requests that each child can process before
-                             exiting. Default is 20.
+    or --mr n                exiting. Default is 20.
   --childtimeout=n         Time out children after this many seconds during
                              transactions (each S/LMTP command including the
                              time it takes to send the data). 
@@ -1098,11 +1021,11 @@ Options:
                              Default is 285 seconds.
 
   --pid=filename           Store the daemon's process ID in this file. 
-                             Default is /var/run/spampd.pid
+    or -p filename           Default is /var/run/spampd.pid
   --user=username          Specifies the user that the daemon runs as.
-                             Default is mail.
+    or -u username           Default is mail.
   --group=groupname        Specifies the group that the daemon runs as.
-                             Default is mail.
+    or -g groupname          Default is mail.
   --nodetach               Don't detach from the console and fork into
                              background. Useful for some daemon control
                              tools or when running as a win32 service
@@ -1111,8 +1034,7 @@ Options:
                              from the command line and then run the
                              POSIX::setsid() command to truly daemonize.
                              Only used if --nodetach isn't specified.
-
-  --logsock=inet or unix   Allows specifying the syslog socket type. Default is 
+  --logsock=(inet|unix)    Allows specifying the syslog socket type. Default is 
                              'unix' except on HPUX and SunOS which use 'inet'.
 
   --maxsize=n              Maximum size of mail to scan (in KB).
@@ -1185,7 +1107,7 @@ __END__
 
 =head1 NAME
 
-SpamPD - Spam Proxy Daemon (version 2.2)
+SpamPD - Spam Proxy Daemon (version 2.5x)
 
 =head1 Synopsis
 
@@ -1221,7 +1143,7 @@ B<spampd> B<--help>
 =head1 Description
 
 I<spampd> is an SMTP/LMTP proxy that marks (or tags) spam using
-SpamAssassin (http://www.SpamAssassin.org/). The proxy is designed
+SpamAssassin (L<http://www.SpamAssassin.org/>). The proxy is designed
 to be transparent to the sending and receiving mail servers and at no point
 takes responsibility for the message itself. If a failure occurs within
 I<spampd> (or SpamAssassin) then the mail servers will disconnect and the
@@ -1238,8 +1160,7 @@ it rewrite all messages passing through by adding the --tagall option
 I<spampd> logs all aspects of its operation to syslog(8), using the
 mail syslog facility.
 
-The latest version can be found at 
-L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>.
+The latest version can be found at L<https://github.com/mpaperno/spampd>.
 
 =head1 Requires
 
@@ -1388,7 +1309,7 @@ I<spampd> is set up for the default Postfix timeout values.
 
 =over 5
 
-=item B<--host=ip[:port] or hostname[:port]>
+=item B<--host=(ip|hostname)[:port]>
 
 Specifies what hostname/IP and port I<spampd> listens on. By default, it listens
 on 127.0.0.1 (localhost) on port 10025. 
@@ -1411,9 +1332,9 @@ Specifies what UNIX socket I<spampd> listens on. If this is specified,
 The file mode fo the created UNIX socket (see --socket) in octal
 format, e.g. 700 to specify acces only for the user spampd is run as.
 
-=item B<--relayhost=ip[:port] or hostname[:port]>
+=item B<--relayhost=(ip|hostname)[:port]>
 
-Specifies the hostname/IP where I<spampd> will relay all
+Specifies the hostname/IP to which I<spampd> will relay all
 messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
 defaults to 25.
 
@@ -1424,17 +1345,17 @@ alternate to using the above --relayhost=ip:port notation.
 
 =item B<--relaysocket=socketpath>
 
-Spevifies what UNIX socket spampd will relay to. If this is specified
+Specifies what UNIX socket spampd will relay to. If this is specified
 --relayhost and --relayport will be ignored.
 
-=item B<--user=username> or B<--u=username>
+=item B<--user=username> or B<-u=username>
 
-=item B<--group=groupname> or  B<--g=groupname>
+=item B<--group=groupname> or  B<-g=groupname>
 
-Specifies the user and group that the proxy will run as. Default is
+Specifies the user and/or group that the proxy will run as. Default is
 I<mail>/I<mail>.
 
-=item B<--children=n> or B<--c=n>
+=item B<--children=n> or B<-c=n>
 
 Number of child servers to start and maintain (where n > 0). Each child will 
 process up to --maxrequests (below) before exiting and being replaced by 
@@ -1478,14 +1399,14 @@ on anyway (w/out spam tagging, obviously).  To fail the message with a temp
 450 error, see the --dose (die-on-sa-errors) option, below.
 Default is 285 seconds.
 
-=item B<--pid=filename> or B<--p=filename>
+=item B<--pid=filename> or B<-p=filename>
 
 Specifies a filename where I<spampd> will write its process ID so
 that it is easy to kill it later. The directory that will contain this
 file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
-=item B<--logsock=unix or inet> C<(new in v2.20)>
+=item B<--logsock=(unix|inet)> C<(new in v2.20)>
 
 Syslog socket to use.  May be either "unix" of "inet".  Default is "unix"
 except on HP-UX and SunOS (Solaris) systems which seem to prefer "inet".
@@ -1518,7 +1439,7 @@ you specify this option however, the mail is instead rejected with a temporary
 error (code 450, which means the origination server should keep retrying to send 
 it).  See the related --satimeout option, above.
 
-=item B<--tagall> or B<--a>
+=item B<--tagall> or B<-a>
 
 Tells I<spampd> to have SpamAssassin add headers to all scanned mail,
 not just spam.  By default I<spampd> will only rewrite messages which 
@@ -1560,7 +1481,7 @@ controls auto whitelist use via local.cf settings.
 For SA version < 3.0, turns on the SpamAssassin global whitelist feature.  
 See the SA docs. Note that per-user whitelists are not available.
 
-=item B<--local-only> or B<--L>
+=item B<--local-only> or B<-L>
 
 Turn off all SA network-based tests (DNS, Razor, etc).
 
@@ -1580,14 +1501,14 @@ Use the specified file for SpamAssassin configuration options in addition to the
 default local.cf file.  Any options specified here will override the same
 option from local.cf.  Default is to not use any additional configuration file.
 
-=item B<--debug> or B<--d>
+=item B<--debug> or B<-d>
 
 Turns on SpamAssassin debug messages which print to the system mail log
 (same log as spampd will log to).  Also turns on more verbose logging of 
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 
-=item B<--help> or B<--h>
+=item B<--help> or B<-h> or B<-?>
 
 Prints usage information.
 
@@ -1638,8 +1559,7 @@ children immediately and shut down the daemon.
 
 =over 5
 
-=item Running between firewall/gateway and internal mail server
-
+=item Running between firewall/gateway and internal mail server:
 
 I<spampd> listens on port 10025 on the same host as the internal mail server.
 
@@ -1652,20 +1572,20 @@ on another host.
   spampd --relayhost=192.168.1.10
 
 =item Using Postfix advanced content filtering example
-and the SA auto-whitelist feature
+and disable SA network checks:
 
-  spampd --port=10025 --relayhost=127.0.0.1:10026 --auto-whitelist
+  spampd --port=10025 --relayhost=127.0.0.1:10026 --local-only
 
-=item Using UNIX sockets instead if INET ports
+=item Using UNIX sockets instead if INET ports:
 
 Spampd listens on the UNIX socket /var/run/spampd.socket with
 persmissions 700 instead of a TCP port:
 
-spampd --socket /var/run/spampd.socket --socket-perms 700
+  spampd --socket /var/run/spampd.socket --socket-perms 700
 
 Spampd will relay mail to /var/run/dovecot/lmtp instead of a TCP port:
 
-spampd --relaysocket /var/run/dovecot/lmtp
+  spampd --relaysocket /var/run/dovecot/lmtp
 
 Remember that the user spampd runs as needs to have read AND write
 permissions on the relaysocket!
@@ -1675,7 +1595,7 @@ permissions on the relaysocket!
 =head1 Credits
 
 I<spampd> is written and maintained by Maxim Paperno <MPaperno@WorldDesign.com>.
-See http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm for latest info.
+See L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm> for latest info.
 
 I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan 
 Stanley Dean Witter. These are distributed under the GNU GPL (see
@@ -1687,10 +1607,10 @@ this version of I<spampd>.  See http://bent.latency.net/smtpprox/ .
 
 I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace 
 amounts of his code or documentation may still remain. Thanks to him for the
-original inspiration and code. See http://www.rudedog.org/assassind/ .
+original inspiration and code. L<https://openshut.net/>.
 
 Also thanks to I<spamd> (included with SpamAssassin) and 
-I<amavisd-new> (http://www.ijs.si/software/amavisd/) for some tricks.
+I<amavisd-new> (L<http://www.ijs.si/software/amavisd/>) for some tricks.
 
 Various people have contributed patches, bug reports, and ideas, all of whom
 I would like to thank.  I have tried to include credits in code comments and
@@ -1703,11 +1623,14 @@ in the change log, as appropriate.
  Urban Petry
  Sven Mueller
 
+See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
+
 =head1 Copyright, License, and Disclaimer
 
-I<spampd> is Copyright (c) 2002 by World Design Group, Inc. and Maxim Paperno.
+I<spampd> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018 
+by World Design Group, Inc. and Maxim Paperno.
 
-Portions are Copyright (C) 2001 Morgan Stanley Dean Witter as mentioned above
+Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above
 in the Credits section.
 
     This program is free software; you can redistribute it and/or modify
@@ -1720,12 +1643,14 @@ in the Credits section.
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
-    The GNU GPL can be found at http://www.fsf.org/copyleft/gpl.html
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<https://www.gnu.org/licenses/>.
 
 
 =head1 Bugs
 
-None known.  Please report any to MPaperno@WorldDesign.com.
+Use GitHub issue tracking: L<https://github.com/mpaperno/spampd/issues>
 
 =head1 To Do
 
