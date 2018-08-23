@@ -1599,6 +1599,28 @@ compatibility with prevoius I<spampd> versions:
 
 =back
 
+=head1 Signals
+
+=over 5
+
+=item HUP
+
+Sending HUP signal to the master process will restart all the children
+gracefully (meaning the currently running requests will shut down once
+the request is complete).  SpamAssassin configuration is NOT reloaded.
+
+=item TTIN, TTOU
+
+Sending TTIN signal to the master process will dynamically increase
+the number of children by one, and TTOU signal will decrease it by one.
+
+=item INT, TERM
+
+Sending INT or TERM signal to the master process will kill all the
+children immediately and shut down the daemon.
+
+=back
+
 =head1 Examples
 
 =over 5
