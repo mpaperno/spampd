@@ -38,9 +38,9 @@
 #
 #    The GNU GPL can be found at http://www.fsf.org/copyleft/gpl.html
 #
-# spampd v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan 
+# spampd v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan
 #   Stanley Dean Witter. These are also distributed under the GNU GPL (see
-#   module code for more details). Both modules have been slightly modified 
+#   module code for more details). Both modules have been slightly modified
 #   from the originals and are included in this file under new names.
 #
 # spampd v1 was based on code by Dave Carrigan named assassind. Trace amounts
@@ -99,39 +99,39 @@ use IO::File;
 # =cut
 
 sub new {
-	
-# This now emulates Net::SMTP::Server::Client for use with Net::Server which
-# passes an already open socket.
 
-    my($this, $socket) = @_;
-    
-    my $class = ref($this) || $this;
-    my $self = {};
-    $self->{sock} = $socket;
-    
-    bless($self, $class);
-    
-    die "$0: socket bind failure: $!\n" unless defined $self->{sock};
-    $self->{state} = 'started';
-    return $self;
- 
-#    Original code, removed by MP for spampd use
-#
-#     my ($this, @opts) = @_;
-#     my $class = ref($this) || $this;
-#     my $self = bless { @opts }, $class;
-#     $self->{sock} = IO::Socket::INET->new(
-# 	LocalAddr => $self->{interface},
-# 	LocalPort => $self->{port},
-# 	Proto => 'tcp',
-# 	Type => SOCK_STREAM,
-# 	Listen => 65536,
-# 	Reuse => 1,
-#     );
-#     die "$0: socket bind failure: $!\n" unless defined $self->{sock};
-#     $self->{state} = 'just bound',
-#     return $self;
-    
+  # This now emulates Net::SMTP::Server::Client for use with Net::Server which
+  # passes an already open socket.
+
+  my ($this, $socket) = @_;
+
+  my $class = ref($this) || $this;
+  my $self = {};
+  $self->{sock} = $socket;
+
+  bless($self, $class);
+
+  die "$0: socket bind failure: $!\n" unless defined $self->{sock};
+  $self->{state} = 'started';
+  return $self;
+
+  #    Original code, removed by MP for spampd use
+  #
+  #     my ($this, @opts) = @_;
+  #     my $class = ref($this) || $this;
+  #     my $self = bless { @opts }, $class;
+  #     $self->{sock} = IO::Socket::INET->new(
+  # 	LocalAddr => $self->{interface},
+  # 	LocalPort => $self->{port},
+  # 	Proto => 'tcp',
+  # 	Type => SOCK_STREAM,
+  # 	Listen => 65536,
+  # 	Reuse => 1,
+  #     );
+  #     die "$0: socket bind failure: $!\n" unless defined $self->{sock};
+  #     $self->{state} = 'just bound',
+  #     return $self;
+
 }
 
 # sub accept { }
@@ -166,66 +166,74 @@ sub new {
 # =cut
 
 sub chat {
-    my ($self) = @_;
-    local(*_);
-    if ($self->{state} !~ /^data/i) {
-		return 0 unless defined($_ = $self->_getline);
-		s/[\r\n]*$//;
-		$self->{state} = $_;
-		if (s/^(l|h)?he?lo\s+//i) {  # mp: find helo|ehlo|lhlo
-			# mp: determine protocol (for future use)
-			if (s/^helo\s+//i) {
-			    $self->{proto} = "smtp";
-			} elsif (s/^ehlo\s+//i) {
-			    $self->{proto} = "esmtp";
-			} elsif (s/^lhlo\s+//i) {
-			    $self->{proto} = "lmtp";
-			}
+  my ($self) = @_;
+  local (*_);
+  if ($self->{state} !~ /^data/i) {
+    return 0 unless defined($_ = $self->_getline);
+    s/[\r\n]*$//;
+    $self->{state} = $_;
+    if (s/^(l|h)?he?lo\s+//i) {  # mp: find helo|ehlo|lhlo
+      # mp: determine protocol (for future use)
+      if (s/^helo\s+//i) {
+        $self->{proto} = "smtp";
+      }
+      elsif (s/^ehlo\s+//i) {
+        $self->{proto} = "esmtp";
+      }
+      elsif (s/^lhlo\s+//i) {
+        $self->{proto} = "lmtp";
+      }
 
-#			if ( /^L/i ) { 
-#				$self->{proto} = "lmtp";
-#			} elsif ( /^E/i ) { 
-#    			$self->{proto} = "esmtp"; 
-#			} else { 
-#    			$self->{proto} = "smtp"; }
-		    s/\s*$//;
-		    s/\s+/ /g;
-		    $self->{helo} = $_;
-		} elsif (s/^rset\s*//i) {
-		    delete $self->{to};
-		    delete $self->{data};
-		    delete $self->{recipients};
-		} elsif (s/^mail\s+from:\s*//i) {
-		    delete $self->{to};
-		    delete $self->{data};
-		    delete $self->{recipients};
-		    s/\s*$//;
-		    $self->{from} = $_;
-		} elsif (s/^rcpt\s+to:\s*//i) {
-		    s/\s*$//; s/\s+/ /g;
-		    $self->{to} = $_;
-		    push @{$self->{recipients}}, $_;
-		} elsif (/^data/i) {
-		    $self->{to} = $self->{recipients};
-		}
-    } else {
-		if (defined($self->{data})) {
-		    $self->{data}->seek(0, 0);
-		    $self->{data}->truncate(0);
-		} else {
-		    $self->{data} = IO::File->new_tmpfile;
-		}
-		while (defined($_ = $self->_getline)) {
-		    if ($_ eq ".\r\n") {
-			  $self->{data}->seek(0,0);
-			  return $self->{state} = '.';
-		    }
-		    s/^\.\./\./;
-		    $self->{data}->print($_) or die "$0: write error saving data\n";
-		}
-		return(0);
+      #			if ( /^L/i ) {
+      #				$self->{proto} = "lmtp";
+      #			} elsif ( /^E/i ) {
+      #    			$self->{proto} = "esmtp";
+      #			} else {
+      #    			$self->{proto} = "smtp"; }
+      s/\s*$//;
+      s/\s+/ /g;
+      $self->{helo} = $_;
     }
-    return $self->{state};
+    elsif (s/^rset\s*//i) {
+      delete $self->{to};
+      delete $self->{data};
+      delete $self->{recipients};
+    }
+    elsif (s/^mail\s+from:\s*//i) {
+      delete $self->{to};
+      delete $self->{data};
+      delete $self->{recipients};
+      s/\s*$//;
+      $self->{from} = $_;
+    }
+    elsif (s/^rcpt\s+to:\s*//i) {
+      s/\s*$//; s/\s+/ /g;
+      $self->{to} = $_;
+      push @{$self->{recipients}}, $_;
+    }
+    elsif (/^data/i) {
+      $self->{to} = $self->{recipients};
+    }
+  }
+  else {
+    if (defined($self->{data})) {
+      $self->{data}->seek(0, 0);
+      $self->{data}->truncate(0);
+    }
+    else {
+      $self->{data} = IO::File->new_tmpfile;
+    }
+    while (defined($_ = $self->_getline)) {
+      if ($_ eq ".\r\n") {
+        $self->{data}->seek(0, 0);
+        return $self->{state} = '.';
+      }
+      s/^\.\./\./;
+      $self->{data}->print($_) or die "$0: write error saving data\n";
+    }
+    return (0);
+  }
+  return $self->{state};
 }
 
 # =item ok([message]);
@@ -238,10 +246,10 @@ sub chat {
 # =cut
 
 sub ok {
-    my ($self, @msg) = @_;
-    @msg = ("250 ok.") unless @msg;
-    $self->_print("@msg\r\n") or
-	  die "$0: write error acknowledging $self->{state}: $!\n";
+  my ($self, @msg) = @_;
+  @msg = ("250 ok.") unless @msg;
+  $self->_print("@msg\r\n") or
+    die "$0: write error acknowledging $self->{state}: $!\n";
 }
 
 # =item fail([message]);
@@ -254,28 +262,28 @@ sub ok {
 # =cut
 
 sub fail {
-    my ($self, @msg) = @_;
-    @msg = ("550 no.") unless @msg;
-    $self->_print("@msg\r\n") or
-	  die "$0: write error acknowledging $self->{state}: $!\n";
+  my ($self, @msg) = @_;
+  @msg = ("550 no.") unless @msg;
+  $self->_print("@msg\r\n") or
+    die "$0: write error acknowledging $self->{state}: $!\n";
 }
 
 # utility functions
 
 sub _getline {
-    my ($self) = @_;
-    local ($/) = "\r\n";
-    my $tmp = $self->{sock}->getline;
-    if ( defined $self->{debug} ) {
-      $self->{debug}->print($tmp) if ($tmp);
-    }
-    return $tmp;
+  my ($self) = @_;
+  local ($/) = "\r\n";
+  my $tmp = $self->{sock}->getline;
+  if (defined $self->{debug}) {
+    $self->{debug}->print($tmp) if ($tmp);
+  }
+  return $tmp;
 }
 
 sub _print {
-    my ($self, @msg) = @_;
-    $self->{debug}->print(@msg) if defined $self->{debug};
-    $self->{sock}->print(@msg);
+  my ($self, @msg) = @_;
+  $self->{debug}->print(@msg) if defined $self->{debug};
+  $self->{sock}->print(@msg);
 }
 
 1;
@@ -326,26 +334,27 @@ use IO::Socket::IP;
 # =cut
 
 sub new {
-    my ($this, @opts) = @_;
-    my $class = ref($this) || $this;
-    my $self = bless { timeout => 300, @opts }, $class;
-	if (defined $self->{unix_socket}) {
-		$self->{sock} = IO::Socket::UNIX->new(
-			Peer => $self->{unix_socket},
-			Timeout => $self->{timeout},
-			Type => SOCK_STREAM,
-		);
-	} else {
-		$self->{sock} = IO::Socket::IP->new(
-			PeerAddr => $self->{interface},
-			PeerPort => $self->{port},
-			Timeout => $self->{timeout},
-			Proto => 'tcp',
-			Type => SOCK_STREAM,
-		);
-	}
-    die "$0: socket connect failure: $!\n" unless defined $self->{sock};
-    return $self;
+  my ($this, @opts) = @_;
+  my $class = ref($this) || $this;
+  my $self = bless {timeout => 300, @opts}, $class;
+  if (defined $self->{unix_socket}) {
+    $self->{sock} = IO::Socket::UNIX->new(
+      Peer    => $self->{unix_socket},
+      Timeout => $self->{timeout},
+      Type    => SOCK_STREAM,
+    );
+  }
+  else {
+    $self->{sock} = IO::Socket::IP->new(
+      PeerAddr => $self->{interface},
+      PeerPort => $self->{port},
+      Timeout  => $self->{timeout},
+      Proto    => 'tcp',
+      Type     => SOCK_STREAM,
+    );
+  }
+  die "$0: socket connect failure: $!\n" unless defined $self->{sock};
+  return $self;
 }
 
 # =item hear
@@ -358,16 +367,16 @@ sub new {
 # =cut
 
 sub hear {
-    my ($self) = @_;
-    my ($tmp, $reply);
-    return undef unless $tmp = $self->{sock}->getline;
-    while ($tmp =~ /^\d{3}-/) {
-		$reply .= $tmp;
-		return undef unless $tmp = $self->{sock}->getline;
-    }
+  my ($self) = @_;
+  my ($tmp, $reply);
+  return undef unless $tmp = $self->{sock}->getline;
+  while ($tmp =~ /^\d{3}-/) {
     $reply .= $tmp;
-    $reply =~ s/\r\n$//;
-    return $reply;
+    return undef unless $tmp = $self->{sock}->getline;
+  }
+  $reply .= $tmp;
+  $reply =~ s/\r\n$//;
+  return $reply;
 }
 
 # =item say("command text")
@@ -377,9 +386,9 @@ sub hear {
 # =cut
 
 sub say {
-    my ($self, @msg) = @_;
-    return unless @msg;
-    $self->{sock}->print("@msg", "\r\n") or die "$0: write error: $!";
+  my ($self, @msg) = @_;
+  return unless @msg;
+  $self->{sock}->print("@msg", "\r\n") or die "$0: write error: $!";
 }
 
 # =item yammer(FILEHANDLE)
@@ -398,16 +407,16 @@ sub say {
 # =cut
 
 sub yammer {
-    my ($self, $fh) = (@_);
-    local (*_);
-    local ($/) = "\r\n";
-    $self->{sock}->autoflush(0);  # use less writes (thx to Sam Horrocks for the tip)
-    while (<$fh>) {
-	  s/^\./../;
-	  $self->{sock}->print($_) or die "$0: write error: $!\n";
-    }
-    $self->{sock}->autoflush(1);  # restore unbuffered socket operation
-    $self->{sock}->print(".\r\n") or die "$0: write error: $!\n";
+  my ($self, $fh) = (@_);
+  local (*_);
+  local ($/) = "\r\n";
+  $self->{sock}->autoflush(0);  # use fewer writes (thx to Sam Horrocks for the tip)
+  while (<$fh>) {
+    s/^\./../;
+    $self->{sock}->print($_) or die "$0: write error: $!\n";
+  }
+  $self->{sock}->autoflush(1);  # restore unbuffered socket operation
+  $self->{sock}->print(".\r\n") or die "$0: write error: $!\n";
 }
 
 1;
@@ -425,8 +434,8 @@ use Mail::SpamAssassin;
 BEGIN {
   # Load Time::HiRes if it's available
   eval { require Time::HiRes };
-  Time::HiRes->import( qw(time) ) unless $@;
-  
+  Time::HiRes->import(qw(time)) unless $@;
+
   # use included modules
   import SpamPD::Server;
   import SpamPD::Client;
@@ -434,192 +443,198 @@ BEGIN {
 
 
 use vars qw(@ISA $VERSION);
-our @ISA = qw(Net::Server::PreForkSimple);
+our @ISA     = qw(Net::Server::PreForkSimple);
 our $VERSION = '2.51';
 
 sub process_message {
-	my ($self, $fh) = @_;
-	
-	# output lists with a , delimeter by default
-	local ($") = ",";
-	
-	# start a timer
-	my $start = time;
-    # use the assassin object created during startup
-    my $assassin = $self->{spampd}->{assassin};
-    my $sa_version = Mail::SpamAssassin::Version();
-    # $sa_version can have a non-numeric value if version_tag is
-    # set in local.cf. Only take first numeric value
-    $sa_version =~ s/([0-9]*\.[0-9]*).*/$1/;
+  my ($self, $fh) = @_;
 
-    # this gets info about the message temp file
-    my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
-    
-    # Only process message under --maxsize KB
-    if ( $size < ($self->{spampd}->{maxsize} * 1024) ) {
-	    
-	    my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
-	    
-	    my $inhdr = 1;
-	    my $envfrom = 0;
-	    my $envto = 0;
-	    my $addedenvto = 0;
-	    
-		$recips = "@{$self->{smtp_server}->{to}}";
-		if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/ ) {$sender = $1;}
-	    $recips ||= "(unknown)";
-		$sender ||= "(unknown)";
-	    
-		## read message into array of lines to feed to SA
-	    
-	    # loop over message file content
-	    $fh->seek(0,0) or die "Can't rewind message file: $!";
-		while (<$fh>) { 
-			$envto = 1 if (/^(?:X-)?Envelope-To: /);
-			$envfrom = 1 if (/^(?:X-)?Envelope-From: /);
-			if ( (/^\r?\n$/) && ($inhdr ==1) ) {
-    	    	$inhdr = 0; # outside of msg header after first blank line
-    	    	if ( ( $self->{spampd}->{envelopeheaders} || 
-	    				$self->{spampd}->{setenvelopefrom} ) && 
-	    				$envfrom == 0 ) {
-		    		unshift(@msglines, "X-Envelope-From: $sender\r\n");
-					if ( $self->{spampd}->{debug} ) {
-					  $self->mylog(2, "Added X-Envelope-From"); }
-	    		}
-    	    	if ( $self->{spampd}->{envelopeheaders} && $envto == 0 ) {
-	       	 		unshift(@msglines, "X-Envelope-To: $recips\r\n");
-	        		$addedenvto = 1;
-					if ( $self->{spampd}->{debug} ) {
-					  $self->mylog(2, "Added X-Envelope-To"); }
-				}
-    	    }
-			push(@msglines, $_);
-			# find the Message-ID for logging (code is mostly from spamd)
-            if ( $inhdr && /^Message-Id:\s+(.*?)\s*$/i ) {
-                $msgid = $1;
-                while ( $msgid =~ s/\([^\(\)]*\)// ) { } # remove comments and
-				$msgid =~ s/^\s+|\s+$//g;          # leading and trailing spaces
-				$msgid =~ s/\s+/ /g;               # collapse whitespaces
-				$msgid =~ s/^.*?<(.*?)>.*$/$1/;    # keep only the id itself
-				$msgid =~ s/[^\x21-\x7e]/?/g;      # replace all weird chars
-				$msgid =~ s/[<>]/?/g;              # plus all dangling angle brackets
-				$msgid =~ s/^(.+)$/<$1>/;          # re-bracket the id (if not empty)
-            }
-		}
-		
-	    $msgid ||= "(unknown)";
-	    
-	    $self->mylog(2, "processing message $msgid for ". $recips);
-	    
-		eval {
-			
-			local $SIG{ALRM} = sub { die "Timed out!\n" };
-			# save previous timer and start new
-			my $previous_alarm = alarm($self->{spampd}->{satimeout}); 
-			
-			# Audit the message
-			if ($sa_version >= 3) {
-				$mail = $assassin->parse(\@msglines, 0);
-				undef @msglines;  #clear some memory-- this screws up SA < v3
-			} elsif ($sa_version >= 2.70) {
-				$mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
-			} else {
-		   		$mail = Mail::SpamAssassin::NoMailAudit->new (
-		                            data => \@msglines );
-			}
-	
-			
-		    # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
-		    my $status = $assassin->check($mail);
-		    
-			if ( $self->{spampd}->{debug} ) {
-			  $self->mylog(2, "Returned from checking by SpamAssassin"); }
+  # output lists with a , delimeter by default
+  local ($") = ",";
 
-			#  Rewrite mail if high spam factor or options --tagall
-			if ( $status->is_spam || $self->{spampd}->{tagall} ) { 
-				
-				if ( $self->{spampd}->{debug} ) {
-				  $self->mylog(2, "Rewriting mail using SpamAssassin"); }
-		    
-				# use Mail::SpamAssassin:PerMsgStatus object to rewrite message
-				if ( $sa_version >= 3 ) {
-					$msg_resp = $status->rewrite_mail; 
-				} else {
-				# SA versions prior to 3 need to get the response in a different manner
-					$status->rewrite_mail; 
-			    	$msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
-				}
-				
-			    # Build the new message to relay
-			    # pause the timeout alarm while we do this (no point in timing
-			    # out here and leaving a half-written file).
-			    my @resplines = split(/\r?\n/, $msg_resp);
-			    my $pause_alarm = alarm(0);
-			    my $inhdr = 1;
-			    my $skipline = 0;
-			    $fh->seek(0,0) or die "Can't rewind message file: $!";
-			    $fh->truncate(0) or die "Can't truncate message file: $!";
-			    my $arraycont = @resplines; 
-			    
-				for ( 0..($arraycont-1) ) {  
-					$inhdr=0 if ($resplines[$_] =~ m/^\r?\n$/);
-					
-					# if we are still in the header, skip over any
-					# "X-Envelope-To: " line if we have previously added it.
-					if ( $inhdr == 1 && 
-						 	$addedenvto == 1 &&
-						 	$resplines[$_] =~ m/^X-Envelope-To: .*$/) {
-						$skipline = 1;
-						if ( $self->{spampd}->{debug} ) {
-						  $self->mylog(2, "Removing X-Envelope-To"); }
-					}
-					
-					if (! $skipline) {
-						$fh->print($resplines[$_] . "\r\n") 
-					    	or die "Can't print to message file: $!"; 
-					} else { 
-						$skipline = 0; }
-				}
-				
-				#restart the alarm
-				alarm($pause_alarm);
-	    
-			}
-	
-			# Log what we did
-		    my $was_it_spam = 'clean message';
-		    if ($status->is_spam) { $was_it_spam = 'identified spam'; }
-		    my $msg_score = sprintf("%.2f",$status->get_hits);
-		    my $msg_threshold = sprintf("%.2f",$status->get_required_hits);
-		    my $proc_time = sprintf("%.2f", time - $start);
-		    
-			$self->mylog(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for ".
-							"$recips in ". $proc_time . "s, $size bytes.");
-			
-			# thanks to Kurt Andersen for this idea
-			if ( $self->{spampd}->{rh} ) {			
-				$self->mylog(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit); }
-	
-		    $status->finish();
-		    $mail->finish();
-     
-		    # set the timeout alarm back to wherever it was at
-		    alarm($previous_alarm);
-		   
-		};
-	
-		if ( $@ ne '' ) {
-		  $self->mylog(1, "WARNING!! SpamAssassin error on message $msgid: $@");
-	      return 0;
-	    }
-	
-    } else {
-    
-		$self->mylog(2, "skipped large message (". $size / 1024 ."KB)");
+  # start a timer
+  my $start = time;
+  # use the assassin object created during startup
+  my $assassin   = $self->{spampd}->{assassin};
+  my $sa_version = Mail::SpamAssassin::Version();
+  # $sa_version can have a non-numeric value if version_tag is
+  # set in local.cf. Only take first numeric value
+  $sa_version =~ s/([0-9]*\.[0-9]*).*/$1/;
 
+  # this gets info about the message temp file
+  my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
+
+  # Only process message under --maxsize KB
+  if ($size < ($self->{spampd}->{maxsize} * 1024)) {
+
+    my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
+
+    my $inhdr      = 1;
+    my $envfrom    = 0;
+    my $envto      = 0;
+    my $addedenvto = 0;
+
+    $recips = "@{$self->{smtp_server}->{to}}";
+    if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/) { $sender = $1; }
+    $recips ||= "(unknown)";
+    $sender ||= "(unknown)";
+
+    ## read message into array of lines to feed to SA
+
+    # loop over message file content
+    $fh->seek(0, 0) or die "Can't rewind message file: $!";
+    while (<$fh>) {
+      $envto   = 1 if (/^(?:X-)?Envelope-To: /);
+      $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
+      if (/^\r?\n$/ && $inhdr) {
+        $inhdr = 0;  # outside of msg header after first blank line
+        if (($self->{spampd}->{envelopeheaders} || $self->{spampd}->{setenvelopefrom}) && !$envfrom) {
+          unshift(@msglines, "X-Envelope-From: $sender\r\n");
+          if ($self->{spampd}->{debug}) {
+            $self->mylog(2, "Added X-Envelope-From");
+          }
+        }
+        if ($self->{spampd}->{envelopeheaders} && !$envto) {
+          unshift(@msglines, "X-Envelope-To: $recips\r\n");
+          $addedenvto = 1;
+          if ($self->{spampd}->{debug}) {
+            $self->mylog(2, "Added X-Envelope-To");
+          }
+        }
+      }
+      push(@msglines, $_);
+      # find the Message-ID for logging (code is mostly from spamd)
+      if ($inhdr && /^Message-Id:\s+(.*?)\s*$/i) {
+        $msgid = $1;
+        while ($msgid =~ s/\([^\(\)]*\)//) { }  # remove comments and
+        $msgid =~ s/^\s+|\s+$//g;               # leading and trailing spaces
+        $msgid =~ s/\s+/ /g;                    # collapse whitespaces
+        $msgid =~ s/^.*?<(.*?)>.*$/$1/;         # keep only the id itself
+        $msgid =~ s/[^\x21-\x7e]/?/g;           # replace all weird chars
+        $msgid =~ s/[<>]/?/g;                   # plus all dangling angle brackets
+        $msgid =~ s/^(.+)$/<$1>/;               # re-bracket the id (if not empty)
+      }
     }
-    
-    return 1;
+
+    $msgid ||= "(unknown)";
+
+    $self->mylog(2, "processing message $msgid for " . $recips);
+
+    eval {
+
+      local $SIG{ALRM} = sub { die "Timed out!\n" };
+      # save previous timer and start new
+      my $previous_alarm = alarm($self->{spampd}->{satimeout});
+
+      # Audit the message
+      if ($sa_version >= 3) {
+        $mail = $assassin->parse(\@msglines, 0);
+        undef @msglines;  #clear some memory-- this screws up SA < v3
+      }
+      elsif ($sa_version >= 2.70) {
+        $mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
+      }
+      else {
+        $mail = Mail::SpamAssassin::NoMailAudit->new(data => \@msglines);
+      }
+
+      # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
+      my $status = $assassin->check($mail);
+
+      if ($self->{spampd}->{debug}) {
+        $self->mylog(2, "Returned from checking by SpamAssassin");
+      }
+
+      #  Rewrite mail if high spam factor or options --tagall
+      if ($status->is_spam || $self->{spampd}->{tagall}) {
+
+        if ($self->{spampd}->{debug}) {
+          $self->mylog(2, "Rewriting mail using SpamAssassin");
+        }
+
+        # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
+        if ($sa_version >= 3) {
+          $msg_resp = $status->rewrite_mail;
+        }
+        else {
+          # SA versions prior to 3 need to get the response in a different manner
+          $status->rewrite_mail;
+          $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
+        }
+
+        # Build the new message to relay
+        # pause the timeout alarm while we do this (no point in timing
+        # out here and leaving a half-written file).
+        my @resplines   = split(/\r?\n/, $msg_resp);
+        my $pause_alarm = alarm(0);
+        my $inhdr       = 1;
+        my $skipline    = 0;
+        $fh->seek(0, 0) or die "Can't rewind message file: $!";
+        $fh->truncate(0) or die "Can't truncate message file: $!";
+        my $arraycont = @resplines;
+
+        for (0 .. ($arraycont - 1)) {
+          $inhdr = 0 if ($resplines[$_] =~ m/^\r?\n$/);
+
+          # if we are still in the header, skip over any
+          # "X-Envelope-To: " line if we have previously added it.
+          if ($inhdr && $addedenvto && $resplines[$_] =~ m/^X-Envelope-To: .*$/) {
+            $skipline = 1;
+            if ($self->{spampd}->{debug}) {
+              $self->mylog(2, "Removing X-Envelope-To");
+            }
+          }
+
+          if (!$skipline) {
+            $fh->print($resplines[$_] . "\r\n")
+              or die "Can't print to message file: $!";
+          }
+          else {
+            $skipline = 0;
+          }
+        }
+
+        #restart the alarm
+        alarm($pause_alarm);
+
+      }
+
+      # Log what we did
+      my $was_it_spam = 'clean message';
+      if ($status->is_spam) { $was_it_spam = 'identified spam'; }
+      my $msg_score     = sprintf("%.2f", $status->get_hits);
+      my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
+      my $proc_time     = sprintf("%.2f", time - $start);
+
+      $self->mylog(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
+                      "$recips in " . $proc_time . "s, $size bytes.");
+
+      # thanks to Kurt Andersen for this idea
+      if ($self->{spampd}->{rh}) {
+        $self->mylog(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit);
+      }
+
+      $status->finish();
+      $mail->finish();
+
+      # set the timeout alarm back to wherever it was at
+      alarm($previous_alarm);
+
+    };
+
+    if ($@ ne '') {
+      $self->mylog(1, "WARNING!! SpamAssassin error on message $msgid: $@");
+      return 0;
+    }
+
+  }
+  else {
+
+    $self->mylog(2, "skipped large message (" . $size / 1024 . "KB)");
+
+  }
+
+  return 1;
 
 }
 
@@ -627,347 +642,350 @@ sub process_request {
   my $self = shift;
   my $msg;
   my $rcpt_ok;
-  	
+
   eval {
-	
-	local $SIG{ALRM} = sub { die "Child server process timed out!\n" };
-	my $timeout = $self->{spampd}->{childtimeout};
-	
-	# start a timeout alarm  
-	alarm($timeout);
-	
-	# start an smtp server
-	my $smtp_server = SpamPD::Server->new($self->{server}->{client});
-	unless ( defined $smtp_server ) {
-	  die "Failed to create listening Server: $!"; }
-	  
-	$self->{smtp_server} = $smtp_server;
-	
-	if ( $self->{spampd}->{debug} ) {
-	  $self->mylog(2, "Initiated Server"); }
-	    
-	# start an smtp "client" (really a sending server)
-	my $client = SpamPD::Client->new(interface => $self->{spampd}->{relayhost}, 
-					   port => $self->{spampd}->{relayport},
-					   unix_socket => $self->{spampd}->{unix_relaysocket});
-	unless ( defined $client ) {
-	  die "Failed to create sending Client: $!"; }
 
-	if ( $self->{spampd}->{debug} ) {
-	  $self->mylog(2, "Initiated Client"); }
-	    
-	# pass on initial client response
-	# $client->hear can handle multiline responses so no need to loop
-	$smtp_server->ok($client->hear)
-		or die "Error in initial server->ok(client->hear): $!";
-		
-	if ( $self->{spampd}->{debug} ) {
-	  $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'"); }
-	  
-	# while loop over incoming data from the server
-	while ( my $what = $smtp_server->chat ) {
-	  
-	  if ( $self->{spampd}->{debug} ) {
-	    $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'"); }
-		
-	  # until end of DATA is sent, just pass the commands on transparently
-	  if ($what ne '.') {
-		  
-	    $client->say($what)
-		  or die "Failure in client->say(what): $!";
-		
-	  # but once the data is sent now we want to process it
-	  } else {
+    local $SIG{ALRM} = sub { die "Child server process timed out!\n" };
+    my $timeout = $self->{spampd}->{childtimeout};
 
-		# spam checking routine - message might be rewritten here
-	    my $pmrescode = $self->process_message($smtp_server->{data});
-	    
-	    # pass on the messsage if exit code <> 0 or die-on-sa-errors flag is off
-	    if ( $pmrescode or !$self->{spampd}->{dose} ) {
-		    
-		    # need to give the client a rewound file
-		    $smtp_server->{data}->seek(0,0)
-				or die "Can't rewind mail file: $!";
-		    
-		    # now send the data on through the client
-		    $client->yammer($smtp_server->{data})
-			  or die "Failure in client->yammer(smtp_server->{data}): $!";
-			  
-		} else {
-			
-			$smtp_server->ok("450 Temporary failure processing message, please try again later");
-			last;
-		}
-		
-		#close the temp file
-		$smtp_server->{data}->close
-			or $self->mylog(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+    # start a timeout alarm
+    alarm($timeout);
 
-	    if ( $self->{spampd}->{debug} ) {
-	      $self->mylog(2, "Finished sending DATA"); }
-	  }
+    # start an smtp server
+    my $smtp_server = SpamPD::Server->new($self->{server}->{client});
+    unless (defined $smtp_server) {
+      die "Failed to create listening Server: $!";
+    }
 
-	  # pass on whatever the relayhost said in response
-	  # $client->hear can handle multiline responses so no need to loop
-	  my $destresp = $client->hear;
-	  $smtp_server->ok($destresp)
-		or die "Error in server->ok(client->hear): $!";
-		
-	  if ( $self->{spampd}->{debug} ) {
-	    $self->mylog(2, "Destination response: '" . $destresp . "'"); }
-	  
-	  # if we're in data state but the response is an error, exit data state.
-	  # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
-	  if ( $smtp_server->{state} =~ /^data/i and $destresp  =~ /^[45]\d{2} / ) {
-		$smtp_server->{state} = "err_after_data";
-		if ( $self->{spampd}->{debug} ) {
-		  $self->mylog(2, "Destination response indicates error after DATA command"); }
-	  }
+    $self->{smtp_server} = $smtp_server;
 
-	  # patch for LMTP - multiple responses after . after DATA, done by Vladislav Kurz
-	  # we have to count sucessful RCPT commands and then read the same amount of responses
-	  if ( $smtp_server->{proto} eq 'lmtp' ) {
-		if ( $smtp_server->{state} =~ /^rset/i ) { $rcpt_ok=0; }
-		if ( $smtp_server->{state} =~ /^mail/i ) { $rcpt_ok=0; }
-		if ( $smtp_server->{state} =~ /^rcpt/i and $destresp =~ /^25/ ) { $rcpt_ok++; }
-		if ( $smtp_server->{state} eq '.' ) {
-			while ( --$rcpt_ok ) {
-				$destresp = $client->hear;
-				$smtp_server->ok($destresp)
-				    or die "Error in server->ok(client->hear): $!";
-				if ( $self->{spampd}->{debug} ) {
-				    $self->mylog(2, "Destination response: '" . $destresp . "'");
-				}
-			}
-		}
-	  }
+    if ($self->{spampd}->{debug}) {
+      $self->mylog(2, "Initiated Server");
+    }
 
-	  # restart the timeout alarm  
-	  alarm($timeout);
-		
-	} # server ends connection
+    # start an smtp "client" (really a sending server)
+    my $client = SpamPD::Client->new(
+      interface   => $self->{spampd}->{relayhost},
+      port        => $self->{spampd}->{relayport},
+      unix_socket => $self->{spampd}->{unix_relaysocket});
+    unless (defined $client) {
+      die "Failed to create sending Client: $!";
+    }
+
+    if ($self->{spampd}->{debug}) {
+      $self->mylog(2, "Initiated Client");
+    }
+
+    # pass on initial client response
+    # $client->hear can handle multiline responses so no need to loop
+    $smtp_server->ok($client->hear)
+      or die "Error in initial server->ok(client->hear): $!";
+
+    if ($self->{spampd}->{debug}) {
+      $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'");
+    }
+
+    # while loop over incoming data from the server
+    while (my $what = $smtp_server->chat) {
+
+      if ($self->{spampd}->{debug}) {
+        $self->mylog(2, "smtp_server state: '" . $smtp_server->{state} . "'");
+      }
+
+      # until end of DATA is sent, just pass the commands on transparently
+      if ($what ne '.') {
+
+        $client->say($what)
+          or die "Failure in client->say(what): $!";
+
+        # but once the data is sent now we want to process it
+      }
+      else {
+
+        # spam checking routine - message might be rewritten here
+        my $pmrescode = $self->process_message($smtp_server->{data});
+
+        # pass on the messsage if exit code <> 0 or die-on-sa-errors flag is off
+        if ($pmrescode or !$self->{spampd}->{dose}) {
+
+          # need to give the client a rewound file
+          $smtp_server->{data}->seek(0, 0)
+            or die "Can't rewind mail file: $!";
+
+          # now send the data on through the client
+          $client->yammer($smtp_server->{data})
+            or die "Failure in client->yammer(smtp_server->{data}): $!";
+
+        }
+        else {
+
+          $smtp_server->ok("450 Temporary failure processing message, please try again later");
+          last;
+        }
+
+        #close the temp file
+        $smtp_server->{data}->close
+          or $self->mylog(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+
+        if ($self->{spampd}->{debug}) {
+          $self->mylog(2, "Finished sending DATA");
+        }
+      }
+
+      # pass on whatever the relayhost said in response
+      # $client->hear can handle multiline responses so no need to loop
+      my $destresp = $client->hear;
+      $smtp_server->ok($destresp)
+        or die "Error in server->ok(client->hear): $!";
+
+      if ($self->{spampd}->{debug}) {
+        $self->mylog(2, "Destination response: '" . $destresp . "'");
+      }
+
+      # if we're in data state but the response is an error, exit data state.
+      # Shold not normally occur, but can happen. Thanks to Rodrigo Ventura for bug reports.
+      if ($smtp_server->{state} =~ /^data/i and $destresp =~ /^[45]\d{2} /) {
+        $smtp_server->{state} = "err_after_data";
+        if ($self->{spampd}->{debug}) {
+          $self->mylog(2, "Destination response indicates error after DATA command");
+        }
+      }
+
+      # patch for LMTP - multiple responses after . after DATA, done by Vladislav Kurz
+      # we have to count sucessful RCPT commands and then read the same amount of responses
+      if ($smtp_server->{proto} eq 'lmtp') {
+        if ($smtp_server->{state} =~ /^rset/i) { $rcpt_ok = 0; }
+        if ($smtp_server->{state} =~ /^mail/i) { $rcpt_ok = 0; }
+        if ($smtp_server->{state} =~ /^rcpt/i and $destresp =~ /^25/) { $rcpt_ok++; }
+        if ($smtp_server->{state} eq '.') {
+          while (--$rcpt_ok) {
+            $destresp = $client->hear;
+            $smtp_server->ok($destresp)
+              or die "Error in server->ok(client->hear): $!";
+            if ($self->{spampd}->{debug}) {
+              $self->mylog(2, "Destination response: '" . $destresp . "'");
+            }
+          }
+        }
+      }
+
+      # restart the timeout alarm
+      alarm($timeout);
+
+    }  # server ends connection
 
     # close connections
     $client->{sock}->close
-			or die "Couldn't close client->{sock}: $!";
+      or die "Couldn't close client->{sock}: $!";
     $smtp_server->{sock}->close
-			or die "Couldn't close smtp_server->{sock}: $!";
+      or die "Couldn't close smtp_server->{sock}: $!";
 
-	if ( $self->{spampd}->{debug} ) {
-	  $self->mylog(2, "Closed connections"); }
-	    
-  }; # end eval block
-  
+    if ($self->{spampd}->{debug}) {
+      $self->mylog(2, "Closed connections");
+    }
+
+  };  # end eval block
+
   alarm(0);  # stop the timer
-  # check for error in eval block
+             # check for error in eval block
   if ($@ ne '') {
-	  chomp($@);
-	  $msg = "WARNING!! Error in process_request eval block: $@";
-	  $self->mylog(0, $msg);
-	  die ($msg . "\n");
+    chomp($@);
+    $msg = "WARNING!! Error in process_request eval block: $@";
+    $self->mylog(0, $msg);
+    die($msg . "\n");
   }
-  
+
   $self->{spampd}->{instance}++;
-  
+
 }
 
 # Net::Server hook
 # After binding listening sockets
 sub post_bind_hook {
-	my $self = shift;
-	my $server = $self->{server};
-	if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
-		my $mode = oct($server->{unix_socket_perms});
-		chmod $mode, $server->{unix_socket} or die $@;
-	}
+  my $self   = shift;
+  my $server = $self->{server};
+  if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
+    my $mode = oct($server->{unix_socket_perms});
+    chmod $mode, $server->{unix_socket} or die $@;
+  }
 }
 
 # Net::Server hook
 # about to exit child process
 sub child_finish_hook {
-    my($self) = shift;
-	if ( $self->{spampd}->{debug} ) {
-		$self->mylog(2, "Exiting child process after handling ". 
-	                  $self->{spampd}->{instance} ." requests"); }
+  my ($self) = shift;
+  if ($self->{spampd}->{debug}) {
+    $self->mylog(2, "Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
+  }
 }
 
 # older Net::Server versions (<= 0.87) die when logging a % character to Sys::Syslog
 sub mylog($$$) {
-    my ($self, $level, $msg) = @_;
-    $msg =~ s/\%/%%/g;
-    $self->log($level, $msg);
+  my ($self, $level, $msg) = @_;
+  $msg =~ s/\%/%%/g;
+  $self->log($level, $msg);
 }
 
 # Override Net::Server's HUP handling - just gracefully restart all the children.
 sub sig_hup {
-	my $self = shift;
-	$self->hup_children;
+  my $self = shift;
+  $self->hup_children;
 }
 
 ##################   SETUP   ######################
 
 
-my $relayhost = '127.0.0.1'; # relay to ip
-my $relayport = 25; # relay to port
-my $relaysocket;
-my $host = '127.0.0.1'; # listen on ip
-my $port = 10025; # listen on port
-my $socket;
-my $socket_perms;
-my $children = 5; # number of child processes (servers) to spawn at start
-# my $maxchildren = $children; # max. number of child processes (servers) to spawn
-my $maxrequests = 20; # max requests handled by child b4 dying
-my $childtimeout = 6*60; # child process per-command timeout in seconds
-my $satimeout = 285; # SpamAssassin timeout in seconds (15s less than Postfix 
-                     # default for smtp_data_done_timeout)
-my $pidfile = '/var/run/spampd.pid'; # write pid to file
-my $user = 'mail'; # user to run as
-my $group = 'mail'; # group to run as
-my $tagall = 0; # mark-up all msgs with SA, not just spam
-my $maxsize = 64; # max. msg size to scan with SA, in KB.
-my $rh = 0; # log which rules were hit
-my $debug = 0; # debug flag
-my $dose = 0; # die-on-sa-errors flag
-my $logsock = "unix";  # default log socket (some systems like 'inet')
-my $nsloglevel = 2; # default log level for Net::Server (in the range 0-4)
-my $background = 1; # specifies whether to 'daemonize' and fork into background;
-					# apparently useful under Win32/cygwin to disable this via 
-					# --nodetach option;
-my $setsid = 0; # specifies wheter to use POSIX::setsid() command to truly daemonize.
-my $envelopeheaders = 0; # Set X-Envelope-To and X-Envelope-From headers in the mail before
-						 # passing it to spamassassin. Set to 1 to enable this.
-my $setenvelopefrom = 0; # Set X-Envelope-From header only
-my $saconfigfile = ""; # use this config file for SA settings (blank uses default local.cf)
-my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA files 
-                                                    # (auto-whitelist, plugin helpers)
+my $relayhost       = '127.0.0.1';                       # relay to ip
+my $relayport       = 25;                                # relay to port
+my $relaysocket     = undef;                             # relay to socket
+my $host            = '127.0.0.1';                       # listen on ip
+my $port            = 10025;                             # listen on port
+my $socket          = undef;                             # listen on socket
+my $socket_perms    = undef;                             # listening socket permissions (octal)
+my $children        = 5;                                 # number of child processes (servers) to spawn at start
+my $maxrequests     = 20;                                # max requests handled by child b4 dying
+my $childtimeout    = 6 * 60;                            # child process per-command timeout in seconds
+my $satimeout       = 285;                               # SpamAssassin timeout in seconds (15s less than Postfix
+                                                         #   default for smtp_data_done_timeout)
+my $pidfile         = '/var/run/spampd.pid';             # write pid to file
+my $user            = 'mail';                            # user to run as
+my $group           = 'mail';                            # group to run as
+my $tagall          = 0;                                 # mark-up all msgs with SA, not just spam
+my $maxsize         = 64;                                # max. msg size to scan with SA, in KB.
+my $rh              = 0;                                 # log which rules were hit
+my $debug           = 0;                                 # debug flag
+my $dose            = 0;                                 # die-on-sa-errors flag
+my $logsock         = "unix";                            # default log socket (some systems like 'inet')
+my $nsloglevel      = 2;                                 # default log level for Net::Server (in the range 0-4)
+my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background;
+                                                         #   apparently useful under Win32/cygwin to disable this via --nodetach;
+my $setsid          = 0;                                 # specifies wheter to use POSIX::setsid() command to truly daemonize.
+my $envelopeheaders = 0;                                 # Set X-Envelope-To and X-Envelope-From headers in the mail before
+                                                         # passing it to spamassassin. Set to 1 to enable this.
+my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only
+my $saconfigfile    = "";                                # use this config file for SA settings (blank uses default local.cf)
+my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files
+                                                         # (auto-whitelist, plugin helpers)
 
-my %options = (port => \$port,
-	       host => \$host,
-	       socket => \$socket,
-	       'socket-perms' => \$socket_perms,
-	       relayhost => \$relayhost,
-	       relayport => \$relayport,
-	       relaysocket => \$relaysocket,
-	       pid => \$pidfile,
-	       user => \$user,
-	       group => \$group,
-	       maxrequests => \$maxrequests,
-	       maxsize => \$maxsize,
-	       childtimeout => \$childtimeout,
-	       satimeout => \$satimeout,
-	       children => \$children,
-	       # maxchildren => \$maxchildren,
-	       logsock => \$logsock,
-	       envelopeheaders => \$envelopeheaders,
-	       setenvelopefrom => \$setenvelopefrom,
-	       saconfigfile => \$saconfigfile,
-	       sa_home_dir => \$sa_home_dir,
-	      );
+my %options = (
+  port            => \$port,
+  host            => \$host,
+  socket          => \$socket,
+  'socket-perms'  => \$socket_perms,
+  relayhost       => \$relayhost,
+  relayport       => \$relayport,
+  relaysocket     => \$relaysocket,
+  pid             => \$pidfile,
+  user            => \$user,
+  group           => \$group,
+  maxrequests     => \$maxrequests,
+  maxsize         => \$maxsize,
+  childtimeout    => \$childtimeout,
+  satimeout       => \$satimeout,
+  children        => \$children,
+  logsock         => \$logsock,
+  envelopeheaders => \$envelopeheaders,
+  setenvelopefrom => \$setenvelopefrom,
+  saconfigfile    => \$saconfigfile,
+  sa_home_dir     => \$sa_home_dir,
+);
 
-usage(1) unless GetOptions(\%options,
-		   'port=i',
-		   'host=s',
-		   'socket=s',
-		   'socket-perms=s',
-		   'relayhost=s',
-		   'relayport=i',
-		   'relaysocket=s',
-		   'children|c=i',
-		   # 'maxchildren|mc=i',
-		   'maxrequests|mr=i',
-		   'childtimeout=i',
-		   'satimeout=i',
-		   'dead-letters=s',  # deprecated
-		   'user|u=s',
-		   'group|g=s',
-		   'pid|p=s',
-		   'maxsize=i',
-		   'heloname=s',  # deprecated
-		   'tagall|a',
-		   'auto-whitelist|aw',
-		   'stop-at-threshold',  # deprecated
-		   'debug|d',
-		   'help|h|?',
-		   'local-only|l',
-		   'log-rules-hit|rh',
-		   'dose',
-		   'add-sc-header|ash',  # deprecated
-		   'hostname=s',  # deprecated
-		   'logsock=s',
-		   'nodetach',
-		   'setsid',
-		   'set-envelope-headers|seh',
-		   'set-envelope-from|sef',
-		   'saconfig=s',
-		   'homedir=s',
-		   );
+GetOptions(
+  \%options,
+  'port=i',
+  'host=s',
+  'socket=s',
+  'socket-perms=s',
+  'relayhost=s',
+  'relayport=i',
+  'relaysocket=s',
+  'children|c=i',
+  'maxrequests|mr=i',
+  'childtimeout=i',
+  'satimeout=i',
+  'dead-letters=s',  # deprecated
+  'user|u=s',
+  'group|g=s',
+  'pid|p=s',
+  'maxsize=i',
+  'heloname=s',      # deprecated
+  'tagall|a',
+  'auto-whitelist|aw',
+  'stop-at-threshold',  # deprecated
+  'debug|d',
+  'help|h|?',
+  'local-only|l',
+  'log-rules-hit|rh',
+  'dose',
+  'add-sc-header|ash',  # deprecated
+  'hostname=s',         # deprecated
+  'logsock=s',
+  'nodetach',
+  'setsid',
+  'set-envelope-headers|seh',
+  'set-envelope-from|sef',
+  'saconfig=s',
+  'homedir=s',
+) or usage(1);
 
 usage(0) if $options{help};
 
-if ( $logsock !~ /^(unix|inet)$/ ) {
-	print "--logsock parameter needs to be either unix or inet\n\n";
-	usage(0);
+if ($logsock !~ /^(unix|inet)$/) {
+  print "--logsock parameter needs to be either unix or inet\n\n";
+  usage(0);
 }
 
 # Untaint some options provided by admin command line.
-$logsock = $1 if $logsock =~ /^(.*)$/;
-
-$pidfile = $1 if $pidfile =~ /^(.*)$/;
-
-$relayhost = $1 if $relayhost =~ /^(.*)$/;
-
-$relayport = $1 if $relayport =~ /^(.*)$/;
-
-$relaysocket = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
-
-$host = $1 if $host =~ /^(.*)$/;
-
-$port = $1 if $port =~ /^(.*)$/;
-
-$socket = $1 if defined($socket) && $socket =~ /^(.*)$/;
-
+$logsock      = $1 if $logsock =~ /^(.*)$/;
+$pidfile      = $1 if $pidfile =~ /^(.*)$/;
+$relayhost    = $1 if $relayhost =~ /^(.*)$/;
+$relayport    = $1 if $relayport =~ /^(.*)$/;
+$relaysocket  = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
+$host         = $1 if $host =~ /^(.*)$/;
+$port         = $1 if $port =~ /^(.*)$/;
+$socket       = $1 if defined($socket) && $socket =~ /^(.*)$/;
 $socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
 #
 
-if ( $options{tagall} ) { $tagall = 1; }
-if ( $options{'log-rules-hit'} ) { $rh = 1; }
-if ( $options{debug} ) { $debug = 1; $nsloglevel = 4; }
-if ( $options{dose} ) { $dose = 1; }
-if ( $options{'nodetach'} ) { $background = undef; }
-if ( $options{'setsid'} && defined($background)) { $setsid = 1; }
-if ( $options{'set-envelope-headers'} ) { $envelopeheaders = 1; }
-if ( $options{'set-envelope-from'} ) { $setenvelopefrom = 1; }
-if ( $options{'saconfig'} ) { $saconfigfile = $options{'saconfig'}; }
-if ( $options{'homedir'} ) { $sa_home_dir = $options{'homedir'}; }
+if ($options{tagall})                  { $tagall     = 1; }
+if ($options{'log-rules-hit'})         { $rh         = 1; }
+if ($options{debug})                   { $debug      = 1; $nsloglevel = 4; }
+if ($options{dose})                    { $dose       = 1; }
+if ($options{'nodetach'})              { $background = 0; }
+if ($options{'setsid'} && $background) { $setsid = 1; }
+if ($options{'set-envelope-headers'})  { $envelopeheaders = 1; }
+if ($options{'set-envelope-from'})     { $setenvelopefrom = 1; }
+if ($options{'saconfig'})              { $saconfigfile    = $options{'saconfig'}; }
+if ($options{'homedir'})               { $sa_home_dir     = $options{'homedir'}; }
 # if ( !$options{maxchildren} or $maxchildren < $children ) { $maxchildren = $children; }
 
-if ( $children < 1 ) { print "Option --children must be greater than zero!\n"; exit shift; }
+if ($children < 1) { 
+  print "Option --children must be greater than zero!\n"; 
+  exit 1; 
+}
 
-# my $min_spare_servers = ($children == $maxchildren) ? 0 : 1;
-# my $max_spare_servers = ($min_spare_servers == 0) ? 0 : $maxchildren-1;
-
-my @tmp = split (/:/, $relayhost);
+my @tmp = split(/:/, $relayhost);
 $relayhost = $tmp[0];
-if ( $tmp[1] ) { $relayport = $tmp[1]; }
+if ($tmp[1]) { $relayport = $tmp[1]; }
 
-@tmp = split (/:/, $host);
+@tmp = split(/:/, $host);
 $host = $tmp[0];
-if ( $tmp[1] ) { $port = $tmp[1]; }
+if ($tmp[1]) { $port = $tmp[1]; }
 
-my $sa_options = { 
-		'dont_copy_prefs' => 1,
-		'debug' => $debug,
-		'local_tests_only' => $options{'local-only'} || 0,
-		'home_dir_for_helpers' => $sa_home_dir, 
-		'userstate_dir' => $sa_home_dir, 
-		'username' => $user
+my $sa_options = {
+  'dont_copy_prefs'      => 1,
+  'debug'                => $debug,
+  'local_tests_only'     => $options{'local-only'} || 0,
+  'home_dir_for_helpers' => $sa_home_dir,
+  'userstate_dir'        => $sa_home_dir,
+  'username'             => $user
 };
 
 my $use_user_prefs = 0;
 
-if ( $saconfigfile != "" ) { 
-	$sa_options->{ 'userprefs_filename' } = $saconfigfile; 
-	$use_user_prefs = 1;
+if ($saconfigfile ne '') {
+  $sa_options->{'userprefs_filename'} = $saconfigfile;
+  $use_user_prefs = 1;
 }
 
 #cleanup environment before starting SA (thanks to Alexander Wirt)
@@ -977,76 +995,75 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 my $assassin = Mail::SpamAssassin->new($sa_options);
 
 $options{'auto-whitelist'} and eval {
-   require Mail::SpamAssassin::DBBasedAddrList;
+  require Mail::SpamAssassin::DBBasedAddrList;
 
-   # create a factory for the persistent address list
-   my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
-   $assassin->set_persistent_address_list_factory ($addrlistfactory);
+  # create a factory for the persistent address list
+  my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
+  $assassin->set_persistent_address_list_factory($addrlistfactory);
 };
 
 $assassin->compile_now($use_user_prefs);
 
 # thanks to Kurt Andersen for the 'uname -s' fix
-if ( !$options{logsock} ) {
-	eval {
-	  my $osname = `uname -s`;
-	  if (($osname =~ 'HP-UX') || ($osname =~ 'SunOS')) { 
-		  $logsock = "inet"; 
-	  }
-	};
+if (!$options{logsock}) {
+  eval {
+    my $osname = `uname -s`;
+    if (($osname =~ 'HP-UX') || ($osname =~ 'SunOS')) {
+      $logsock = "inet";
+    }
+  };
 }
 
 # Net::Server wants UNIX sockets passed via port too. This part
 # decides what we want to pass.
 my @ports;
 if (defined $socket) {
-	@ports = ($socket . '|unix');
-} else {
-	@ports = ($port);
+  @ports = ($socket . '|unix');
+}
+else {
+  @ports = ($port);
 }
 
 my $server = bless {
-    server => {host => $host,
-				port => \@ports,
-				unix_socket => $socket,
-				unix_socket_perms => $socket_perms,
-				log_file => 'Sys::Syslog',
-				log_level => $nsloglevel,
-				syslog_logsock => $logsock,
-				syslog_ident => 'spampd',
-				syslog_facility => 'mail',
-				background => $background,
-				setsid => $setsid,
-				pid_file => $pidfile,
-				user => $user,
-				group => $group,
-				max_servers => $children,
-				max_requests => $maxrequests,
-				# min_servers => $children,
-				# max_servers => $maxchildren,
-				# min_spare_servers => $min_spare_servers,
-				# max_spare_servers => $max_spare_servers,
-		      },
-    spampd => { relayhost => $relayhost,
-				relayport => $relayport,
-				unix_relaysocket => $relaysocket,
-				tagall => $tagall,
-				maxsize => $maxsize,
-				assassin => $assassin,
-				childtimeout => $childtimeout,
-				satimeout => $satimeout,
-				rh => $rh,
-				debug => $debug,
-				dose => $dose,
-				instance => 0,
-				envelopeheaders => $envelopeheaders,
-				setenvelopefrom => $setenvelopefrom,
-			   },
-   }, 'SpamPD';
+  server => {
+    host              => $host,
+    port              => \@ports,
+    unix_socket       => $socket,
+    unix_socket_perms => $socket_perms,
+    log_file          => 'Sys::Syslog',
+    log_level         => $nsloglevel,
+    syslog_logsock    => $logsock,
+    syslog_ident      => 'spampd',
+    syslog_facility   => 'mail',
+    background        => $background,
+    setsid            => $setsid,
+    pid_file          => $pidfile,
+    user              => $user,
+    group             => $group,
+    max_servers       => $children,
+    max_requests      => $maxrequests,
+  },
+  spampd => {
+    relayhost        => $relayhost,
+    relayport        => $relayport,
+    unix_relaysocket => $relaysocket,
+    tagall           => $tagall,
+    maxsize          => $maxsize,
+    assassin         => $assassin,
+    childtimeout     => $childtimeout,
+    satimeout        => $satimeout,
+    rh               => $rh,
+    debug            => $debug,
+    dose             => $dose,
+    instance         => 0,
+    envelopeheaders  => $envelopeheaders,
+    setenvelopefrom  => $setenvelopefrom,
+  },
+}, 'SpamPD';
 
-# Redirect all warnings to Server::log 
-$SIG{__WARN__} = sub { $server->log (2, $_[0]); };
-	   
+# Redirect all warnings to Server::log
+$SIG{__WARN__} = sub { $server->log(2, $_[0]); };
+
 # call Net::Server to start up the daemon inside
 $server->run;
 
@@ -1058,86 +1075,83 @@ usage: $0 [ options ]
 
 Options:
   --host=host[:port]       Hostname/IP and optional port to listen on. 
-	                          Default is 127.0.0.1 port 10025
+                             Default is 127.0.0.1 port 10025
   --port=n                 Port to listen on (alternate syntax to above).
   --socket=socketpath      UNIX socket to listen on. Alternative to
-                                  --host and --port.
+                             --host and --port.
   --socket-perms=perms     The file mode to set on the created UNIX
-                                  socket in octal format.
+                             socket in octal format.
   --relayhost=host[:port]  Host to relay mail to. 
-	                          Default is 127.0.0.1 port 25.
+                             Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
   --relaysocket            UNIX socket to relay to. Alternative to
-                                  --relayhost and --relayport.
+                             --relayhost and --relayport.
   --children=n             Number of child processes (servers) to start and
-                               keep running. Default is 5 (plus 1 parent proc).
+                             keep running. Default is 5 (plus 1 parent proc).
   --maxrequests=n          Maximum requests that each child can process before
-                               exiting. Default is 20.
+                             exiting. Default is 20.
   --childtimeout=n         Time out children after this many seconds during
-                               transactions (each S/LMTP command including the
-                               time it takes to send the data). 
-                               Default is 360 seconds (6min).
+                             transactions (each S/LMTP command including the
+                             time it takes to send the data). 
+                             Default is 360 seconds (6min).
   --satimeout=n            Time out SpamAssassin after this many seconds.
-                               Default is 285 seconds.
-                               
+                             Default is 285 seconds.
+
   --pid=filename           Store the daemon's process ID in this file. 
-                               Default is /var/run/spampd.pid
+                             Default is /var/run/spampd.pid
   --user=username          Specifies the user that the daemon runs as.
-                               Default is mail.
+                             Default is mail.
   --group=groupname        Specifies the group that the daemon runs as.
-                               Default is mail.
+                             Default is mail.
   --nodetach               Don't detach from the console and fork into
-                               background. Useful for some daemon control
-                               tools or when running as a win32 service
-                               under cygwin.
+                             background. Useful for some daemon control
+                             tools or when running as a win32 service
+                             under cygwin.
   --setsid                 Fork after the bind method to release itself
-                               from the command line and then run the
-                               POSIX::setsid() command to truly daemonize.
-                               Only used if --nodetach isn't specified.
-                               
+                             from the command line and then run the
+                             POSIX::setsid() command to truly daemonize.
+                             Only used if --nodetach isn't specified.
+
   --logsock=inet or unix   Allows specifying the syslog socket type. Default is 
-                               'unix' except on HPUX and SunOS which prefer 'inet'.
+                             'unix' except on HPUX and SunOS which use 'inet'.
 
   --maxsize=n              Maximum size of mail to scan (in KB).
-                               Default is 64KB.
+                             Default is 64KB.
   --dose                   (d)ie (o)n (s)pamAssassin (e)rrors. If this is
-                               specified and SA times out or throws an error,
-                               the mail will be rejected with a 450 temporary
-                               error message. Default is to pass through email
-                               even in the event of an SA problem.
+                             specified and SA times out or throws an error,
+                             the mail will be rejected with a 450 temporary
+                             error message. Default is to pass through email
+                             even in the event of an SA problem.
   --tagall                 Tag all messages with SA headers, not just spam.
   --log-rules-hit          Log the name of each SA test which matched the
-    or --rh                    current message.
-                          	   
+    or --rh                  current message.
+
   --set-envelope-headers   Set X-Envelope-From and X-Envelope-To headers before
-    or --seh                   passing the mail to SpamAssassin. This is 
-                               disabled by default because it potentially leaks
-                               information. NOTE: Please read the manpage before
-                               enabling this!
+    or --seh                 passing the mail to SpamAssassin. This is 
+                             disabled by default because it potentially leaks
+                             information. NOTE: Please read the manpage before
+                             enabling this!
   --set-envelope-from      Same as above but only sets X-Envelope-From, for
-    or --sef                   those that don't feel comfortable with the
-                               potential information leak.
- 					     
+    or --sef                 those that don't feel comfortable with the
+                             potential information leak.
+
   --auto-whitelist         Use the SA global auto-whitelist feature 
-    or --aw                   (SA versions => 3.0 now control this via local.cf).
-  --local-only or -L       Turn off all SA network-based tests (RBL, Razor, etc).
+    or --aw                  (SA versions => 3.0 now control this via local.cf).
+  --local-only or -L       Turn off all SA network-based tests (RBL/Razor/etc).
   --homedir=path           Use the specified directory as home directory for 
-                              the SpamAssassin process. 
-                              Default is /var/spool/spamassassin/spampd
+                             the SpamAssassin process. 
+                             Default is /var/spool/spamassassin/spampd
   --saconfig=filename      Use the specified file for loading SA configuration
-                               options after the default local.cf file.
+                             options after the default local.cf file.
   --debug or -d            Turn on SA debugging (sent to log file).
-						   
+
   --help or -h or -?       This message
-  
+
 Deprecated Options (still accepted for backwards compatibility):
   --heloname=hostname      No longer used in spampd v.2
   --dead-letters=path      No longer used in spampd v.2
   --stop-at-threshold      No longer implemented in SpamAssassin
 EOF
-
-# --maxchildren=n          Maximum number of child processes (servers) to
-#                               run. Default is the value of --children.
 
   exit shift;
 }
@@ -1184,7 +1198,6 @@ B<spampd>
 [B<--user|u=username>]
 [B<--group|g=groupname>]
 [B<--children|c=n>]
-#[B<--maxchildren|mc=n>]
 [B<--maxrequests=n>]
 [B<--childtimeout=n>]
 [B<--satimeout=n>]
