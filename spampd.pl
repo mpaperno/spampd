@@ -1154,6 +1154,8 @@ Perl modules:
 
 =item B<IO::Socket::IP>
 
+=item B<IO::Socket::UNIX>
+
 =item B<Time::HiRes> (not actually required but recommended)
 
 =back
