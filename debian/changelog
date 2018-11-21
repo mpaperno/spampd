@@ -2,8 +2,9 @@ spampd (2.52-1) unstable; urgency=medium
 
   * New upstream version 2.52 (Closes: #849543)
   * Bumped Standards-Version, no changes needed.
+  * Fixed usage of uninitialized value.
 
- -- Michael Meskes <meskes@debian.org>  Wed, 21 Nov 2018 10:31:13 +0100
+ -- Michael Meskes <meskes@debian.org>  Wed, 21 Nov 2018 12:24:59 +0100
 
 spampd (2.51-1) unstable; urgency=medium
 
