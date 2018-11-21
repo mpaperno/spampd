@@ -1,10 +1,19 @@
 SpamPD Change Log
 -----------------
 
+2.52 (10-Nov-18)
+
+- Override Net::Server's HUP handling, just restart children (https://github.com/mpaperno/spampd/pull/20).
+- Add --version option to print information about SpamPD, Net::Server, SpamAssassin, and Perl.
+- Add warnings about using deprecated options.
+- Documentation updates and code cosmetics.
+
 2.51 (01-May-18)
 
 - Fix listening to IP address, broken in 2.50 "Unix ports" feature.  (#18)
 - Add --setsid option to start server with setsid if running in background (#18)
+- Fix listening to IP address, broken in 2.50 "Unix ports" feature.  (https://github.com/mpaperno/spampd/pull/18)
+- Add --setsid option to start server with setsid if running in background (https://github.com/mpaperno/spampd/pull/18)
 
 2.50 (30-Apr-18)
 
@@ -12,9 +21,15 @@ SpamPD Change Log
 - Unix ports (ability to listen on UNIX sockets) (#13).
 - Add X-Envelope-* headers before Received (#14).
 - Add /usr/local/bin and /usr/local/sbin to PATH (#17).
+- Replace IO::Socket::INET with IO::Socket::IP for IPv6 support (https://github.com/mpaperno/spampd/pull/9).
+- Unix ports (ability to listen on UNIX sockets) (https://github.com/mpaperno/spampd/pull/13).
+- Add X-Envelope-* headers before Received (https://github.com/mpaperno/spampd/pull/14).
+- Add /usr/local/bin and /usr/local/sbin to PATH (https://github.com/mpaperno/spampd/pull/17).
 
 Please refer to commit notes at (https://github.com/mpaperno/spampd/compare/2.42...2.50) for details and credits.
 
+########
+  
 2.42 (08-Dec-13) (experimental)
 
 - Untaint some params for compatibility with Perl 5.18.
