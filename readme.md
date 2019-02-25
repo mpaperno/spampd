@@ -12,5 +12,5 @@ More information is available <a href="http://www.worlddesign.com/index.cfm/page
 
 Linux packages data courtesy of Repology:  
 <a href="https://repology.org/metapackage/spampd/versions" target="_new">
-    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?minversion=2.52&header=Latest+release+v2.52" alt="Packaging status">
+    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?minversion=2.53&header=Latest+release+v2.53" alt="Packaging status">
 </a>
