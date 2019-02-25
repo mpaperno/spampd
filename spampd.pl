@@ -3,6 +3,7 @@
 ######################
 # SpamPD - spam proxy daemon
 #
+# v2.53  - 25-Feb-19
 # v2.52  - 10-Nov-18
 # v2.51  - 01-May-18
 # v2.50  - 30-Apr-18
@@ -110,6 +111,8 @@ sub new {
 
   die "$0: socket bind failure: $!\n" unless defined $self->{sock};
   $self->{state} = 'started';
+  $self->{proto} = 'unknown';
+  $self->{helo} = 'unknown.host';
   return $self;
 }
 
@@ -145,7 +148,7 @@ sub chat {
     return 0 unless defined($_ = $self->_getline);
     s/[\r\n]*$//;
     $self->{state} = $_;
-    if (s/^(l|h)?he?lo\s+//i) {  # mp: find helo|ehlo|lhlo
+    if (/^(l|h)?he?lo\s+/i) {  # mp: find helo|ehlo|lhlo
       # mp: determine protocol
       if (s/^helo\s+//i) {
         $self->{proto} = "smtp";
@@ -413,7 +416,7 @@ BEGIN {
 
 use vars qw(@ISA $VERSION);
 our @ISA     = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.52';
+our $VERSION = '2.53';
 
 sub process_message {
   my ($self, $fh) = @_;
