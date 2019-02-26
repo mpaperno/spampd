@@ -1662,5 +1662,5 @@ possible relay hole if localhost is trusted.
 
 =head1 See Also
 
-perl(1), Spam::Assassin(3), L<http://www.spamassassin.org/>, 
+perl(1), Mail::SpamAssassin(3pm), L<http://www.spamassassin.org/>, 
 L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>
