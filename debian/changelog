@@ -1,3 +1,10 @@
+spampd (2.53-1) unstable; urgency=medium
+
+  * New upstream version 2.53
+  * Use the --setsid argument to make sure the process is correctly detached.
+
+ -- Michael Meskes <meskes@debian.org>  Tue, 26 Feb 2019 12:16:46 +0100
+
 spampd (2.52-1) unstable; urgency=medium
 
   * New upstream version 2.52 (Closes: #849543)
