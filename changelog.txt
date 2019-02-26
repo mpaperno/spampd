@@ -1,6 +1,11 @@
 SpamPD Change Log
 -----------------
 
+2.53 (25-Feb-19)
+
+- Fix LMTP delivery with multiple recipients (https://github.com/mpaperno/spampd/issues/23 & https://github.com/mail-in-a-box/mailinabox/issues/1523)
+- Fix Warning for "Use of uninitialized value in string" (https://github.com/mpaperno/spampd/issues/22)
+
 2.52 (10-Nov-18)
 
 - Override Net::Server's HUP handling, just restart children (https://github.com/mpaperno/spampd/pull/20).
@@ -10,17 +15,11 @@ SpamPD Change Log
 
 2.51 (01-May-18)
 
-- Fix listening to IP address, broken in 2.50 "Unix ports" feature.  (#18)
-- Add --setsid option to start server with setsid if running in background (#18)
 - Fix listening to IP address, broken in 2.50 "Unix ports" feature.  (https://github.com/mpaperno/spampd/pull/18)
 - Add --setsid option to start server with setsid if running in background (https://github.com/mpaperno/spampd/pull/18)
 
 2.50 (30-Apr-18)
 
-- Replace IO::Socket::INET with IO::Socket::IP for IPv6 support (#9).
-- Unix ports (ability to listen on UNIX sockets) (#13).
-- Add X-Envelope-* headers before Received (#14).
-- Add /usr/local/bin and /usr/local/sbin to PATH (#17).
 - Replace IO::Socket::INET with IO::Socket::IP for IPv6 support (https://github.com/mpaperno/spampd/pull/9).
 - Unix ports (ability to listen on UNIX sockets) (https://github.com/mpaperno/spampd/pull/13).
 - Add X-Envelope-* headers before Received (https://github.com/mpaperno/spampd/pull/14).
