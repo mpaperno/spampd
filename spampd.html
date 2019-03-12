@@ -17,12 +17,12 @@
   <li><a href="#Description">Description</a></li>
   <li><a href="#Requires">Requires</a></li>
   <li><a href="#Operation">Operation</a></li>
-  <li><a href="#Upgrading">Upgrading</a></li>
-  <li><a href="#Installation">Installation</a>
+  <li><a href="#Installation-Configuration">Installation / Configuration</a>
     <ul>
       <li><a href="#Postfix-specific-Notes">Postfix-specific Notes</a></li>
     </ul>
   </li>
+  <li><a href="#Upgrading">Upgrading</a></li>
   <li><a href="#Options">Options</a>
     <ul>
       <li><a href="#Deprecated-Options">Deprecated Options</a></li>
@@ -125,21 +125,19 @@
 
 </ul>
 
-<p>Note that these examples only show incoming mail delivery. Since it is usually unnecessary to scan mail coming from your network (right?), it may be desirable to set up a separate outbound route which bypasses <i>spampd</i>.</p>
+<p>Note that these examples only show incoming mail delivery. Since it is often unnecessary to scan mail coming from your network, it may be desirable to set up a separate outbound route which bypasses <i>spampd</i>.</p>
 
-<h1 id="Upgrading">Upgrading</h1>
+<h1 id="Installation-Configuration">Installation / Configuration</h1>
 
-<p>If upgrading from a version prior to 2.2, please note that the --add-sc-header option is no longer supported. Use SAs built-in header manipulation features instead (as of SA v2.6).</p>
+<p><i>spampd</i> can be run directly from the command prompt if desired. This is useful for testing purposes, but for long term use you probably want to put it somewhere like /usr/bin or /usr/local/bin and execute it at system startup. For example on Red Hat-style Linux system one can use a script in /etc/rc.d/init.d to start <i>spampd</i> (a <a href="https://github.com/mpaperno/spampd/tree/master/misc">sample script</a> is available in the <i>spampd</i> code repository).</p>
 
-<p>Upgrading from version 1 simply involves replacing the <i>spampd</i> program file with the latest one. Note that the <i>dead-letters</i> folder is no longer being used and the --dead-letters option is no longer needed (though no errors are thrown if it&#39;s present). Check the <a href="#Options">&quot;Options&quot;</a> list below for a full list of new and deprecated options. Also be sure to check out the change log.</p>
+<p><i>spampd</i> is available as a <b>package</b> for a significant number of Linux distributions, including Debian and derivatives (Ubuntu, etc). This is typically the easiest/best way to install and configure <i>spampd</i> since it should already take into account any system specifics for setting up and running as a daemon, etc. Note however that packages might not offer the latest version of <i>spampd</i>. A good reference for available packages and their versions can be found at <a href="https://repology.org/project/spampd/versions">https://repology.org/project/spampd/versions</a>.</p>
 
-<h1 id="Installation">Installation</h1>
+<p><i>spampd</i> is also used in the turnkey <a href="https://mailinabox.email/">Mail-in-a-Box</a> project, which includes Postfix as the main MTA and Dovecot as the local delivery agent with LMTP protocol. Even if you don&#39;t need the turnkey solution, it may be imformative to peruse the MIAB <a href="https://github.com/mail-in-a-box/mailinabox/tree/master/setup">setup</a> / <a href="https://github.com/mail-in-a-box/mailinabox/tree/master/conf">configuration</a> files for reference.</p>
 
-<p><i>spampd</i> can be run directly from the command prompt if desired. This is useful for testing purposes, but for long term use you probably want to put it somewhere like /usr/bin or /usr/local/bin and execute it at system startup. For example on Red Hat-style Linux system one can use a script in /etc/rc.d/init.d to start <i>spampd</i> (a sample script is available on the <i>spampd</i> Web page @ http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm).</p>
+<p>All <i>spampd</i> options have reasonable defaults, especially for a Postfix-centric installation. You may want to specify the --children option if you have an especially beefy or weak server box because <i>spampd</i> is a memory-hungry program. Check the <a href="#Options">&quot;Options&quot;</a> for details on this and all other parameters.</p>
 
-<p>The options all have reasonable defaults, especially for a Postfix-centric installation. You may want to specify the --children option if you have an especially beefy or weak server box because <i>spampd</i> is a memory-hungry program. Check the <a href="#Options">&quot;Options&quot;</a> for details on this and all other parameters.</p>
-
-<p>Note that <i>spampd</i> <b>replaces</b> <i>spamd</i> from the <i>SpamAssassin</i> distribution in function. You do not need to run <i>spamd</i> in order for <i>spampd</i> to work. This has apparently been the source of some confusion, so now you know.</p>
+<p>Note that <b><i>spampd</i> replaces <i>spamd</i></b> from the <i>SpamAssassin</i> distribution in function. You do not need to run <i>spamd</i> in order for <i>spampd</i> to work. This has apparently been the source of some confusion, so now you know.</p>
 
 <h2 id="Postfix-specific-Notes">Postfix-specific Notes</h2>
 
@@ -169,6 +167,14 @@
 </code></code></p>
 
 <p>This will return a list of useful timeout settings and their values. For explanations see the relevant <code><code>man</code></code> page (smtp, smtpd, lmtp). By default <i>spampd</i> is set up for the default Postfix timeout values.</p>
+
+<p>The following guide has some more specific setup instructions: <b><a href="https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd">Integrating SpamAssassin into Postfix using spampd</a></b></p>
+
+<h1 id="Upgrading">Upgrading</h1>
+
+<p>If upgrading from a version prior to 2.2, please note that the --add-sc-header option is no longer supported. Use SA&#39;s built-in header manipulation features instead (as of SA v2.6).</p>
+
+<p>Upgrading from version 1 simply involves replacing the <i>spampd</i> program file with the latest one. Note that the <i>dead-letters</i> folder is no longer being used and the --dead-letters option is no longer needed (though no errors are thrown if it&#39;s present). Check the <a href="#Options">&quot;Options&quot;</a> list below for a full list of new and deprecated options. Also be sure to check out the change log.</p>
 
 <h1 id="Options">Options</h1>
 
@@ -305,9 +311,9 @@
 <dt id="set-envelope-headers-or---seh-new-in-v2.30"><b>--set-envelope-headers</b> or <b>--seh</b> <code><code>(new in v2.30)</code></code></dt>
 <dd>
 
-<p>Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail being scanned before it is passed to SpamAssassin. The idea is to help SA process any blacklist/whitelist to/from directives on the actual sender/recipients instead of the possibly bogus envelope headers. This potentially exposes the list of all recipients of that mail (even BCC&#39;ed ones). Therefore usage of this option is discouraged.</p>
+<p>Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail being scanned before it is passed to SpamAssassin. The idea is to help SA process any blacklist/whitelist to/from directives on the actual sender/recipients instead of the possibly bogus envelope headers. This potentially exposes the list of all recipients of that mail (even BCC&#39;d ones). Therefore usage of this option is discouraged.</p>
 
-<p><i>NOTE</i>: Even though spampd tries to prevent this leakage by removing the X-Envelope-To header after scanning, SpamAssassin itself might add headers itself which report one or more of the recipients which had been listed in this header.</p>
+<p><i>NOTE</i>: Even though <i>spampd</i> tries to prevent this leakage by removing the X-Envelope-To header after scanning, SpamAssassin itself might add headers that report recipient(s) listed in X-Envelope-To.</p>
 
 </dd>
 <dt id="set-envelope-from-or---sef-new-in-v2.30"><b>--set-envelope-from</b> or <b>--sef</b> <code><code>(new in v2.30)</code></code></dt>
@@ -335,7 +341,7 @@
 <dt id="homedir-directory"><b>--homedir=directory</b></dt>
 <dd>
 
-<p>Use the specified directory as home directory for the spamassassin process. Things like the auto-whitelist and other plugin (razor/pyzor) files get written to here. Defaul is /var/spool/spamassassin/spampd. A good place for this is in the same place your bayes_path SA config setting points to (if any). Make sure this directory is accessible to the user that spampd is running as (default: mail). New in v2.40. Thanks to Alexander Wirt for this fix.</p>
+<p>Use the specified directory as home directory for the spamassassin process. Things like the auto-whitelist and other plugin (razor/pyzor) files get written to here. Default is /var/spool/spamassassin/spampd. A good place for this is in the same place your bayes_path SA config setting points to (if any). Make sure this directory is accessible to the user that spampd is running as (default: mail). New in v2.40. Thanks to Alexander Wirt for this fix.</p>
 
 </dd>
 <dt id="saconfig-filename"><b>--saconfig=filename</b></dt>
@@ -479,7 +485,7 @@
 
 <h1 id="Copyright-License-and-Disclaimer">Copyright, License, and Disclaimer</h1>
 
-<p><i>spampd</i> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018 by World Design Group, Inc. and Maxim Paperno.</p>
+<p><i>spampd</i> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; All Rights Reserved.</p>
 
 <p>Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above in the Credits section.</p>
 
@@ -507,7 +513,7 @@
 
 <h1 id="See-Also">See Also</h1>
 
-<p>perl(1), Spam::Assassin(3), <a href="http://www.spamassassin.org/">http://www.spamassassin.org/</a>, <a href="http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm">http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm</a></p>
+<p><a href="http://man.he.net/man1/perl">perl(1)</a>, <a href="http://man.he.net/man1/spamassassin">spamassassin(1)</a>, <a href="https://spamassassin.apache.org/doc/Mail_SpamAssassin.html">Mail::SpamAssassin(3)</a>, <a href="http://www.spamassassin.org/">SpamAssassin Site</a>, <a href="https://github.com/mpaperno/spampd">SpamPD Code Repository</a>, <a href="http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm">SpamPD product page</a>, <a href="https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd">Integrating SpamAssassin into Postfix using spampd</a></p>
 
 
 </body>
