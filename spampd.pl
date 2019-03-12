@@ -23,8 +23,7 @@
 # v1.0.1 - 03-Feb-03
 # v1.0.0 - May 2002
 #
-# spampd is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018 by World Design Group and Maxim Paperno
-#  (see http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm)
+# spampd is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; All Rights Reserved.
 #
 # Written and maintained by Maxim Paperno (MPaperno@WorldDesign.com)
 #
@@ -460,7 +459,7 @@ sub process_message {
   while (<$fh>) {
     $envto   = 1 if (/^(?:X-)?Envelope-To: /);
     $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
-      if (/^\r?\n$/ && $inhdr) {
+    if (/^\r?\n$/ && $inhdr) {
       $inhdr = 0;  # outside of msg header after first blank line
       if (($self->{spampd}->{envelopeheaders} || $self->{spampd}->{setenvelopefrom}) && !$envfrom) {
         unshift(@msglines, "X-Envelope-From: $sender\r\n");
@@ -1215,37 +1214,37 @@ need to have a version of Postfix which supports this (ideally v.2 and up).
 =back
 
 Note that these examples only show incoming mail delivery.  Since it is 
-usually unnecessary to scan mail coming from your network (right?),
-it may be desirable to set up a separate outbound route which bypasses
-I<spampd>.
+often unnecessary to scan mail coming from your network, it may be desirable 
+to set up a separate outbound route which bypasses I<spampd>.
 
-=head1 Upgrading
-
-If upgrading from a version prior to 2.2, please note that the --add-sc-header
-option is no longer supported.  Use SAs built-in header manipulation features
-instead (as of SA v2.6).
-
-Upgrading from version 1 simply involves replacing the F<spampd> program file
-with the latest one.  Note that the I<dead-letters> folder is no longer being
-used and the --dead-letters option is no longer needed (though no errors are
-thrown if it's present).  Check the L<"Options"> list below for a full list of new
-and deprecated options.  Also be sure to check out the change log.
-
-=head1 Installation
+=head1 Installation / Configuration
 
 I<spampd> can be run directly from the command prompt if desired.  This is
 useful for testing purposes, but for long term use you probably want to put
 it somewhere like /usr/bin or /usr/local/bin and execute it at system startup.
 For example on Red Hat-style Linux system one can use a script in 
-/etc/rc.d/init.d to start I<spampd> (a sample script is available on the 
-I<spampd> Web page @ http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm).
+/etc/rc.d/init.d to start I<spampd> (a L<sample script|https://github.com/mpaperno/spampd/tree/master/misc> 
+is available in the I<spampd> code repository).
 
-The options all have reasonable defaults, especially for a Postfix-centric
+I<spampd> is available as a B<package> for a significant number of Linux distributions,
+including Debian and derivatives (Ubuntu, etc). This is typically the easiest/best way
+to install and configure I<spampd> since it should already take into account any system 
+specifics for setting up and running as a daemon, etc.  Note however that packages 
+might not offer the latest version of I<spampd>. A good reference for available
+packages and their versions can be found at L<https://repology.org/project/spampd/versions>.
+
+I<spampd> is also used in the turnkey L<Mail-in-a-Box|https://mailinabox.email/>
+project, which includes Postfix as the main MTA and Dovecot as the local delivery agent 
+with LMTP protocol. Even if you don't need the turnkey solution, it may be imformative 
+to peruse the MIAB L<setup|https://github.com/mail-in-a-box/mailinabox/tree/master/setup> /
+L<configuration|https://github.com/mail-in-a-box/mailinabox/tree/master/conf> files for reference.
+
+All I<spampd> options have reasonable defaults, especially for a Postfix-centric
 installation.  You may want to specify the --children option if you have an
 especially beefy or weak server box because I<spampd> is a memory-hungry 
 program.  Check the L<"Options"> for details on this and all other parameters.
 
-Note that I<spampd> B<replaces> I<spamd> from the I<SpamAssassin> distribution
+Note that B<I<spampd> replaces I<spamd>> from the I<SpamAssassin> distribution
 in function. You do not need to run I<spamd> in order for I<spampd> to work.
 This has apparently been the source of some confusion, so now you know.
 
@@ -1288,6 +1287,21 @@ C<# postconf | grep timeout>
 This will return a list of useful timeout settings and their values.  For 
 explanations see the relevant C<man> page (smtp, smtpd, lmtp).  By default
 I<spampd> is set up for the default Postfix timeout values.
+
+The following guide has some more specific setup instructions:
+B<L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>>
+
+=head1 Upgrading
+
+If upgrading from a version prior to 2.2, please note that the --add-sc-header
+option is no longer supported.  Use SA's built-in header manipulation features
+instead (as of SA v2.6).
+
+Upgrading from version 1 simply involves replacing the F<spampd> program file
+with the latest one.  Note that the I<dead-letters> folder is no longer being
+used and the --dead-letters option is no longer needed (though no errors are
+thrown if it's present).  Check the L<"Options"> list below for a full list of new
+and deprecated options.  Also be sure to check out the change log.
 
 =head1 Options
 
@@ -1443,13 +1457,12 @@ Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
 being scanned before it is passed to SpamAssassin. The idea is to help SA 
 process any blacklist/whitelist to/from directives on the actual 
 sender/recipients instead of the possibly bogus envelope headers. This 
-potentially exposes the list of all recipients of that mail (even BCC'ed ones). 
+potentially exposes the list of all recipients of that mail (even BCC'd ones). 
 Therefore usage of this option is discouraged. 
 
-I<NOTE>: Even though spampd tries to prevent this leakage by removing the
+I<NOTE>: Even though I<spampd> tries to prevent this leakage by removing the
 X-Envelope-To header after scanning, SpamAssassin itself might add headers
-itself which report one or more of the recipients which had been listed in
-this header.
+that report recipient(s) listed in X-Envelope-To.
 
 =item B<--set-envelope-from> or B<--sef> C<(new in v2.30)>
 
@@ -1480,7 +1493,7 @@ Turn off all SA network-based tests (DNS, Razor, etc).
 Use the specified directory as home directory for the spamassassin process. 
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
 written to here.
-Defaul is /var/spool/spamassassin/spampd.  A good place for this is in the same
+Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
 place your bayes_path SA config setting points to (if any).  Make sure this
 directory is accessible to the user that spampd is running as (default: mail).
 New in v2.40. Thanks to Alexander Wirt for this fix.
@@ -1621,8 +1634,8 @@ See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
 
 =head1 Copyright, License, and Disclaimer
 
-I<spampd> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018 
-by World Design Group, Inc. and Maxim Paperno.
+I<spampd> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; 
+All Rights Reserved.
 
 Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above
 in the Credits section.
@@ -1662,5 +1675,9 @@ possible relay hole if localhost is trusted.
 
 =head1 See Also
 
-perl(1), Mail::SpamAssassin(3pm), L<http://www.spamassassin.org/>, 
-L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>
+L<perl(1)>, L<spamassassin(1)>, 
+L<Mail::SpamAssassin(3)|https://spamassassin.apache.org/doc/Mail_SpamAssassin.html>,
+L<SpamAssassin Site|http://www.spamassassin.org/>, 
+L<SpamPD Code Repository|https://github.com/mpaperno/spampd>, 
+L<SpamPD product page|http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>,
+L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>
