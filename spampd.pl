@@ -397,6 +397,7 @@ package SpamPD;
 
 use strict;
 use warnings;
+use version;
 use Net::Server::PreForkSimple;
 use IO::File;
 use Getopt::Long;
@@ -845,6 +846,11 @@ if ($children < 1) {
   exit 1;
 }
 
+if ($sa_awl && version->parse($Mail::SpamAssassin::VERSION) >= 3) {
+  warn "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead.\n";
+  exit 1;
+}
+
 # Untaint some options provided by admin command line.
 $host         = $1 if $host =~ /^(.*)$/;
 $port         = $1 if $port =~ /^(.*)$/;
@@ -1027,8 +1033,6 @@ Options:
     or --sef                 those that don't feel comfortable with the
                              potential information leak.
 
-  --auto-whitelist         Use the SA global auto-whitelist feature
-    or --aw                  (SA versions => 3.0 now control this via local.cf).
   --local-only or -L       Turn off all SA network-based tests (RBL/Razor/etc).
   --homedir=path           Use the specified directory as home directory for
                              the SpamAssassin process.
@@ -1044,6 +1048,8 @@ Deprecated Options (still accepted for backwards compatibility):
   --heloname=hostname      No longer used in spampd v.2
   --dead-letters=path      No longer used in spampd v.2
   --stop-at-threshold      No longer implemented in SpamAssassin
+  --auto-whitelist         Use the SA global auto-whitelist feature
+    or --aw                  (SA versions => 3.0 now control this via local.cf).
 
 EOF
 
@@ -1110,7 +1116,6 @@ B<spampd>
 [B<--log-rules-hit|rh>]
 [B<--set-envelope-headers|seh>]
 [B<--set-envelope-from|sef>]
-[B<--auto-whitelist|aw>]
 [B<--local-only|L>]
 [B<--saconfig=filename>]
 [B<--debug|d>]
@@ -1469,9 +1474,9 @@ of X-Envelope-To.  The above option overrides this one.
 =item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
 
 This option is no longer relevant with SA version 3.0 and above, which
-controls auto whitelist use via config file settings. This option is likely to
-be removed in the future.  Do not use it unless you must use an older SA
-version.
+controls auto whitelist use via config file settings. Do not use it unless
+you must use an older SA version. An error will be generated if attempting
+to use this option with SA 3.0 or above.
 
 For SA version < 3.0, turns on the SpamAssassin global whitelist feature.
 See the SA docs. Note that per-user whitelists are not available.
