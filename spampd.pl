@@ -23,7 +23,7 @@
 # v1.0.1 - 03-Feb-03
 # v1.0.0 - May 2002
 #
-# spampd is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; All Rights Reserved.
+# spampd is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno; All Rights Reserved.
 #
 # Written and maintained by Maxim Paperno (MPaperno@WorldDesign.com)
 #
@@ -88,7 +88,7 @@ use IO::File;
 
 # =item new(socket => $socket);
 #
-# Changed by MP: This now emulates Net::SMTP::Server::Client for use with 
+# Changed by MP: This now emulates Net::SMTP::Server::Client for use with
 #   Net::Server which passes an already open socket.
 # The #socket listen on must be specified. If this call
 # succeeds, it returns a server structure. If it fails it dies, so
@@ -294,8 +294,8 @@ use IO::Socket::UNIX;
 #
 # The interface and port, OR a unix socket to talk to must be specified. If
 # this call succeeds, it returns a client structure with an open
-# IO::Socket::IP or IO::Socket::UNIX in it, ready to talk to. 
-# If it fails it dies, so if you want anything other than an exit with an 
+# IO::Socket::IP or IO::Socket::UNIX in it, ready to talk to.
+# If it fails it dies, so if you want anything other than an exit with an
 # explanatory error message, wrap the constructor call in an eval block and pull
 # the error out of $@ as usual. This is also the case for all other
 # methods; they succeed or they die. The timeout parameter is passed
@@ -771,8 +771,7 @@ my $relaysocket     = undef;                             # relay to socket
 my $children        = 5;                                 # number of child processes (servers) to spawn at start
 my $maxrequests     = 20;                                # max requests handled by child b4 dying
 my $childtimeout    = 6 * 60;                            # child process per-command timeout in seconds
-my $satimeout       = 285;                               # SpamAssassin timeout in seconds (15s less than Postfix
-                                                         #   default for smtp_data_done_timeout)
+my $satimeout       = 285;                               # SA timeout in seconds (15s less than Postfix default for smtp_data_done_timeout)
 my $pidfile         = '/var/run/spampd.pid';             # write pid to file
 my $user            = 'mail';                            # user to run as
 my $group           = 'mail';                            # group to run as
@@ -782,13 +781,11 @@ my $rh              = 0;                                 # log which rules were 
 my $debug           = 0;                                 # debug flag
 my $dose            = 0;                                 # die-on-sa-errors flag
 my $logsock         = 'unix';                            # default log socket (some systems like 'inet')
-my $nsloglevel      = 2;                                 # default log level for Net::Server (in the range 0-4)
-my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background;
-                                                         #   apparently useful under Win32/cygwin to disable this via --nodetach;
-my $setsid          = 0;                                 # specifies whether to use POSIX::setsid() command to truly daemonize.
-my $envelopeheaders = 0;                                 # Set X-Envelope-To and X-Envelope-From headers in the mail before
-                                                         #   passing it to spamassassin. Set to 1 to enable this.
-my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only
+my $nsloglevel      = 2;                                 # log level for Net::Server (in the range 0-4) (--debug option sets this to 4)
+my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background (--[no]detach option)
+my $setsid          = 0;                                 # use POSIX::setsid() command to truly daemonize.
+my $envelopeheaders = 0;                                 # Set X-Envelope-To & X-Envelope-From headers in the mail before passing it to SA (--seh option)
+my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only (--sef option)
 my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
 my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
 my $sa_local_only   = 0;                                 # disable SA network tests
@@ -822,7 +819,7 @@ GetOptions(
   'dose'                     => \$dose,
   'logsock=s'                => \$logsock,
   'detach!'                  => \$background,
-  'setsid'                   => \$setsid,
+  'setsid!'                  => \$setsid,
   'set-envelope-headers|seh' => \$envelopeheaders,
   'set-envelope-from|sef'    => \$setenvelopefrom,
   'saconfig=s'               => \$sa_config,
@@ -971,14 +968,14 @@ sub usage {
 usage: $0 [ options ]
 
 Options:
-  --host=host[:port]       Hostname/IP and optional port to listen on. 
+  --host=host[:port]       Hostname/IP and optional port to listen on.
                              Default is 127.0.0.1 port 10025
   --port=n                 Port to listen on (alternate syntax to above).
   --socket=socketpath      UNIX socket to listen on. Alternative to
                              --host and --port.
   --socket-perms=perms     The file mode to set on the created UNIX
                              socket in octal format.
-  --relayhost=host[:port]  Host to relay mail to. 
+  --relayhost=host[:port]  Host to relay mail to.
                              Default is 127.0.0.1 port 25.
   --relayport=n            Port to relay to (alternate syntax to above).
   --relaysocket            UNIX socket to relay to. Alternative to
@@ -989,23 +986,21 @@ Options:
     or --mr n                exiting. Default is 20.
   --childtimeout=n         Time out children after this many seconds during
                              transactions (each S/LMTP command including the
-                             time it takes to send the data). 
+                             time it takes to send the data).
                              Default is 360 seconds (6min).
   --satimeout=n            Time out SpamAssassin after this many seconds.
                              Default is 285 seconds.
 
-  --pid=filename           Store the daemon's process ID in this file. 
+  --pid=filename           Store the daemon's process ID in this file.
     or -p filename           Default is /var/run/spampd.pid
   --user=username          Specifies the user that the daemon runs as.
     or -u username           Default is mail.
   --group=groupname        Specifies the group that the daemon runs as.
     or -g groupname          Default is mail.
 
-  --nodetach               Don't detach from the console and fork into
-                             background. Useful for some daemon control
-                             tools or when running as a win32 service
-                             under cygwin.
-  --setsid                 Fork after the bind method to release itself
+  --[no]detach             Detach from the console and fork into
+                             background. Default is to detach.
+  --[no]setsid             Fork after the bind method to release itself
                              from the command line and then run the
                              POSIX::setsid() command to truly daemonize.
                              Only used if --nodetach isn't specified.
@@ -1024,7 +1019,7 @@ Options:
     or --rh                  current message.
 
   --set-envelope-headers   Set X-Envelope-From and X-Envelope-To headers before
-    or --seh                 passing the mail to SpamAssassin. This is 
+    or --seh                 passing the mail to SpamAssassin. This is
                              disabled by default because it potentially leaks
                              information. NOTE: Please read the manpage before
                              enabling this!
@@ -1032,11 +1027,11 @@ Options:
     or --sef                 those that don't feel comfortable with the
                              potential information leak.
 
-  --auto-whitelist         Use the SA global auto-whitelist feature 
+  --auto-whitelist         Use the SA global auto-whitelist feature
     or --aw                  (SA versions => 3.0 now control this via local.cf).
   --local-only or -L       Turn off all SA network-based tests (RBL/Razor/etc).
-  --homedir=path           Use the specified directory as home directory for 
-                             the SpamAssassin process. 
+  --homedir=path           Use the specified directory as home directory for
+                             the SpamAssassin process.
                              Default is /var/spool/spamassassin/spampd
   --saconfig=filename      Use the specified file for loading SA configuration
                              options after the default local.cf file.
@@ -1049,6 +1044,7 @@ Deprecated Options (still accepted for backwards compatibility):
   --heloname=hostname      No longer used in spampd v.2
   --dead-letters=path      No longer used in spampd v.2
   --stop-at-threshold      No longer implemented in SpamAssassin
+
 EOF
 
   exit shift;
@@ -1061,26 +1057,26 @@ sub deprecated_opt {
 
 __END__
 
-# Some commented-out documentation.  POD doesn't have a way to comment 
+# Some commented-out documentation.  POD doesn't have a way to comment
 # out sections!?  This documents a feature which may be implemented later.
 #
 # =item B<--maxchildren=n> or B<--mc=n>
 #
-# Maximum number of children to spawn if needed (where n >= --children).  When 
-# I<spampd> starts it will spawn a number of child servers as specified by 
+# Maximum number of children to spawn if needed (where n >= --children).  When
+# I<spampd> starts it will spawn a number of child servers as specified by
 # --children. If all those servers become busy, a new child is spawned up to the
 # number specified in --maxchildren. Default is to have --maxchildren equal to
-# --children so extra child processes aren't started. Also see the --children 
-# option, above.  You may want to set your origination mail server to limit the 
-# number of concurrent connections to I<spampd> to match this setting (for 
-# Postfix this is the C<xxxx_destination_concurrency_limit> setting where 
+# --children so extra child processes aren't started. Also see the --children
+# option, above.  You may want to set your origination mail server to limit the
+# number of concurrent connections to I<spampd> to match this setting (for
+# Postfix this is the C<xxxx_destination_concurrency_limit> setting where
 # 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
 #
 # Note that extra servers after the initial --children will only spawn on very
 # busy systems.  This is because the check to see if a new server is needed (ie.
-# all current ones are busy) is only done around once per minute (this is 
-# controlled by the Net::Server::PreFork module, in case you want to 
-# hack at it :).  It can still be useful as an "overflow valve," and is 
+# all current ones are busy) is only done around once per minute (this is
+# controlled by the Net::Server::PreFork module, in case you want to
+# hack at it :).  It can still be useful as an "overflow valve," and is
 # especially nice since the extra child servers will die off once they're not
 # needed.
 
@@ -1095,9 +1091,9 @@ SpamPD - Spam Proxy Daemon (version 2.5x)
 B<spampd>
 [B<--host=host[:port]>]
 [B<--relayhost=hostname[:port]>]
-[B<--socket>]
-[B<--socket-perms>]
-[B<--relaysocket>]
+[B<--socket=I<socketpath>>]
+[B<--socket-perms=I<perm>>]
+[B<--relaysocket=I<host[:port]>>]
 [B<--user|u=username>]
 [B<--group|g=groupname>]
 [B<--children|c=n>]
@@ -1105,8 +1101,8 @@ B<spampd>
 [B<--childtimeout=n>]
 [B<--satimeout=n>]
 [B<--pid|p=filename>]
-[B<--nodetach>]
-[B<--setsid>]
+[B<--[no]detach>]
+[B<--[no]setsid>]
 [B<--logsock=inet|unix>]
 [B<--maxsize=n>]
 [B<--dose>]
@@ -1118,6 +1114,8 @@ B<spampd>
 [B<--local-only|L>]
 [B<--saconfig=filename>]
 [B<--debug|d>]
+
+B<spampd> B<--version>
 
 B<spampd> B<--help>
 
@@ -1131,11 +1129,11 @@ I<spampd> (or SpamAssassin) then the mail servers will disconnect and the
 sending server is still responsible for retrying the message for as long
 as it is configured to do so.
 
-I<spampd> uses SpamAssassin to modify (tag) relayed messages based on 
-their spam score, so all SA settings apply. This is described in the SA 
-documentation.  I<spampd> will by default only tell SA to tag a 
-message if it exceeds the spam threshold score, however you can have 
-it rewrite all messages passing through by adding the --tagall option 
+I<spampd> uses SpamAssassin to modify (tag) relayed messages based on
+their spam score, so all SA settings apply. This is described in the SA
+documentation.  I<spampd> will by default only tell SA to tag a
+message if it exceeds the spam threshold score, however you can have
+it rewrite all messages passing through by adding the --tagall option
 (see SA for how non-spam messages are tagged).
 
 I<spampd> logs all aspects of its operation to syslog(8), using the
@@ -1171,8 +1169,8 @@ does not do anything other than check for spam, so it is not suitable as
 an anti-relay system.  It is meant to work in conjunction with your
 regular mail system.  Typically one would pipe any messages they wanted
 scanned through I<spampd> after initial acceptance by your MX host.
-This is especially useful for using Postfix's (http://www.postfix.org) 
-advanced content filtering mechanism, although certainly not limited to 
+This is especially useful for using Postfix's (http://www.postfix.org)
+advanced content filtering mechanism, although certainly not limited to
 that application.
 
 Please re-read the second sentence in the above paragraph.  You should NOT
@@ -1183,38 +1181,33 @@ way.
 Here are some simple examples (square brackets in the "diagrams" indicate
 physical machines):
 
+=over 2
 
-B<Running between firewall/gateway and internal mail server>
+=item B<Running between firewall/gateway and internal mail server>
 
-=over 3
-
-The firewall/gateway MTA would be configured to forward all of its mail 
-to the port that I<spampd> listens on, and I<spampd> would relay its 
-messages to port 25 of your internal server. I<spampd> could either 
-run on its own host (and listen on any port) or it could run on either 
+The firewall/gateway MTA would be configured to forward all of its mail
+to the port that I<spampd> listens on, and I<spampd> would relay its
+messages to port 25 of your internal server. I<spampd> could either
+run on its own host (and listen on any port) or it could run on either
 mail server (and listen on any port except port 25).
 
- Internet -> [ MX gateway (@inter.net.host:25) -> 
-	spampd (@localhost:2025) ] ->
-	Internal mail (@private.host.ip:25)
+  Internet ->
+  [ MX gateway (@inter.net.host:25) -> spampd (@localhost:2025) ] ->
+  [ Internal mail (@private.host.ip:25) ]
 
-=back
-
-B<Using Postfix advanced content filtering>
-
-=over 3
+=item B<Using Postfix advanced content filtering>
 
 Please see the F<FILTER_README> that came with the Postfix distribution.  You
 need to have a version of Postfix which supports this (ideally v.2 and up).
 
- Internet -> [ Postfix (@inter.net.host:25) -> 
-	spampd (@localhost:10025) -> 
-	Postfix (@localhost:10026) ] -> final delivery
+  Internet -> [ Postfix (@inter.net.host:25)  ->
+                spampd (@localhost:10025)     ->
+                Postfix (@localhost:10026)  ] -> final delivery
 
 =back
 
-Note that these examples only show incoming mail delivery.  Since it is 
-often unnecessary to scan mail coming from your network, it may be desirable 
+Note that these examples only show incoming mail delivery.  Since it is
+often unnecessary to scan mail coming from your network, it may be desirable
 to set up a separate outbound route which bypasses I<spampd>.
 
 =head1 Installation / Configuration
@@ -1222,26 +1215,26 @@ to set up a separate outbound route which bypasses I<spampd>.
 I<spampd> can be run directly from the command prompt if desired.  This is
 useful for testing purposes, but for long term use you probably want to put
 it somewhere like /usr/bin or /usr/local/bin and execute it at system startup.
-For example on Red Hat-style Linux system one can use a script in 
-/etc/rc.d/init.d to start I<spampd> (a L<sample script|https://github.com/mpaperno/spampd/tree/master/misc> 
+For example on Red Hat-style Linux system one can use a script in
+/etc/rc.d/init.d to start I<spampd> (a L<sample script|https://github.com/mpaperno/spampd/tree/master/misc>
 is available in the I<spampd> code repository).
 
 I<spampd> is available as a B<package> for a significant number of Linux distributions,
 including Debian and derivatives (Ubuntu, etc). This is typically the easiest/best way
-to install and configure I<spampd> since it should already take into account any system 
-specifics for setting up and running as a daemon, etc.  Note however that packages 
+to install and configure I<spampd> since it should already take into account any system
+specifics for setting up and running as a daemon, etc.  Note however that packages
 might not offer the latest version of I<spampd>. A good reference for available
 packages and their versions can be found at L<https://repology.org/project/spampd/versions>.
 
 I<spampd> is also used in the turnkey L<Mail-in-a-Box|https://mailinabox.email/>
-project, which includes Postfix as the main MTA and Dovecot as the local delivery agent 
-with LMTP protocol. Even if you don't need the turnkey solution, it may be imformative 
+project, which includes Postfix as the main MTA and Dovecot as the local delivery agent
+with LMTP protocol. Even if you don't need the turnkey solution, it may be informative
 to peruse the MIAB L<setup|https://github.com/mail-in-a-box/mailinabox/tree/master/setup> /
 L<configuration|https://github.com/mail-in-a-box/mailinabox/tree/master/conf> files for reference.
 
 All I<spampd> options have reasonable defaults, especially for a Postfix-centric
 installation.  You may want to specify the --children option if you have an
-especially beefy or weak server box because I<spampd> is a memory-hungry 
+especially beefy or weak server box because I<spampd> is a memory-hungry
 program.  Check the L<"Options"> for details on this and all other parameters.
 
 Note that B<I<spampd> replaces I<spamd>> from the I<SpamAssassin> distribution
@@ -1251,21 +1244,21 @@ This has apparently been the source of some confusion, so now you know.
 =head2 Postfix-specific Notes
 
 Here is a typical setup for Postfix "advanced" content filtering as described
-in the F<FILTER_README> that came with the Postfix distribution (which you 
+in the F<FILTER_README> that came with the Postfix distribution (which you
 really need to read):
 
 F</etc/postfix/master.cf>:
- 
- smtp	inet	n	-	y	-	-	smtpd
- 	-o content_filter=smtp:localhost:10025
-	-o myhostname=mx.example.com
 
- localhost:10026	inet	n	-	n	-	10	smtpd
- 	-o content_filter=
- 	-o myhostname=mx-int.example.com
+  smtp             inet  n  -  y  -  -   smtpd
+    -o content_filter=smtp:localhost:10025
+    -o myhostname=mx.example.com
+
+  localhost:10026  inet  n  -  n  -  10  smtpd
+    -o content_filter=
+    -o myhostname=mx-int.example.com
 
 The first entry is the main public-facing MTA which uses localhost:10025
-as the content filter for all mail.	The second entry receives mail from
+as the content filter for all mail. The second entry receives mail from
 the content filter and does final delivery.  Both smtpd instances use
 the same Postfix F<main.cf> file.  I<spampd> is the process that listens on
 localhost:10025 and then connects to the Postfix listener on localhost:10026.
@@ -1284,7 +1277,7 @@ Another tip for Postfix when considering what timeout values to use for
 
 C<# postconf | grep timeout>
 
-This will return a list of useful timeout settings and their values.  For 
+This will return a list of useful timeout settings and their values.  For
 explanations see the relevant C<man> page (smtp, smtpd, lmtp).  By default
 I<spampd> is set up for the default Postfix timeout values.
 
@@ -1310,7 +1303,7 @@ and deprecated options.  Also be sure to check out the change log.
 =item B<--host=(ip|hostname)[:port]>
 
 Specifies what hostname/IP and port I<spampd> listens on. By default, it listens
-on 127.0.0.1 (localhost) on port 10025. 
+on 127.0.0.1 (localhost) on port 10025.
 
 B<Important!> You should NOT enable I<spampd> to listen on a
 public interface (IP address) unless you know exactly what you're doing!
@@ -1327,8 +1320,8 @@ Specifies what UNIX socket I<spampd> listens on. If this is specified,
 
 =item B<--socket-perms=mode>
 
-The file mode fo the created UNIX socket (see --socket) in octal
-format, e.g. 700 to specify acces only for the user spampd is run as.
+The file mode for the created UNIX socket (see --socket) in octal
+format, e.g. 700 to specify acces only for the user I<spampd> is run as.
 
 =item B<--relayhost=(ip|hostname)[:port]>
 
@@ -1338,7 +1331,7 @@ defaults to 25.
 
 =item B<--relayport=n>
 
-Specifies what port I<spampd> will relay to. Default is 25. This is an 
+Specifies what port I<spampd> will relay to. Default is 25. This is an
 alternate to using the above --relayhost=ip:port notation.
 
 =item B<--relaysocket=socketpath>
@@ -1355,16 +1348,16 @@ I<mail>/I<mail>.
 
 =item B<--children=n> or B<-c=n>
 
-Number of child servers to start and maintain (where n > 0). Each child will 
-process up to --maxrequests (below) before exiting and being replaced by 
-another child.  Keep this number low on systems w/out a lot of memory. 
-Default is 5 (which seems OK on a 512MB lightly loaded system).  Note that 
+Number of child servers to start and maintain (where n > 0). Each child will
+process up to --maxrequests (below) before exiting and being replaced by
+another child.  Keep this number low on systems w/out a lot of memory.
+Default is 5 (which seems OK on a 512MB lightly loaded system).  Note that
 there is always a parent process running, so if you specify 5 children you
 will actually have 6 I<spampd> processes running.
 
-You may want to set your origination mail server to limit the 
-number of concurrent connections to I<spampd> to match this setting (for 
-Postfix this is the C<xxxx_destination_concurrency_limit> setting where 
+You may want to set your origination mail server to limit the
+number of concurrent connections to I<spampd> to match this setting (for
+Postfix this is the C<xxxx_destination_concurrency_limit> setting where
 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
 
 =item B<--maxrequests=n>
@@ -1378,8 +1371,8 @@ the memory is for the child to exit. The default is 20.
 =item B<--childtimeout=n>
 
 This is the number of seconds to allow each child server before it times out
-a transaction. In an S/LMTP transaction the timer is reset for every command. 
-This timeout includes time it would take to send the message data, so it should 
+a transaction. In an S/LMTP transaction the timer is reset for every command.
+This timeout includes time it would take to send the message data, so it should
 not be too short.  Note that it's more likely the origination or destination
 mail servers will timeout first, which is fine.  This is just a "sane" failsafe.
 Default is 360 seconds (6 minutes).
@@ -1387,9 +1380,9 @@ Default is 360 seconds (6 minutes).
 =item B<--satimeout=n>
 
 This is the number of seconds to allow for processing a message with
-SpamAssassin (including feeding it the message, analyzing it, and adding 
-the headers/report if necessary).  
-This should be less than your origination and destination servers' timeout 
+SpamAssassin (including feeding it the message, analyzing it, and adding
+the headers/report if necessary).
+This should be less than your origination and destination servers' timeout
 settings for the DATA command. For Postfix the default is 300 seconds in both
 cases (smtp_data_done_timeout and smtpd_timeout). In the event of timeout
 while processing the message, the problem is logged and the message is passed
@@ -1409,18 +1402,21 @@ F</var/run/spampd.pid>.
 Syslog socket to use.  May be either "unix" of "inet".  Default is "unix"
 except on HP-UX and SunOS (Solaris) systems which seem to prefer "inet".
 
-=item B<--nodetach> C<(new in v2.20)>
 
-If this option is given spampd won't detach from the console and fork into the
-background. This can be useful for running under control of some daemon
-management tools or when configured as a win32 service under cygrunsrv's
-control.
 
-=item B<--setsid> C<(new in v2.51)>
 
-If this option is given spampd will fork after the bind method to release
+=item B<--[no]detach> C<(new in v2.20)>
+
+By default I<spampd> will detach from the console and fork into the
+background ("daemonize"). Use C<--nodetach> to override this.
+This can be useful for running under control of some daemon
+management tools or testing from a command line.
+
+=item B<--[no]setsid> C<(new in v2.51)>
+
+If C<--setsid> is specified then I<spampd> will fork after the bind method to release
 itself from the command line and then run the POSIX::setsid() command to truly
-daemonize. Only used if --nodetach isn't specified.
+daemonize. Only used if C<--nodetach> isn't specified.
 
 =item B<--maxsize=n>
 
@@ -1431,34 +1427,34 @@ indicating this.  The size includes headers and attachments (if any).
 =item B<--dose>
 
 Acronym for (d)ie (o)n (s)pamAssassin (e)rrors.  By default if I<spampd>
-encounters a problem with processing the message through Spam Assassin (timeout 
-or other error), it will still pass the mail on to the destination server.  If 
-you specify this option however, the mail is instead rejected with a temporary 
-error (code 450, which means the origination server should keep retrying to send 
+encounters a problem with processing the message through Spam Assassin (timeout
+or other error), it will still pass the mail on to the destination server.  If
+you specify this option however, the mail is instead rejected with a temporary
+error (code 450, which means the origination server should keep retrying to send
 it).  See the related --satimeout option, above.
 
 =item B<--tagall> or B<-a>
 
 Tells I<spampd> to have SpamAssassin add headers to all scanned mail,
-not just spam.  By default I<spampd> will only rewrite messages which 
+not just spam.  By default I<spampd> will only rewrite messages which
 exceed the spam threshold score (as defined in the SA settings).  Note that
-for this option to work as of SA-2.50, the I<always_add_report> and/or 
-I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be 
+for this option to work as of SA-2.50, the I<always_add_report> and/or
+I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be
 set to 1/true.
 
 =item B<--log-rules-hit> or B<--rh>
 
-Logs the names of each SpamAssassin rule which matched the message being 
+Logs the names of each SpamAssassin rule which matched the message being
 processed.  This list is returned by SA.
 
 =item B<--set-envelope-headers> or B<--seh> C<(new in v2.30)>
 
 Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
-being scanned before it is passed to SpamAssassin. The idea is to help SA 
-process any blacklist/whitelist to/from directives on the actual 
-sender/recipients instead of the possibly bogus envelope headers. This 
-potentially exposes the list of all recipients of that mail (even BCC'd ones). 
-Therefore usage of this option is discouraged. 
+being scanned before it is passed to SpamAssassin. The idea is to help SA
+process any blacklist/whitelist to/from directives on the actual
+sender/recipients instead of the possibly bogus envelope headers. This
+potentially exposes the list of all recipients of that mail (even BCC'd ones).
+Therefore usage of this option is discouraged.
 
 I<NOTE>: Even though I<spampd> tries to prevent this leakage by removing the
 X-Envelope-To header after scanning, SpamAssassin itself might add headers
@@ -1477,11 +1473,11 @@ controls auto whitelist use via config file settings. This option is likely to
 be removed in the future.  Do not use it unless you must use an older SA
 version.
 
-For SA version < 3.0, turns on the SpamAssassin global whitelist feature.  
+For SA version < 3.0, turns on the SpamAssassin global whitelist feature.
 See the SA docs. Note that per-user whitelists are not available.
 
 B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
-a different mechanism (such as SQLBasedAddrList), the I<spampd> code will 
+a different mechanism (such as SQLBasedAddrList), the I<spampd> code will
 need to be modified in 2 instances (search the source for DBBasedAddrList).
 
 =item B<--local-only> or B<-L>
@@ -1490,7 +1486,7 @@ Turn off all SA network-based tests (DNS, Razor, etc).
 
 =item B<--homedir=directory>
 
-Use the specified directory as home directory for the spamassassin process. 
+Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
 written to here.
 Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
@@ -1507,11 +1503,11 @@ option from local.cf.  Default is to not use any additional configuration file.
 =item B<--debug> or B<-d>
 
 Turns on SpamAssassin debug messages which print to the system mail log
-(same log as spampd will log to).  Also turns on more verbose logging of 
+(same log as spampd will log to).  Also turns on more verbose logging of
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 
-=item B<--version>
+=item B<--version> C<(new in v2.52)>
 
 Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
@@ -1572,8 +1568,8 @@ I<spampd> listens on port 10025 on the same host as the internal mail server.
 
   spampd --host=192.168.1.10
 
-Same as above but I<spampd> runs on port 10025 of the same host as 
-the firewall/gateway and passes messages on to the internal mail server 
+Same as above but I<spampd> runs on port 10025 of the same host as
+the firewall/gateway and passes messages on to the internal mail server
 on another host.
 
   spampd --relayhost=192.168.1.10
@@ -1604,19 +1600,19 @@ permissions on the relaysocket!
 I<spampd> is written and maintained by Maxim Paperno <MPaperno@WorldDesign.com>.
 See L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm> for latest info.
 
-I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan 
+I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan
 Stanley Dean Witter. These are distributed under the GNU GPL (see
-module code for more details). Both modules have been slightly modified 
+module code for more details). Both modules have been slightly modified
 from the originals and are included in this file under new names.
 
 Also thanks to Bennett Todd for the example smtpproxy script which helped create
 this version of I<spampd>.  See http://bent.latency.net/smtpprox/ .
 
-I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace 
+I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace
 amounts of his code or documentation may still remain. Thanks to him for the
 original inspiration and code. L<https://openshut.net/>.
 
-Also thanks to I<spamd> (included with SpamAssassin) and 
+Also thanks to I<spamd> (included with SpamAssassin) and
 I<amavisd-new> (L<http://www.ijs.si/software/amavisd/>) for some tricks.
 
 Various people have contributed patches, bug reports, and ideas, all of whom
@@ -1634,7 +1630,7 @@ See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
 
 =head1 Copyright, License, and Disclaimer
 
-I<spampd> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; 
+I<spampd> is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno;
 All Rights Reserved.
 
 Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above
@@ -1663,21 +1659,21 @@ Use GitHub issue tracking: L<https://github.com/mpaperno/spampd/issues>
 
 Figure out how to use Net::Server::PreFork because it has cool potential for
 load management.  I tried but either I'm missing something or PreFork is
-somewhat broken in how it works.  If anyone has experience here, please let 
+somewhat broken in how it works.  If anyone has experience here, please let
 me know.
 
 Add configurable option for rejecting mail outright based on spam score.
-It would be nice to make this program safe enough to sit in front of a mail 
+It would be nice to make this program safe enough to sit in front of a mail
 server such as Postfix and be able to reject mail before it enters our systems.
 The only real problem is that Postfix will see localhost as the connecting
-client, so that disables any client-based checks Postfix can do and creates a 
+client, so that disables any client-based checks Postfix can do and creates a
 possible relay hole if localhost is trusted.
 
 =head1 See Also
 
-L<perl(1)>, L<spamassassin(1)>, 
+L<perl(1)>, L<spamassassin(1)>,
 L<Mail::SpamAssassin(3)|https://spamassassin.apache.org/doc/Mail_SpamAssassin.html>,
-L<SpamAssassin Site|http://www.spamassassin.org/>, 
-L<SpamPD Code Repository|https://github.com/mpaperno/spampd>, 
+L<SpamAssassin Site|http://www.spamassassin.org/>,
+L<SpamPD Code Repository|https://github.com/mpaperno/spampd>,
 L<SpamPD product page|http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>,
 L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>
