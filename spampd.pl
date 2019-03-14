@@ -403,20 +403,23 @@ use IO::File;
 use Getopt::Long;
 use Mail::SpamAssassin;
 
+use vars qw(@ISA $VERSION $use_sa_logger);
+
+our $VERSION = '2.60';
+our @ISA     = qw(Net::Server::PreForkSimple);
+
 BEGIN {
   # Load Time::HiRes if it's available
   eval { require Time::HiRes };
   Time::HiRes->import(qw(time)) unless $@;
 
+  # SA v3.1.0 changed debug logging to be more granular and introduced Logger module which needs to be configured
+  $use_sa_logger = eval { require Mail::SpamAssassin::Logger; };
+
   # use included modules
   import SpamPD::Server;
   import SpamPD::Client;
 }
-
-
-use vars qw(@ISA $VERSION);
-our @ISA     = qw(Net::Server::PreForkSimple);
-our $VERSION = '2.53';
 
 sub process_message {
   my ($self, $fh) = @_;
@@ -747,7 +750,7 @@ sub mylog($$$) {
 
 sub dbg($$) {
   my ($self, $msg) = @_;
-  $self->mylog(2, $msg) if $self->{spampd}->{debug};
+  $self->mylog(4, $msg) if $self->{spampd}->{debug};
 }
 
 # Override Net::Server's HUP handling - just gracefully restart all the children.
@@ -776,9 +779,12 @@ my $group           = 'mail';                            # group to run as
 my $tagall          = 0;                                 # mark-up all msgs with SA, not just spam
 my $maxsize         = 64;                                # max. msg size to scan with SA, in KB.
 my $rh              = 0;                                 # log which rules were hit
-my $debug           = 0;                                 # debug flag
+my $debug           = undef;                             # debug flag, can be boolean on/off or a list to pass to SA (--debug option)
 my $dose            = 0;                                 # die-on-sa-errors flag
-my $logsock         = 'unix';                            # default log socket (some systems like 'inet')
+my $logfile         = 'syslog';                          # logging destination (syslog|stderr|<filename>)
+my $logsock         = undef;                             # log socket (undef means for Sys::Syslog to decide, except 'inet' on HP-US & SunOS)
+my $logidentity     = 'spampd';                          # syslog identity
+my $logfacility     = 'mail';                            # syslog facility
 my $nsloglevel      = 2;                                 # log level for Net::Server (in the range 0-4) (--debug option sets this to 4)
 my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background (--[no]detach option)
 my $setsid          = 0;                                 # use POSIX::setsid() command to truly daemonize.
@@ -787,7 +793,11 @@ my $setenvelopefrom = 0;                                 # Set X-Envelope-From h
 my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
 my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
 my $sa_local_only   = 0;                                 # disable SA network tests
+my $sa_debug        = 0;                                 # SA debug logging "channels" (aka "areas") (--debug option overrides this)
 my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
+
+# valid syslog sockets, used for config error checking and usage text (this could be made more adaptive by OS)
+my $allowed_syslog_socks = 'native|eventlog|tcp|udp|inet|unix|stream|pipe|console';
 
 # log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
 eval {
@@ -813,9 +823,12 @@ GetOptions(
   'maxsize=i'                => \$maxsize,
   'tagall|a'                 => \$tagall,
   'log-rules-hit|rh'         => \$rh,
-  'debug|d'                  => \$debug,
+  'debug|d:s'                => \$debug,
   'dose'                     => \$dose,
-  'logsock=s'                => \$logsock,
+  'logfile|o=s'              => \$logfile,
+  'logsock|ls=s'             => \$logsock,
+  'logident|li=s'            => \$logidentity,
+  'logfacility|lf=s'         => \$logfacility,
   'detach!'                  => \$background,
   'setsid!'                  => \$setsid,
   'set-envelope-headers|seh' => \$envelopeheaders,
@@ -833,12 +846,12 @@ GetOptions(
   'hostname=s'               => \&deprecated_opt,
 ) or usage(1);
 
-if ($logsock !~ /^(unix|inet)$/) {
-  print "--logsock parameter needs to be either unix or inet\n\n";
-  exit 1; 
+if (defined($logsock) && $logsock !~ /^($allowed_syslog_socks)$/) {
+  print "--logsock parameter not recognized, must be one of ($allowed_syslog_socks).\n";
+  exit 1;
 }
 
-if ($children < 1) { 
+if ($children < 1) {
   print "Option --children must be greater than zero!\n";
   exit 1;
 }
@@ -857,11 +870,25 @@ $relayhost    = $1 if $relayhost =~ /^(.*)$/;
 $relayport    = $1 if $relayport =~ /^(.*)$/;
 $relaysocket  = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
 $pidfile      = $1 if $pidfile =~ /^(.*)$/;
-$logsock      = $1 if $logsock =~ /^(.*)$/;
+$logfile      = $1 if $logfile =~ /^(.*)$/;
+$logsock      = $1 if defined($logsock) && $logsock =~ /^(.*)$/;
 #
 
-$nsloglevel = 4 if $debug;
-$setsid     = 0 if !$background;
+$setsid = 0 if !$background;
+$debug  = defined($debug) ? ($debug || 1) : 0;
+
+if ($debug) {
+  # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
+  # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
+  # In case of old SA version, just set the debug flag to true.
+  $sa_debug = $use_sa_logger ? ($debug eq '1' ? 'all' : $debug) : 1;
+  $nsloglevel = 4;  # set Net::Server log level to debug
+  $debug = 1;       # reset our internal flag to a simple boolean after $sa_debug is set, because that's all we care about (for now).
+}
+
+my $use_user_prefs = ($sa_config ne '');
+my $using_syslog = ($logfile eq 'syslog');
+my $using_stderr = (!$using_syslog && $logfile eq 'stderr');
 
 my @tmp = split(/:/, $relayhost);
 $relayhost = $tmp[0];
@@ -871,25 +898,48 @@ $relayport = $tmp[1] if $tmp[1];
 $host = $tmp[0];
 $port = $tmp[1] if $tmp[1];
 
-my $sa_options = {
-  'dont_copy_prefs'      => 1,
-  'debug'                => $debug,
-  'local_tests_only'     => $sa_local_only,
-  'home_dir_for_helpers' => $sa_home_dir,
-  'userstate_dir'        => $sa_home_dir,
-  'username'             => $user
-};
-
-my $use_user_prefs = 0;
-
-if ($sa_config ne '') {
-  $sa_options->{'userprefs_filename'} = $sa_config;
-  $use_user_prefs = 1;
-}
+# Net::Server wants UNIX sockets passed via port too. This part
+# decides what we want to pass.
+my @ports = (defined($socket) ? ($socket . '|unix') : $port);
 
 #cleanup environment before starting SA (thanks to Alexander Wirt)
 $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
+
+# Need to configure SA Logger?
+if ($use_sa_logger) {
+  if ($debug) {
+    # Specify method for SA debug logging which matches our own logging config.
+    if ($using_syslog) {
+      Mail::SpamAssassin::Logger::add(
+        method => 'syslog',
+		    socket => $logsock,
+		    facility => $logfacility,
+		    ident => $logidentity
+		  );
+	  }
+	  elsif (!$using_stderr) {
+      Mail::SpamAssassin::Logger::add(
+        method => 'file',
+		    filename => $logfile
+		  );
+	  }
+  }
+  if (!$using_stderr) {
+    # Remove the stderr logger.
+    Mail::SpamAssassin::Logger::remove('stderr');
+  }
+}
+
+my $sa_options = {
+  'dont_copy_prefs'      => 1,
+  'debug'                => $sa_debug,
+  'local_tests_only'     => $sa_local_only,
+  'home_dir_for_helpers' => $sa_home_dir,
+  'userstate_dir'        => $sa_home_dir,
+  'username'             => $user,
+  'userprefs_filename'   => ($use_user_prefs ? $sa_config : undef)
+};
 
 my $assassin = Mail::SpamAssassin->new($sa_options);
 
@@ -903,27 +953,18 @@ $sa_awl and eval {
 
 $assassin->compile_now($use_user_prefs);
 
-# Net::Server wants UNIX sockets passed via port too. This part
-# decides what we want to pass.
-my @ports;
-if (defined $socket) {
-  @ports = ($socket . '|unix');
-}
-else {
-  @ports = ($port);
-}
-
 my $server = bless {
   server => {
     host              => $host,
     port              => \@ports,
     unix_socket       => $socket,
     unix_socket_perms => $socket_perms,
-    log_file          => 'Sys::Syslog',
+    log_file          => ($using_syslog ? 'Sys::Syslog' : ($using_stderr ? undef : $logfile)),
     log_level         => $nsloglevel,
     syslog_logsock    => $logsock,
-    syslog_ident      => 'spampd',
-    syslog_facility   => 'mail',
+    syslog_ident      => $logidentity,
+    syslog_facility   => $logfacility,
+    syslog_logopt     => 'pid,ndelay',
     background        => $background,
     setsid            => $setsid,
     pid_file          => $pidfile,
@@ -950,8 +991,9 @@ my $server = bless {
   },
 }, 'SpamPD';
 
-# Redirect all warnings to Server::log
-$SIG{__WARN__} = sub { $server->log(2, $_[0]); };
+# Redirect all warnings and errors to logger
+$SIG{__WARN__} = sub { $server->mylog(2, $_[0]); };
+$SIG{__DIE__}  = sub { $server->mylog(0, $_[0]) if !$^S; };
 
 # call Net::Server to start up the daemon inside
 $server->run;
@@ -1007,8 +1049,6 @@ Options:
                              from the command line and then run the
                              POSIX::setsid() command to truly daemonize.
                              Only used if --nodetach isn't specified.
-  --logsock=(inet|unix)    Allows specifying the syslog socket type. Default is 
-                             'unix' except on HPUX and SunOS which use 'inet'.
 
   --maxsize=n              Maximum size of mail to scan (in KB).
                              Default is 64KB.
@@ -1018,9 +1058,6 @@ Options:
                              error message. Default is to pass through email
                              even in the event of an SA problem.
   --tagall                 Tag all messages with SA headers, not just spam.
-  --log-rules-hit          Log the name of each SA test which matched the
-    or --rh                  current message.
-
   --set-envelope-headers   Set X-Envelope-From and X-Envelope-To headers before
     or --seh                 passing the mail to SpamAssassin. This is
                              disabled by default because it potentially leaks
@@ -1037,7 +1074,27 @@ Options:
   --saconfig=filename      Use the specified file for loading SA configuration
                              options after the default local.cf file.
 
-  --debug or -d            Turn on extra debugging details (sent to log file).
+  --logfile=<destination>  Allows changing the destination of log messages.
+    or -o <destination>       <destination> must be be on of:
+                               syslog - use syslogd via Sys::Syslog
+                               stderr - direct all logging to stderr
+                               filename - use the specified file
+  --logsock=<socket>       Allows specifying the syslog socket type.
+    or --ls <socket>         On HPUX and SunOS the default is 'inet', otherwise
+                             a sensible default is chosen by Sys::Syslog.
+                             <socket> must be be on of:
+                             $allowed_syslog_socks
+  --logident=<name>       Specify syslog identity name. Default is "spampd".
+    or --li <name>
+  --logfacility=<name>    Specify syslog facility (log name). Default is "mail".
+    or --lf <name>
+  --log-rules-hit          Log the name of each SA test which matched the
+    or --rh                  current message.
+  --debug[=areas|1|0]      Control extra debug logging. Zero (default) turns off
+    or -d [areas|1|0]        debug messages. 1 enables them and is the same as
+                             using no value (just -d). "areas" are passed on to
+                             SpamAssassin debug logging options, default is "all".
+
   --version                Print version information and exit.
   --help or -h or -?       Show this help text.
 
@@ -1106,7 +1163,10 @@ B<spampd>
 [B<--pid|p=filename>]
 [B<--[no]detach>]
 [B<--[no]setsid>]
-[B<--logsock=inet|unix>]
+[B<--logfile|o=(syslog|stderr|I<filename>)>]
+[B<--logsock|ls=I<socket>>]
+[B<--logident|li=I<name>>]
+[B<--logfacility|lf=I<name>>]
 [B<--maxsize=n>]
 [B<--dose>]
 [B<--tagall|a>]
@@ -1115,7 +1175,7 @@ B<spampd>
 [B<--set-envelope-from|sef>]
 [B<--local-only|L>]
 [B<--saconfig=filename>]
-[B<--debug|d>]
+[B<--debug|d [I<area,...>|1|0]>]
 
 B<spampd> B<--version>
 
@@ -1399,13 +1459,64 @@ that it is easy to kill it later. The directory that will contain this
 file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
-=item B<--logsock=(unix|inet)> C<(new in v2.20)>
+=item B<--logfile=(syslog|stderr|I<filename>)> or B<-o (syslog|stderr|I<filename>)> C<(new in v2.60)>
 
-Syslog socket to use.  May be either "unix" of "inet".  Default is "unix"
-except on HP-UX and SunOS (Solaris) systems which seem to prefer "inet".
+Logging method to use.  May be one of:
 
+=over 10
 
+=item *
 
+C<syslog>: Use the system's syslogd (via Sys::Syslog).
+
+=item *
+
+C<stderr>: Direct all logging to stderr (if running in background mode
+  these may still end up in the default system log).
+
+=item *
+
+C<filename>: Use the specified file (the location must be accessible to the
+  user I<spampd> is running as). This can also be a device handle, eg: C</dev/tty0>
+  or even C</dev/null> to disable logging entirely.
+
+=back
+
+Default is I<syslog>.
+
+=item B<--logsock=I<type>> C<(new in v2.20)>  C<(updated in v2.60)>
+
+Syslog socket to use if C<--logfile> is set to I<syslog>.
+
+C<(since v2.60)>
+
+The I<type> can be any of the socket types or logging mechanisms as accepted by
+the subroutine Sys::Syslog::setlogsock(). Depending on the version of Sys::Syslog and
+the underlying operating system, one of the following values (or their subset) can
+be used:
+
+    native, tcp, udp, inet, unix, stream, pipe, console, eventlog (Win32 only)
+
+The default behavior since I<spampd> v2.60 is to let Sys::Syslog pick the default
+syslog socket. This is the recommended usage for Sys::Syslog (since v0.15).
+
+    The default is to try native, tcp, udp, unix, pipe, stream, console. Under systems with the
+    Win32 API, eventlog will be added as the first mechanism to try if Win32::EventLog is available.
+
+C<(prior to v2.60)>
+
+The default was C<unix>. To preserve backwards-compatibility, the default on HP-UX and SunOS
+(Solaris) systems is C<inet>.
+
+For more information please consult the L<Sys::Syslog|https://metacpan.org/pod/Sys::Syslog> documentation.
+
+=item B<--logident=I<name>)> or B<--li=I<name>)> C<(new in v2.60)>
+
+Syslog identity name to use. This may also be used in log files written directly (w/out syslog). Default is C<spampd>.
+
+=item B<--logfacility=I<name>)> or B<--lf=I<name>)> C<(new in v2.60)>
+
+Syslog facility name to use. This is typically the name of the system-wide log file to be written to. Default is C<mail>.
 
 =item B<--[no]detach> C<(new in v2.20)>
 
@@ -1502,12 +1613,43 @@ Use the specified file for SpamAssassin configuration options in addition to the
 default local.cf file.  Any options specified here will override the same
 option from local.cf.  Default is to not use any additional configuration file.
 
-=item B<--debug> or B<-d>
+=item B<--debug[=(I<area,...>|1|0)]> or B<-d [I<area,...>|1|0]> C<(updated in v2.60)>
 
 Turns on SpamAssassin debug messages which print to the system mail log
 (same log as spampd will log to).  Also turns on more verbose logging of
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
+
+C<(new in v2.60)>
+
+Setting the value to 1 (one) is the same as using no parameter (eg. simply I<-d>).
+The value of 0 (zero) disables debug logging (this is the default).
+
+The I<area> list is passed on directly to SpamAssassin and controls logging
+facilities. If no I<area>s are listed (and debug logging is enabled), all
+debugging information is printed (this equivalent to passing C<all> as the I<area>).
+Diagnostic output can also be enabled for each area individually;
+I<area> is the area of the code to instrument. For example, to produce
+diagnostic output on bayes, learn, and dns, use:
+
+    -d bayes,learn,dns
+
+You can also disable specific areas with the "no" prefix:
+
+    -d all,norules,nobayes
+
+Higher priority informational messages that are suitable for logging in normal
+circumstances are available with an area of C<info>. To remove all SpamAssassin
+debug logging but keep I<spampd> debug messages, use:
+
+    -d info
+
+For more information about which I<areas> (aka I<channels> or I<facilities>) are available,
+please see the documentation at:
+
+L<SpamAssassin Wiki::DebugChannels|http://wiki.apache.org/spamassassin/DebugChannels>
+
+L<Mail::SpamAssassin::Logger::add_facilities()|https://spamassassin.apache.org/doc/Mail_SpamAssassin_Logger.html#METHODS>
 
 =item B<--version> C<(new in v2.52)>
 
