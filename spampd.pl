@@ -1117,30 +1117,7 @@ sub deprecated_opt {
 
 __END__
 
-# Some commented-out documentation.  POD doesn't have a way to comment
-# out sections!?  This documents a feature which may be implemented later.
-#
-# =item B<--maxchildren=n> or B<--mc=n>
-#
-# Maximum number of children to spawn if needed (where n >= --children).  When
-# I<spampd> starts it will spawn a number of child servers as specified by
-# --children. If all those servers become busy, a new child is spawned up to the
-# number specified in --maxchildren. Default is to have --maxchildren equal to
-# --children so extra child processes aren't started. Also see the --children
-# option, above.  You may want to set your origination mail server to limit the
-# number of concurrent connections to I<spampd> to match this setting (for
-# Postfix this is the C<xxxx_destination_concurrency_limit> setting where
-# 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
-#
-# Note that extra servers after the initial --children will only spawn on very
-# busy systems.  This is because the check to see if a new server is needed (ie.
-# all current ones are busy) is only done around once per minute (this is
-# controlled by the Net::Server::PreFork module, in case you want to
-# hack at it :).  It can still be useful as an "overflow valve," and is
-# especially nice since the extra child servers will die off once they're not
-# needed.
-
-=pod
+# Start POD
 
 =head1 NAME
 
@@ -1821,3 +1798,31 @@ L<SpamAssassin Site|http://www.spamassassin.org/>,
 L<SpamPD Code Repository|https://github.com/mpaperno/spampd>,
 L<SpamPD product page|http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>,
 L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>
+
+=cut
+
+=begin comment
+
+This documents a feature which may be implemented later.
+
+=item B<--maxchildren=n> or B<--mc=n>
+
+Maximum number of children to spawn if needed (where n >= --children).  When
+I<spampd> starts it will spawn a number of child servers as specified by
+--children. If all those servers become busy, a new child is spawned up to the
+number specified in --maxchildren. Default is to have --maxchildren equal to
+--children so extra child processes aren't started. Also see the --children
+option, above.  You may want to set your origination mail server to limit the
+number of concurrent connections to I<spampd> to match this setting (for
+Postfix this is the C<xxxx_destination_concurrency_limit> setting where
+'xxxx' is the transport being used, usually 'smtp', and the default is 100).
+
+Note that extra servers after the initial --children will only spawn on very
+busy systems.  This is because the check to see if a new server is needed (ie.
+all current ones are busy) is only done around once per minute (this is
+controlled by the Net::Server::PreFork module, in case you want to
+hack at it :).  It can still be useful as an "overflow valve," and is
+especially nice since the extra child servers will die off once they're not
+needed.
+
+=cut
