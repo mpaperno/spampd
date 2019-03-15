@@ -428,10 +428,7 @@ sub process_message {
   my $start = time;
   # use the assassin object created during startup
   my $assassin   = $self->{spampd}->{assassin};
-  my $sa_version = Mail::SpamAssassin::Version();
-  # $sa_version can have a non-numeric value if version_tag is
-  # set in local.cf. Only take first numeric value
-  $sa_version =~ s/([0-9]*\.[0-9]*).*/$1/;
+  my $sa_version = version->parse($Mail::SpamAssassin::VERSION);
 
   # this gets info about the message temp file
   my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
