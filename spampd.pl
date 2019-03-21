@@ -747,6 +747,18 @@ sub child_finish_hook {
   $self->dbg("Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
 }
 
+# Map Net::Server logging levels to SpamAssassin::Logger levels.
+my %sa_level = (0 => 'error', 1 => 'warn', 2 => 'notice', 3 => 'info', 4 => 'dbg');
+
+# Net::Server hook
+# Only called when we're using SA Logger and bypassing Net::Server logging entirely.
+sub write_to_log_hook {
+  my ($self, $level, $msg) = @_;
+  if (!$self->{spampd}->{using_syslog})
+    { $msg = join(': ', $self->{server}->{syslog_ident}, $msg); }
+  Mail::SpamAssassin::Logger::log_message($sa_level{$level}, $msg);
+}
+
 sub dbg {
   shift()->log(4, @_);
 }
@@ -777,7 +789,7 @@ my $group           = 'mail';                            # group to run as
 my $tagall          = 0;                                 # mark-up all msgs with SA, not just spam
 my $maxsize         = 64;                                # max. msg size to scan with SA, in KB.
 my $rh              = 0;                                 # log which rules were hit
-my $debug           = undef;                             # debug flag, can be boolean on/off or a list to pass to SA (--debug option)
+my $debug           = 0;                                 # debug flag, can be boolean on/off or a list to pass to SA (--debug option)
 my $dose            = 0;                                 # die-on-sa-errors flag
 my $logfile         = 'syslog';                          # logging destination (syslog|stderr|<filename>)
 my $logsock         = undef;                             # log socket (undef means for Sys::Syslog to decide, except 'inet' on HP-US & SunOS)
@@ -791,7 +803,6 @@ my $setenvelopefrom = 0;                                 # Set X-Envelope-From h
 my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
 my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
 my $sa_local_only   = 0;                                 # disable SA network tests
-my $sa_debug        = 0;                                 # SA debug logging "channels" (aka "areas") (--debug option overrides this)
 my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
 
 # valid syslog sockets, used for config error checking and usage text (this could be made more adaptive by OS)
@@ -873,20 +884,22 @@ $logsock      = $1 if defined($logsock) && $logsock =~ /^(.*)$/;
 #
 
 $setsid = 0 if !$background;
-$debug  = defined($debug) ? ($debug || 1) : 0;
+
+my $ns_logfile;
+my $sa_debug = $use_sa_logger ? 'info' : 0;
+my $use_user_prefs = ($sa_config ne '');
+my $using_syslog = ($logfile eq 'syslog');
+my $using_stderr = (!$using_syslog && $logfile eq 'stderr');
 
 if ($debug) {
   # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
   # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
   # In case of old SA version, just set the debug flag to true.
-  $sa_debug = $use_sa_logger ? ($debug eq '1' ? 'all' : $debug) : 1;
+  $debug = 'all' if ($debug eq '1');
+  $debug = join(',', $debug, $logidentity) if ($debug !~ /(?:\A|,)$logidentity/i);
+  $sa_debug = $use_sa_logger ? $debug : 1;
   $nsloglevel = 4;  # set Net::Server log level to debug
-  $debug = 1;       # reset our internal flag to a simple boolean after $sa_debug is set, because that's all we care about (for now).
 }
-
-my $use_user_prefs = ($sa_config ne '');
-my $using_syslog = ($logfile eq 'syslog');
-my $using_stderr = (!$using_syslog && $logfile eq 'stderr');
 
 my @tmp = split(/:/, $relayhost);
 $relayhost = $tmp[0];
@@ -906,27 +919,34 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
 
 # Need to configure SA Logger?
 if ($use_sa_logger) {
-  if ($debug) {
-    # Specify method for SA debug logging which matches our own logging config.
-    if ($using_syslog) {
-      Mail::SpamAssassin::Logger::add(
-        method => 'syslog',
-		    socket => $logsock,
-		    facility => $logfacility,
-		    ident => $logidentity
-		  );
-	  }
-	  elsif (!$using_stderr) {
-      Mail::SpamAssassin::Logger::add(
-        method => 'file',
-		    filename => $logfile
-		  );
-	  }
+  # Remove the stderr logger first (unless we're using it) to avoid any initial messages from Logger.
+  Mail::SpamAssassin::Logger::remove('stderr') if !$using_stderr;
+  if ($using_syslog) {
+    Mail::SpamAssassin::Logger::add(
+      method => 'syslog',
+	    socket => $logsock,
+	    facility => $logfacility,
+	    ident => $logidentity
+	  );
   }
-  if (!$using_stderr) {
-    # Remove the stderr logger.
-    Mail::SpamAssassin::Logger::remove('stderr');
+  elsif (!$using_stderr) {
+    Mail::SpamAssassin::Logger::add(
+      method => 'file',
+	    filename => $logfile
+	  );
   }
+  # Add SA logging facilities
+  Mail::SpamAssassin::Logger::add_facilities($sa_debug);
+  $sa_debug = undef;  # don't need this anymore
+  Mail::SpamAssassin::Logger::log_message(
+    "dbg", "SpamPD v$VERSION starting..."
+  ) if $nsloglevel >= 4;
+}
+elsif ($using_syslog) {
+  $ns_logfile = 'Sys::Syslog';
+}
+elsif (!$using_stderr) {
+  $ns_logfile = $logfile;
 }
 
 my $sa_options = {
@@ -957,7 +977,7 @@ my $server = bless {
     port              => \@ports,
     unix_socket       => $socket,
     unix_socket_perms => $socket_perms,
-    log_file          => ($using_syslog ? 'Sys::Syslog' : ($using_stderr ? undef : $logfile)),
+    log_file          => $ns_logfile,
     log_level         => $nsloglevel,
     syslog_logsock    => $logsock,
     syslog_ident      => $logidentity,
@@ -981,12 +1001,12 @@ my $server = bless {
     childtimeout     => $childtimeout,
     satimeout        => $satimeout,
     rh               => $rh,
-    debug            => $debug,
     dose             => $dose,
     instance         => 0,
     envelopeheaders  => $envelopeheaders,
     setenvelopefrom  => $setenvelopefrom,
     sa_version       => version->parse($assassin->VERSION()),
+    using_syslog     => $using_syslog,
   },
 }, 'SpamPD';
 
