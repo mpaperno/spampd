@@ -419,8 +419,12 @@ BEGIN {
   import SpamPD::Client;
 }
 
+
+##################   METHODS   ######################
+
 sub process_message {
   my ($self, $fh) = @_;
+  my $prop = $self->{spampd};
 
   # output lists with a , delimeter by default
   local ($") = ",";
@@ -428,14 +432,13 @@ sub process_message {
   # start a timer
   my $start = time;
   # use the assassin object created during startup
-  my $assassin   = $self->{spampd}->{assassin};
-  my $sa_version = version->parse($Mail::SpamAssassin::VERSION);
+  my $assassin   = $prop->{assassin};
 
   # this gets info about the message temp file
   my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
 
   # Only process message under --maxsize KB
-  if ($size >= ($self->{spampd}->{maxsize} * 1024)) {
+  if ($size >= ($prop->{maxsize} * 1024)) {
     $self->log(2, "skipped large message (" . $size / 1024 . "KB)");
     return 1;
   }
@@ -460,11 +463,11 @@ sub process_message {
     $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
     if (/^\r?\n$/ && $inhdr) {
       $inhdr = 0;  # outside of msg header after first blank line
-      if (($self->{spampd}->{envelopeheaders} || $self->{spampd}->{setenvelopefrom}) && !$envfrom) {
+      if (($prop->{envelopeheaders} || $prop->{setenvelopefrom}) && !$envfrom) {
         unshift(@msglines, "X-Envelope-From: $sender\r\n");
         $self->dbg("Added X-Envelope-From") ;
       }
-      if ($self->{spampd}->{envelopeheaders} && !$envto) {
+      if ($prop->{envelopeheaders} && !$envto) {
         unshift(@msglines, "X-Envelope-To: $recips\r\n");
         $addedenvto = 1;
         $self->dbg("Added X-Envelope-To");
@@ -494,14 +497,14 @@ sub process_message {
     local $SIG{ALRM} = sub { die "Timed out!\n" };
 
     # save previous timer and start new
-    my $previous_alarm = alarm($self->{spampd}->{satimeout});
+    my $previous_alarm = alarm($prop->{satimeout});
 
     # Audit the message
-    if ($sa_version >= 3) {
+    if ($prop->{sa_version} >= 3) {
       $mail = $assassin->parse(\@msglines, 0);
       undef @msglines;  #clear some memory-- this screws up SA < v3
     }
-    elsif ($sa_version >= 2.70) {
+    elsif ($prop->{sa_version} >= 2.70) {
       $mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
     }
     else {
@@ -514,12 +517,12 @@ sub process_message {
     $self->dbg("Returned from checking by SpamAssassin");
 
     #  Rewrite mail if high spam factor or options --tagall
-    if ($status->is_spam || $self->{spampd}->{tagall}) {
+    if ($status->is_spam || $prop->{tagall}) {
 
       $self->dbg("Rewriting mail using SpamAssassin");
 
       # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
-      if ($sa_version >= 3) {
+      if ($prop->{sa_version} >= 3) {
         $msg_resp = $status->rewrite_mail;
       }
       else {
@@ -572,7 +575,7 @@ sub process_message {
                     "$recips in " . $proc_time . "s, $size bytes.");
 
     # thanks to Kurt Andersen for this idea
-    $self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($self->{spampd}->{rh});
+    $self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
 
     $status->finish();
     $mail->finish();
@@ -592,15 +595,14 @@ sub process_message {
 
 sub process_request {
   my $self = shift;
+  my $prop = $self->{spampd};
+  my $rcpt_ok = 0;
 
   eval {
 
-    local $SIG{ALRM} = sub { die "Child server process timed out!\n" };
-    my $timeout = $self->{spampd}->{childtimeout};
-    my $rcpt_ok = 0;
-
     # start a timeout alarm
-    alarm($timeout);
+    local $SIG{ALRM} = sub { die "Child server process timed out!\n" };
+    alarm($prop->{childtimeout});
 
     # start an smtp server
     my $smtp_server = SpamPD::Server->new($self->{server}->{client});
@@ -612,9 +614,9 @@ sub process_request {
 
     # start an smtp "client" (really a sending server)
     my $client = SpamPD::Client->new(
-      interface   => $self->{spampd}->{relayhost},
-      port        => $self->{spampd}->{relayport},
-      unix_socket => $self->{spampd}->{unix_relaysocket}
+      interface   => $prop->{relayhost},
+      port        => $prop->{relayport},
+      unix_socket => $prop->{unix_relaysocket}
     );
     die "Failed to create sending Client: $!" unless (defined $client);
 
@@ -643,7 +645,7 @@ sub process_request {
         my $pmrescode = $self->process_message($smtp_server->{data});
 
         # pass on the messsage if exit code <> 0 or die-on-sa-errors flag is off
-        if ($pmrescode or !$self->{spampd}->{dose}) {
+        if ($pmrescode or !$prop->{dose}) {
           # need to give the client a rewound file
           $smtp_server->{data}->seek(0, 0)
             or die "Can't rewind mail file: $!";
@@ -695,7 +697,7 @@ sub process_request {
       }
 
       # restart the timeout alarm
-      alarm($timeout);
+      alarm($prop->{childtimeout});
 
     }  # server ends connection
 
@@ -718,7 +720,7 @@ sub process_request {
     die($msg . "\n");
   }
 
-  $self->{spampd}->{instance}++;
+  $prop->{instance}++;
 }
 
 # Net::Server hook
@@ -978,6 +980,7 @@ my $server = bless {
     instance         => 0,
     envelopeheaders  => $envelopeheaders,
     setenvelopefrom  => $setenvelopefrom,
+    sa_version       => version->parse($assassin->VERSION()),
   },
 }, 'SpamPD';
 
