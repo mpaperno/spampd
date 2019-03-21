@@ -398,20 +398,18 @@ package SpamPD;
 use strict;
 use warnings;
 use version;
-use Net::Server::PreForkSimple;
-use IO::File;
-use Getopt::Long;
-use Mail::SpamAssassin;
-
-use vars qw(@ISA $VERSION $use_sa_logger);
+use IO::File ();
+use Getopt::Long qw(GetOptions);
+use Time::HiRes qw(time);
+use Mail::SpamAssassin ();
 
 our $VERSION = '2.60';
-our @ISA     = qw(Net::Server::PreForkSimple);
 
+use vars qw($use_sa_logger);
 BEGIN {
-  # Load Time::HiRes if it's available
-  eval { require Time::HiRes };
-  Time::HiRes->import(qw(time)) unless $@;
+  require Net::Server; Net::Server->VERSION(0.89);
+  require Net::Server::PreForkSimple;
+  our @ISA = qw(Net::Server::PreForkSimple);
 
   # SA v3.1.0 changed debug logging to be more granular and introduced Logger module which needs to be configured
   $use_sa_logger = eval { require Mail::SpamAssassin::Logger; };
@@ -438,7 +436,7 @@ sub process_message {
 
   # Only process message under --maxsize KB
   if ($size >= ($self->{spampd}->{maxsize} * 1024)) {
-    $self->mylog(2, "skipped large message (" . $size / 1024 . "KB)");
+    $self->log(2, "skipped large message (" . $size / 1024 . "KB)");
     return 1;
   }
 
@@ -489,7 +487,7 @@ sub process_message {
 
   $msgid ||= "(unknown)";
 
-  $self->mylog(2, "processing message $msgid for " . $recips);
+  $self->log(2, "processing message $msgid for " . $recips);
 
   eval {
 
@@ -570,11 +568,11 @@ sub process_message {
     my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
     my $proc_time     = sprintf("%.2f", time - $start);
 
-    $self->mylog(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
+    $self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
                     "$recips in " . $proc_time . "s, $size bytes.");
 
     # thanks to Kurt Andersen for this idea
-    $self->mylog(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($self->{spampd}->{rh});
+    $self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($self->{spampd}->{rh});
 
     $status->finish();
     $mail->finish();
@@ -585,7 +583,7 @@ sub process_message {
   };  # end eval block
 
   if ($@ ne '') {
-    $self->mylog(1, "WARNING!! SpamAssassin error on message $msgid: $@");
+    $self->log(1, "WARNING!! SpamAssassin error on message $msgid: $@");
     return 0;
   }
 
@@ -660,7 +658,7 @@ sub process_request {
 
         #close the temp file
         $smtp_server->{data}->close
-          or $self->mylog(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+          or $self->log(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
 
         $self->dbg("Finished sending DATA");
       }
@@ -716,7 +714,7 @@ sub process_request {
   if ($@ ne '') {
     chomp($@);
     my $msg = "WARNING!! Error in process_request eval block: $@";
-    $self->mylog(0, $msg);
+    $self->log(0, $msg);
     die($msg . "\n");
   }
 
@@ -741,16 +739,8 @@ sub child_finish_hook {
   $self->dbg("Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
 }
 
-# older Net::Server versions (<= 0.87) die when logging a % character to Sys::Syslog
-sub mylog($$$) {
-  my ($self, $level, $msg) = @_;
-  $msg =~ s/\%/%%/g;
-  $self->log($level, $msg);
-}
-
-sub dbg($$) {
-  my ($self, $msg) = @_;
-  $self->mylog(4, $msg) if $self->{spampd}->{debug};
+sub dbg {
+  shift()->log(4, @_);
 }
 
 # Override Net::Server's HUP handling - just gracefully restart all the children.
@@ -992,8 +982,7 @@ my $server = bless {
 }, 'SpamPD';
 
 # Redirect all warnings and errors to logger
-$SIG{__WARN__} = sub { $server->mylog(2, $_[0]); };
-$SIG{__DIE__}  = sub { $server->mylog(0, $_[0]) if !$^S; };
+$SIG{__WARN__} = sub { $server->log(1, $_[0]); };
 
 # call Net::Server to start up the daemon inside
 $server->run;
@@ -1188,7 +1177,7 @@ Perl modules:
 
 =item B<Mail::SpamAssassin>
 
-=item B<Net::Server::PreForkSimple>
+=item B<Net::Server::PreForkSimple> (>= v0.89)
 
 =item B<IO::File>
 
@@ -1196,7 +1185,7 @@ Perl modules:
 
 =item B<IO::Socket::UNIX>
 
-=item B<Time::HiRes> (not actually required but recommended)
+=item B<Time::HiRes>
 
 =back
 
