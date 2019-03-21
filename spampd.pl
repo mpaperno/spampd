@@ -419,6 +419,20 @@ BEGIN {
   import SpamPD::Client;
 }
 
+# Clean up environment.
+delete @ENV{qw(IFS CDPATH ENV BASH_ENV HOME)};
+eval {
+  # Try to safely untaint the PATH instead of resetting it. Also prevents SA from duplicating this step when it starts.
+  require Mail::SpamAssassin::Util;
+  Mail::SpamAssassin::Util::clean_path_in_taint_mode();
+} or do {
+  $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
+};
+
+# Untaint $0 and each member of @ARGV, and save untainted copies for HUPping.
+my $clean_arg0 = untaint_var($0);
+my @clean_argv = untaint_var(\@ARGV);
+
 
 ##################   METHODS   ######################
 
@@ -870,18 +884,8 @@ if ($sa_awl && version->parse($Mail::SpamAssassin::VERSION) >= 3) {
   exit 1;
 }
 
-# Untaint some options provided by admin command line.
-$host         = $1 if $host =~ /^(.*)$/;
-$port         = $1 if $port =~ /^(.*)$/;
-$socket       = $1 if defined($socket) && $socket =~ /^(.*)$/;
-$socket_perms = $1 if defined($socket_perms) && $socket_perms =~ /^(.*)$/;
-$relayhost    = $1 if $relayhost =~ /^(.*)$/;
-$relayport    = $1 if $relayport =~ /^(.*)$/;
-$relaysocket  = $1 if defined($relaysocket) && $relaysocket =~ /^(.*)$/;
-$pidfile      = $1 if $pidfile =~ /^(.*)$/;
-$logfile      = $1 if $logfile =~ /^(.*)$/;
-$logsock      = $1 if defined($logsock) && $logsock =~ /^(.*)$/;
-#
+# These paths are already untainted but do a more careful check JIC.
+$_ = untaint_path($_) for ($socket, $relaysocket, $pidfile, $logfile, $sa_config);
 
 $setsid = 0 if !$background;
 
@@ -913,10 +917,6 @@ $port = $tmp[1] if $tmp[1];
 # decides what we want to pass.
 my @ports = (defined($socket) ? ($socket . '|unix') : $port);
 
-#cleanup environment before starting SA (thanks to Alexander Wirt)
-$ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV', 'HOME'};
-
 # Need to configure SA Logger?
 if ($use_sa_logger) {
   # Remove the stderr logger first (unless we're using it) to avoid any initial messages from Logger.
@@ -939,7 +939,7 @@ if ($use_sa_logger) {
   Mail::SpamAssassin::Logger::add_facilities($sa_debug);
   $sa_debug = undef;  # don't need this anymore
   Mail::SpamAssassin::Logger::log_message(
-    "dbg", "SpamPD v$VERSION starting..."
+    "dbg", "SpamPD v$VERSION starting with: @clean_argv"
   ) if $nsloglevel >= 4;
 }
 elsif ($using_syslog) {
@@ -1017,6 +1017,43 @@ $SIG{__WARN__} = sub { $server->log(1, $_[0]); };
 $server->run;
 
 exit 1;  # shouldn't get here
+
+##################   FUNCTIONS   ######################
+
+# Untaint a scalar or array (most code "borrowed" from spamd)
+sub untaint_var {
+  my $r = ref $_[0];
+  if (!$r) {
+    return undef if !defined($_[0]);
+    local $1;
+    $_[0] =~ /^(.*)$/;
+    return $1;
+  }
+  my $arg = $_[0];
+  if ($r eq 'ARRAY') {
+    $_ = untaint_var($_) for @{$arg};
+    return @{$arg} if wantarray;
+  }
+  elsif ($r eq 'SCALAR' || $r eq 'REF') {
+    ${$arg} = untaint_var(${$arg});
+  }
+  else {
+    warn "Not untainting a $r !\n";
+  }
+  return $_[0];
+}
+
+# Untaint a path/file value (most code "borrowed" from spamd)
+sub untaint_path {
+  my ($path) = @_;
+  return undef unless defined($path);
+  return '' if ($path eq '');
+  my $chars = '-_A-Z0-9.%=+,/:()\\@\\xA0-\\xFF\\\\';
+  my $re = qr{^\s*([$chars][${chars}~ ]*)\z}io;
+  local $1;
+  return $1 if ($path =~ $re);
+  die "refusing to untaint suspicious path: '$path' with '$re'\n";
+}
 
 sub version {
   print "SpamPD version $VERSION\n";
