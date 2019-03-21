@@ -734,6 +734,12 @@ sub post_bind_hook {
   }
 }
 
+# Net::Server hook: new child starting
+sub child_init_hook {
+  # set process name to help clarify via process listing which is child/parent
+  $0 = 'spampd child';
+}
+
 # Net::Server hook
 # about to exit child process
 sub child_finish_hook {
