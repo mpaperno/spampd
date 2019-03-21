@@ -777,12 +777,6 @@ sub dbg {
   shift()->log(4, @_);
 }
 
-# Override Net::Server's HUP handling - just gracefully restart all the children.
-sub sig_hup {
-  my $self = shift;
-  $self->hup_children;
-}
-
 
 ##################   SETUP   ######################
 
@@ -990,6 +984,8 @@ my $server = bless {
     group             => $group,
     max_servers       => $children,
     max_requests      => $maxrequests,
+    commandline       => [$clean_argc, @clean_argv],
+    leave_children_open_on_hup => 1,
   },
   spampd => {
     relayhost        => $relayhost,
@@ -1720,7 +1716,12 @@ compatibility with prevoius I<spampd> versions:
 
 Sending HUP signal to the master process will restart all the children
 gracefully (meaning the currently running requests will shut down once
-the request is complete).  SpamAssassin configuration is NOT reloaded.
+the request is complete).
+
+C<(new in v2.60)>: SpamAssassin configuration IS reloaded on HUP. Any children
+currently in the middle of a transaction will finish with the previous SA config
+and then exit. A new set of children, using the new config, is spawned upon HUP
+and will serve any new requests.
 
 =item TTIN, TTOU
 
