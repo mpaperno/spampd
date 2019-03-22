@@ -287,8 +287,6 @@ package SpamPD::Client;
 
 use strict;
 use warnings;
-use IO::Socket::IP;
-use IO::Socket::UNIX;
 
 # =item new([interface => $interface, port => $port] | [unix_socket => $unix_socket] [, timeout = 300]);
 #
@@ -308,19 +306,21 @@ sub new {
   my $class = ref($this) || $this;
   my $self = bless {timeout => 300, @opts}, $class;
   if (defined $self->{unix_socket}) {
+    require IO::Socket::UNIX;
     $self->{sock} = IO::Socket::UNIX->new(
       Peer    => $self->{unix_socket},
       Timeout => $self->{timeout},
-      Type    => SOCK_STREAM,
+      Type    => IO::Socket::UNIX->SOCK_STREAM,
     );
   }
   else {
+    require IO::Socket::IP;
     $self->{sock} = IO::Socket::IP->new(
       PeerAddr => $self->{interface},
       PeerPort => $self->{port},
       Timeout  => $self->{timeout},
       Proto    => 'tcp',
-      Type     => SOCK_STREAM,
+      Type     => IO::Socket::IP->SOCK_STREAM,
     );
   }
   die "$0: socket connect failure: $!\n" unless defined $self->{sock};
@@ -1243,11 +1243,11 @@ Perl modules:
 
 =item B<IO::File>
 
-=item B<IO::Socket::IP>
-
-=item B<IO::Socket::UNIX>
-
 =item B<Time::HiRes>
+
+=item B<IO::Socket::IP> (if using TCP/IP sockets)
+
+=item B<IO::Socket::UNIX> (if using UNIX sockets)
 
 =back
 
