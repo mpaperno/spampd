@@ -84,7 +84,7 @@ package SpamPD::Server;
 
 use strict;
 use warnings;
-use IO::File;
+use IO::File ();
 
 # =item new(socket => $socket);
 #
@@ -339,10 +339,10 @@ sub new {
 sub hear {
   my ($self) = @_;
   my ($tmp, $reply);
-  return undef unless $tmp = $self->{sock}->getline;
+  return unless $tmp = $self->{sock}->getline;
   while ($tmp =~ /^\d{3}-/) {
     $reply .= $tmp;
-    return undef unless $tmp = $self->{sock}->getline;
+    return unless $tmp = $self->{sock}->getline;
   }
   $reply .= $tmp;
   $reply =~ s/\r\n$//;
@@ -398,7 +398,6 @@ package SpamPD;
 use strict;
 use warnings;
 use version;
-use IO::File ();
 use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
@@ -1002,8 +1001,7 @@ sub child_init_hook {
 # Net::Server hook
 # about to exit child process
 sub child_finish_hook {
-  my $self = shift;
-  $self->dbg("Exiting child process after handling " . $self->{spampd}->{instance} . " requests");
+  $_[0]->dbg("Exiting child process after handling " . $_[0]->{spampd}->{instance} . " requests");
 }
 
 # Net::Server hook
@@ -1021,11 +1019,11 @@ sub dbg {
 
 ##################   FUNCTIONS   ######################
 
-# Untaint a scalar or array (most code "borrowed" from spamd)
+# Untaint a scalar (or ref to one) or an array ref (most code "borrowed" from spamd)
 sub untaint_var {
   my $r = ref $_[0];
   if (!$r) {
-    return undef if !defined($_[0]);
+    return if !defined($_[0]);
     local $1;
     $_[0] =~ /^(.*)$/;
     return $1;
@@ -1047,29 +1045,30 @@ sub untaint_var {
 # Untaint a path/file value (most code "borrowed" from spamd)
 sub untaint_path {
   my ($path) = @_;
-  return undef unless defined($path);
+  return unless defined($path);
   return '' if ($path eq '');
-  my $chars = '-_A-Z0-9.%=+,/:()\\@\\xA0-\\xFF\\\\';
+  my $chars = '-_a-z0-9.%=+,/:()\\@\\xA0-\\xFF\\\\';
   my $re = qr{^\s*([$chars][${chars}~ ]*)\z}io;
   local $1;
   return $1 if ($path =~ $re);
-  die "refusing to untaint suspicious path: '$path' with '$re'\n";
+  die "refusing to untaint suspicious path: '$path'\n";
 }
 
 sub version {
-  print "SpamPD version $VERSION\n";
+  print __PACKAGE__." version $VERSION\n";
   print "  using Net::Server $Net::Server::VERSION\n";
   print "  using SpamAssassin " . Mail::SpamAssassin::Version() . "\n";
   print "  using Perl " . join(".", map(0+($_||0), ($] =~ /(\d)\.(\d{3})(\d{3})?/))) . "\n\n";
   exit 0;
 }
 
+# =item usage([exit_value=2, [help_level=1, [help_format=txt]]])
 sub usage {
   eval {
     no warnings 'once';  # silence useless "$Pod::Usage::Formatter used only once: possible typo" warning
     $Pod::Usage::Formatter = 'Pod::Text::Termcap';
     require Pod::Usage;
-  } or die "Could not find Pod::Usage! $@";
+  } or die "Could not find Pod::Usage!\n\t$@";
 
   my ($exitval, $hlevel, $helpfmt) = @_;
   $exitval = 2 if !defined($exitval);
@@ -1082,18 +1081,18 @@ sub usage {
     eval {
       require File::Temp; require File::Spec;
       $outfile = File::Temp->new(
-        TEMPLATE => "spampd_XXXXXX",
-        DIR => untaint_path($ENV{'TMPDIR'} || File::Spec->tmpdir),
-        SUFFIX => '.html', UNLINK => 0
+        TEMPLATE => "spampd_XXXXXX", SUFFIX => '.html', UNLINK => 0,
+        DIR => untaint_path($ENV{'TMPDIR'} || File::Spec->tmpdir())
       );
-    } or warn "Could not create temp file for html output: $@";
-    $pdoc_opts = "-o html -w index -d " . $outfile->filename() if $outfile;
+      $pdoc_opts = "-o html -w index -d " . $outfile->filename() if $outfile;
+    };
+    warn "Could not create temp file for html output: $@\n" if $@;
   }
   if ($hlevel < 4) {
     push(@sections, "USAGE") if $hlevel == 1 || $hlevel == 3;
     push(@sections, "SYNOPSIS") if $hlevel == 2;
     push(@sections, "OPTIONS") if $hlevel == 3;
-    $msg = "\nSpamPD version $VERSION\n";
+    $msg = "\n".__PACKAGE__." version $VERSION\n";
   }
 
   Pod::Usage::pod2usage(
@@ -1133,13 +1132,12 @@ sub usage {
 }
 
 sub deprecated_opt {
-  my $opt_name = shift;
-  print "Note: option '$opt_name' is deprecated and will be ignored.\n";
+  warn "Note: option '". shift() ."' is deprecated and will be ignored.\n";
 }
 
 __END__
 
-# Start POD
+##################   POD   ######################
 
 =head1 NAME
 
@@ -1381,24 +1379,24 @@ and deprecated options.  Also be sure to check out the change log.
 =head1 USAGE
 
   spampd [
-    ( --host <host>[:<port>] | --socket <socketpath> --socket-perms <mode> )
-    ( --relayhost <host>[:<port>] | --relaysocket <socketpath> )
 
-    --children | -c <n>       --saconfig <filename>    --user  | -u <user>
-    --maxrequests | -r <n>    --satimeout <n>          --group | -g <group>
-    --childtimeout <n>        --dose                   --pid   | -p <file>
-    --log-rules-hit | -rh     --maxsize <n>            --[no]detach
-    --tagall | -a             --local-only | -L        --[no]setsid
+    [ --host <host>[:<port>]      | --socket <path> --socket-perms <mode> ]
+    [ --relayhost <host>[:<port>] | --relaysocket <path>                  ]
 
-    ( (--set-envelope-headers | -seh) | (--set-envelope-from | -sef) )
+    [--children      | -c <n>] [--saconfig <filename>] [--user  | -u <user> ]
+    [--maxrequests   | -r <n>] [--satimeout <n>      ] [--group | -g <group>]
+    [--childtimeout       <n>] [--dose               ] [--pid   | -p <file> ]
+    [--tagall        | -a    ] [--maxsize   <n>      ] [--[no]detach        ]
+    [--log-rules-hit | -rh   ] [--local-only | -L    ] [--[no]setsid        ]
+    [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
 
-    --logfile | -o (syslog|stderr|<filename>)    --logident | -li <name>
-    --logsock | -ls <socketpath>                 --logfacility | -lf <name>
-    --debug | -d [<area,...>|1|0]
+    [ --logfile | -o (syslog|stderr|<filename>) ]...
+    [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
+    [ --debug   | -d [<area,...>|1|0] ]  [ --logfacility | -lf <name> ]
   ]
 
   spampd --version
-  spampd (--help | -h) | -hh | -hhh | (-hhhh | --man [html])
+  spampd [--help | -?] | -?? | -??? | [-???? | --man [html]]
 
 Options are case-insensitive. "=" can be used as name/value separator
 instead of space (--name=value). Single or double dash prefix can be used
@@ -1508,7 +1506,7 @@ F</var/run/spampd.pid>.
 
 =item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<(new in v2.60)>
 
-Logging method to use.  May be one of:
+Logging method to use. May be one of:
 
 =over 10
 
@@ -1685,11 +1683,9 @@ You can also disable specific areas with the "no" prefix:
 
     -d all,norules,nobayes
 
-Higher priority informational messages that are suitable for logging in normal
-circumstances are available with an area of C<info>. To remove all SpamAssassin
-debug logging but keep I<spampd> debug messages, use:
+To show only I<spampd> debug messages (none from SpamAssassin), use:
 
-    -d info
+    -d spampd
 
 For more information about which I<areas> (aka I<channels> or I<facilities>) are available,
 please see the documentation at:
