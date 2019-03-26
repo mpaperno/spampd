@@ -971,11 +971,10 @@ sub process_request {
 
   alarm(0);  # stop the timer
   # check for error in eval block
-  if ($@ ne '') {
+  if ($@) {
     chomp($@);
-    my $msg = "WARNING!! Error in process_request eval block: $@";
-    $self->log(0, $msg);
-    die($msg . "\n");
+    $self->log(0, "WARNING!! Error in process_request eval block: $@");
+    $self->{server}->{done} = 1;  # exit this child gracefully
   }
 
   $prop->{instance}++;
