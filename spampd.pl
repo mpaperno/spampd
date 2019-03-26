@@ -1062,47 +1062,57 @@ sub version {
   exit 0;
 }
 
-# =item usage([exit_value=2, [help_level=1, [help_format=txt]]])
+# =item usage([exit_value=2, [help_level=1, [help_format=man]]])
 sub usage {
-  eval {
-    no warnings 'once';  # silence useless "$Pod::Usage::Formatter used only once: possible typo" warning
-    $Pod::Usage::Formatter = 'Pod::Text::Termcap';
-    require Pod::Usage;
-  } or die "Could not find Pod::Usage!\n\t$@";
-
   my ($exitval, $hlevel, $helpfmt) = @_;
   $exitval = 2 if !defined($exitval);
   $hlevel ||= 1;
-  $helpfmt ||= 'txt';
+  $helpfmt ||= 'man';
+  my ($width, $indent, $quotes) = (78, 2, "‘’");
   my (@sections, $msg, $outfile, $pdoc_opts);
 
+  eval {
+    no warnings 'once';  # silence useless "$Pod::Usage::Formatter used only once: possible typo" warning
+    $Pod::Usage::Formatter = 'Pod::Text::Termcap' if $helpfmt !~ /^txt$/i;
+    require Pod::Usage;
+  } or die "Could not load Pod::Usage!\n\t$@";
+
   # check if html version is requested (currently only works with full docs due to Pod::Usage behavior of -verbose < 2)
-  if ($helpfmt =~ /^html?/i) {
-    eval {
-      require File::Temp; require File::Spec;
-      $outfile = File::Temp->new(
-        TEMPLATE => "spampd_XXXXXX", SUFFIX => '.html', UNLINK => 0,
-        DIR => untaint_path($ENV{'TMPDIR'} || File::Spec->tmpdir())
-      );
-      $pdoc_opts = "-o html -w index -d " . $outfile->filename() if $outfile;
-    };
-    warn "Could not create temp file for html output: $@\n" if $@;
+  if ($hlevel == 4) {
+    if ($helpfmt =~ /^html?$/i) {
+      eval {
+        require File::Temp; require File::Spec;
+        $outfile = File::Temp->new(
+          TEMPLATE => "spampd_XXXXXX", SUFFIX => '.html', UNLINK => 0,
+          DIR => untaint_path($ENV{'TMPDIR'} || File::Spec->tmpdir())
+        );
+        $pdoc_opts = "-o html -w index -d " . $outfile->filename() if $outfile;
+      };
+      warn "Could not create temp file for html output: $@\n" if $@;
+    }
+    elsif ($helpfmt =~ /^man$/i) {
+      $pdoc_opts = "-o man -w quotes:$quotes -w section:8 -w release:$VERSION ".
+                   "-w center:".__PACKAGE__." -w name:".lc(__PACKAGE__);
+    }
+    elsif ($helpfmt =~ /^txt$/i) {
+      $pdoc_opts = "-o text -T -w width:$width -w indent:$indent -w quotes:$quotes";
+    }
   }
-  if ($hlevel < 4) {
-    push(@sections, "USAGE") if $hlevel == 1 || $hlevel == 3;
+  else {
+    push(@sections, "USAGE")    if $hlevel == 1 || $hlevel == 3;
     push(@sections, "SYNOPSIS") if $hlevel == 2;
-    push(@sections, "OPTIONS") if $hlevel == 3;
+    push(@sections, "OPTIONS")  if $hlevel == 3;
     $msg = "\n".__PACKAGE__." version $VERSION\n";
   }
 
   Pod::Usage::pod2usage(
-    -verbose => (!@sections ? 2 : 99),
+    -verbose => (@sections ? 99 : 2),
     -message => $msg,
     -sections => \@sections,
     -perldocopt => $pdoc_opts,
     -exitval => "NOEXIT",
     # text formatter options
-    width => 78, indent => 2, quotes => "[]", errors => "none"
+    width => $width, indent => $indent, quotes => $quotes, errors => "none"
   );
   exit $exitval if !$outfile;
 
@@ -1115,11 +1125,12 @@ sub usage {
   # if HTML::Display is not installed, just try Debian or OSX style, or bail out.
   if (!$disp_ok) {
     my ($deb, $mac) = (-x "/usr/bin/x-www-browser"), ($^O =~ qr/darwin/i);
-    my $cmdline = ($deb ? "x-www-browser " : ($mac ? "open " : undef));
-    $cmdline .= $outfile->filename()." > /dev/null 2>&1" if $cmdline;
-    if ($cmdline && ($disp_ok = (system($cmdline) == 0)))
-      { print "Waiting to delete temp file...\n"; sleep 3; }
-  };
+    if (my $cmdline = ($deb ? "x-www-browser " : ($mac ? "open " : undef))) {
+      $cmdline .= $outfile->filename()." > /dev/null 2>&1" if $cmdline;
+      if ($disp_ok = (system($cmdline) == 0))
+        { print "Waiting to delete temp file...\n"; sleep 3; }
+    }
+  }
   if ($disp_ok) {
     $outfile->unlink_on_destroy(1);
     print "Removing temporary perldoc file ".$outfile->filename()."\n";
@@ -1138,6 +1149,8 @@ sub deprecated_opt {
 __END__
 
 ##################   POD   ######################
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -1189,10 +1202,11 @@ Options:
   --log-rules-hit or -rh    Log the names of each matched SA test per mail.
   --debug or -d [<areas>]   Controls extra debug logging.
 
-  --help   -h -?            Show basic command-line usage.
-          -hh -??           Show short option descriptions (this text).
-         -hhh -???          Show usage summary and full option descriptions.
-  --man -hhhh -???? [html]  Show full documentation, optionally as HTML.
+  --help | -h | -?   [txt]  Show basic command-line usage.
+          -hh | -??  [txt]  Show short option descriptions (this text).
+         -hhh | -??? [txt]  Show usage summary and full option descriptions.
+  --man [html|txt]          Show full documentation as a man page or HTML/txt.
+  --show defaults|<thing>   Print default option values (or <thing>) and exit.
   --version                 Print version information and exit.
 
 Deprecated since SpamAssassin v3:
@@ -1373,7 +1387,7 @@ instead (as of SA v2.6).
 Upgrading from version 1 simply involves replacing the F<spampd> program file
 with the latest one.  Note that the I<dead-letters> folder is no longer being
 used and the --dead-letters option is no longer needed (though no errors are
-thrown if it's present).  Check the L<"Options"> list below for a full list of new
+thrown if it's present).  Check the L</OPTIONS> list below for a full list of new
 and deprecated options.  Also be sure to check out the change log.
 
 =head1 USAGE
@@ -1394,9 +1408,8 @@ and deprecated options.  Also be sure to check out the change log.
     [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
     [ --debug   | -d [<area,...>|1|0] ]  [ --logfacility | -lf <name> ]
   ]
-
   spampd --version
-  spampd [--help | -?] | -?? | -??? | [-???? | --man [html]]
+  spampd [--help | -?] | -?? [txt] | -??? [txt] | [-???? | --man [html|txt]]
 
 Options are case-insensitive. "=" can be used as name/value separator
 instead of space (--name=value). Single or double dash prefix can be used
@@ -1508,11 +1521,11 @@ F</var/run/spampd.pid>.
 
 Logging method to use. May be one of:
 
-=over 10
+=over 5
 
 =item *
 
-C<syslog>: Use the system's syslogd (via Sys::Syslog).
+C<syslog>: Use the system's syslogd (via Sys::Syslog). B<default>
 
 =item *
 
@@ -1527,7 +1540,6 @@ or even C</dev/null> to disable logging entirely.
 
 =back
 
-Default is I<syslog>.
 
 =item B<--logsock> or B<-ls> I<<type>> C<(new in v2.20)>  C<(updated in v2.60)>
 
@@ -1698,18 +1710,27 @@ L<Mail::SpamAssassin::Logger::add_facilities()|https://spamassassin.apache.org/d
 
 Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
-=item B<--help> or B<-h> or B<-?>
+=item B<--help> or B<-h> or B<-?> I<[txt]>
 
-=item B<-hh> or B<-??>
+=item B<-hh> or B<-??> I<[txt]>
 
-=item B<-hhh> or B<-???>
+=item B<-hhh> or B<-???> I<[txt]>
 
-=item B<--man> or B<-hhhh> or B<-????> I<[html]>
+=item B<--man> or B<-hhhh> or B<-????> I<[html|txt]>
 
-Prints increasingly verbose usage information. C<--man> displays the full documentation,
-optionally in C<html> format. HTML version is saved to a temp file and an attempt is made
-to open it in the default system browser (it is better if the browser is already opened).
-If available, the optional Perl module I<HTML::Display> is used to open a browser.
+Prints increasingly verbose usage information. By default help is displayed in
+"terminal" (groff) format with some text styling applied. If you want to use
+C<less> as a pager, provide it with the C<-R> switch, eg.:
+
+  spampd --??? | less -R
+
+Alternatively you can request plain-text format with the optional C<txt> value.
+
+C<--man> displays the full documentation, optionally in C<html> or plain text
+C<txt> formats (default is to use actual "man" format/display). HTML version is
+saved to a temp file and an attempt is made to open it in the default system browser
+(it is better if the browser is already opened). If available, the optional Perl
+module I<HTML::Display> is used to (try to) open a browser.
 
 =back
 
@@ -1886,18 +1907,16 @@ L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spa
 <!-- HTML formatter customizations -->
 
 <style>
-  /* In the styles below, the first selector is for Pod::HTML (pod2html),
-     other(s) for Pod::Simple::HTML (perldoc -o html) */
-  /* nicer index links */
-  ul#index li a,
-  ul.indexList li a {
+  /* change color of internal links */
+  a[href^="#"] {
     color: green;
     text-decoration: none;
   }
+  /* In the styles below, the first selector is for Pod::HTML (pod2html), other(s) for Pod::Simple::HTML (perldoc -o html) */
   /* remove ugly underlines and color on headings with backlinks */
   a[href*="podtop"],
   a.u {
-    color: unset;
+    color: unset !important;
     text-decoration: none;
   }
   /* set up to display "back to top" links on headings with backlinks */
