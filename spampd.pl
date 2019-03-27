@@ -404,281 +404,398 @@ use Mail::SpamAssassin ();
 
 our $VERSION = '2.60';
 
-use vars qw($use_sa_logger);
+# Global flag, if true prevents automatic execution of script.
+our $LoadAsModule;
+
 BEGIN {
   require Net::Server; Net::Server->VERSION(0.89);
   require Net::Server::PreForkSimple;
   our @ISA = qw(Net::Server::PreForkSimple);
-
-  # SA v3.1.0 changed debug logging to be more granular and introduced Logger module which needs to be configured
-  $use_sa_logger = eval { require Mail::SpamAssassin::Logger; };
 
   # use included modules
   import SpamPD::Server;
   import SpamPD::Client;
 }
 
+use constant {
+  # Logging type constants: low byte for destination(s), high byte for logger type.
+  LOG_NONE => 0, LOG_SYSLOG => 0x01, LOG_FILE => 0x02, LOG_STDERR => 0x04,
+  LOGGER_DEFAULT => 0, LOGGER_SA => 0x0100, LOGGER_L4P => 0x0200,
+  # Map Net::Server logging levels to SpamAssassin::Logger level names.
+  SA_LOG_LEVELS => {0 => 'error', 1 => 'warn', 2 => 'notice', 3 => 'info', 4 => 'dbg'},
+};
+
+##################   RUN   ######################
+
+unless ($LoadAsModule) {
+  # Create, init, and go.
+  SpamPD->new()->init()->run();
+  exit 1;  # shouldn't get here
+}
+
 ##################   SETUP   ######################
 
-# Map Net::Server logging levels to SpamAssassin::Logger levels.
-my %sa_level = (0 => 'error', 1 => 'warn', 2 => 'notice', 3 => 'info', 4 => 'dbg');
-
-# Clean up environment.
-delete @ENV{qw(IFS CDPATH ENV BASH_ENV HOME)};
-eval {
-  # Try to safely untaint the PATH instead of resetting it. Also prevents SA from duplicating this step when it starts.
-  require Mail::SpamAssassin::Util;
-  Mail::SpamAssassin::Util::clean_path_in_taint_mode();
-} or do {
-  $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
-};
-
-# Untaint $0 and each member of @ARGV, and save untainted copies for HUPping.
-my $clean_arg0 = untaint_var($0);
-my @clean_argv = untaint_var(\@ARGV);
-
-# Set defaults for options.
-
-my $host            = '127.0.0.1';                       # listen on ip
-my $port            = 10025;                             # listen on port
-my $socket          = undef;                             # listen on socket
-my $socket_perms    = undef;                             # listening socket permissions (octal)
-my $relayhost       = '127.0.0.1';                       # relay to ip
-my $relayport       = 25;                                # relay to port
-my $relaysocket     = undef;                             # relay to socket
-my $children        = 5;                                 # number of child processes (servers) to spawn at start
-my $maxrequests     = 20;                                # max requests handled by child b4 dying
-my $childtimeout    = 6 * 60;                            # child process per-command timeout in seconds
-my $satimeout       = 285;                               # SA timeout in seconds (15s less than Postfix default for smtp_data_done_timeout)
-my $pidfile         = '/var/run/spampd.pid';             # write pid to file
-my $user            = 'mail';                            # user to run as
-my $group           = 'mail';                            # group to run as
-my $tagall          = 0;                                 # mark-up all msgs with SA, not just spam
-my $maxsize         = 64;                                # max. msg size to scan with SA, in KB.
-my $rh              = 0;                                 # log which rules were hit
-my $debug           = 0;                                 # debug flag, can be boolean on/off or a list to pass to SA (--debug option)
-my $dose            = 0;                                 # die-on-sa-errors flag
-my $logfile         = 'syslog';                          # logging destination (syslog|stderr|<filename>)
-my $logsock         = undef;                             # log socket (undef means for Sys::Syslog to decide, except 'inet' on HP-US & SunOS)
-my $logidentity     = 'spampd';                          # syslog identity
-my $logfacility     = 'mail';                            # syslog facility
-my $nsloglevel      = 2;                                 # log level for Net::Server (in the range 0-4) (--debug option sets this to 4)
-my $background      = 1;                                 # specifies whether to 'daemonize' and fork into background (--[no]detach option)
-my $setsid          = 0;                                 # use POSIX::setsid() command to truly daemonize.
-my $envelopeheaders = 0;                                 # Set X-Envelope-To & X-Envelope-From headers in the mail before passing it to SA (--seh option)
-my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only (--sef option)
-my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
-my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
-my $sa_local_only   = 0;                                 # disable SA network tests
-my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
-
-# valid syslog sockets, used for config error checking and usage text (this could be made more adaptive by OS)
-my $allowed_syslog_socks = 'native|eventlog|tcp|udp|inet|unix|stream|pipe|console';
-
-# log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
-eval {
-  my $osname = `uname -s`;
-  $logsock = "inet" if ($osname =~ 'HP-UX' || $osname =~ 'SunOS');
-};
-
-Getopt::Long::Configure(qw(auto_abbrev ignore_case require_order no_permute no_bundling no_pass_through));
-GetOptions(
-  'host=s'                   => \$host,
-  'port=i'                   => \$port,
-  'socket=s'                 => \$socket,
-  'socket-perms=s'           => \$socket_perms,
-  'relayhost=s'              => \$relayhost,
-  'relayport=i'              => \$relayport,
-  'relaysocket=s'            => \$relaysocket,
-  'children|c=i'             => \$children,
-  'maxrequests|mr|r=i'       => \$maxrequests,
-  'childtimeout=i'           => \$childtimeout,
-  'satimeout=i'              => \$satimeout,
-  'pid|p=s'                  => \$pidfile,
-  'user|u=s'                 => \$user,
-  'group|g=s'                => \$group,
-  'maxsize=i'                => \$maxsize,
-  'tagall|a'                 => \$tagall,
-  'log-rules-hit|rh'         => \$rh,
-  'debug|d:s'                => \$debug,
-  'dose'                     => \$dose,
-  'logfile|o=s'              => \$logfile,
-  'logsock|ls=s'             => \$logsock,
-  'logident|li=s'            => \$logidentity,
-  'logfacility|lf=s'         => \$logfacility,
-  'detach!'                  => \$background,
-  'setsid!'                  => \$setsid,
-  'set-envelope-headers|seh' => \$envelopeheaders,
-  'set-envelope-from|sef'    => \$setenvelopefrom,
-  'saconfig=s'               => \$sa_config,
-  'homedir=s'                => \$sa_home_dir,
-  'local-only|l'             => \$sa_local_only,
-  'auto-whitelist|aw'        => \$sa_awl,
-  'help|h|?:s'               => sub { usage(0, 1, $_[1]); },
-  'hh|??:s'                  => sub { usage(0, 2, $_[1]); },
-  'hhh|???:s'                => sub { usage(0, 3, $_[1]); },
-  'hhhh|????|man:s'          => sub { usage(0, 4, $_[1]); },
-  'version'                  => \&version,
-  'dead-letters=s'           => \&deprecated_opt,
-  'heloname=s'               => \&deprecated_opt,
-  'stop-at-threshold'        => \&deprecated_opt,
-  'add-sc-header|ash'        => \&deprecated_opt,
-  'hostname=s'               => \&deprecated_opt,
-) or usage(1);
-
-if (defined($logsock) && $logsock !~ /^($allowed_syslog_socks)$/) {
-  print "--logsock parameter not recognized, must be one of ($allowed_syslog_socks).\n";
-  exit 1;
+# Create ourselves and set defaults for options.
+sub new {
+  my $class = shift || die "Missing class.";
+  return bless {
+    server => {
+      host              => '127.0.0.1',           # listen on ip
+      port              => 10025,                 # listen on port
+      max_servers       => 5,                     # number of child processes (servers) to spawn at start
+      max_requests      => 20,                    # max requests handled by child b4 dying
+      pid_file          => '/var/run/spampd.pid', # write pid to file
+      user              => 'mail',                # user to run as
+      group             => 'mail',                # group to run as
+      log_file          => undef,                 # log destination (undef means log to use write_to_log_hook() with stderr fallback)
+      syslog_logsock    => undef,                 # syslog socket (undef means for Sys::Syslog to decide)
+      syslog_ident      => 'spampd',              # syslog identity
+      syslog_facility   => 'mail',                # syslog facility
+      log_level         => 2,                     # log level for Net::Server (in the range 0-4) (--debug option sets this to 4)
+      background        => 1,                     # specifies whether to 'daemonize' and fork into background (--[no]detach option)
+      setsid            => 0,                     # use POSIX::setsid() command to truly daemonize.
+      leave_children_open_on_hup => 1,            # this lets any busy children finish processing before exiting, using old SA object
+    },
+    spampd => {
+      socket            => undef,                 # listen on socket (saved for setting permissions after binding)
+      socket_mode       => undef,                 # listening socket permissions (octal)
+      relayhost         => '127.0.0.1',           # relay to ip
+      relayport         => 25,                    # relay to port
+      relaysocket       => undef,                 # relay to socket
+      childtimeout      => 6 * 60,                # child process per-command timeout in seconds
+      satimeout         => 285,                   # SA timeout in seconds (15s less than Postfix default for smtp_data_done_timeout)
+      tagall            => 0,                     # mark-up all msgs with SA, not just spam
+      maxsize           => 64,                    # max. msg size to scan with SA, in KB.
+      rh                => 0,                     # log which rules were hit
+      dose              => 0,                     # die-on-sa-errors flag
+      envelopeheaders   => 0,                     # Set X-Envelope-To & X-Envelope-From headers in the mail before passing it to SA (--seh option)
+      setenvelopefrom   => 0,                     # Set X-Envelope-From header only (--sef option)
+      logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
+      instance          => 0,                     # child instance count
+      sa_version        => version->parse(Mail::SpamAssassin->VERSION)  # may be used while processing messages
+    },
+    # this hash is eventually passed to SpamAssassin->new() so it must use valid SA option names. This also becomes the SA object afterwards.
+    assassin => {
+      debug                => 0,                  # debug flag, can be boolean or a list to pass to SA (--debug option)
+      local_tests_only     => 0,                  # disable SA network tests (--local-only flag)
+      userstate_dir        =>
+        '/var/spool/spamassassin/spampd',         # home directory for SA files and plugins (--homedir option)
+      home_dir_for_helpers => '',                 # this will be set to the same as userstate_dir once options are parsed
+      username             => '',                 # this will be set to the same user as we're running as once options are parsed
+      userprefs_filename   => undef,              # add this config file for SA "user_prefs" settings (--saconfig option)
+      dont_copy_prefs      => 1,                  # tell SA not to copy user pref file into its working dir
+    }
+  }, $class;
 }
 
-if ($children < 1) {
-  print "Option --children must be greater than zero!\n";
-  exit 1;
-}
+##################   INIT   ######################
 
-if ($sa_awl && version->parse(Mail::SpamAssassin->VERSION()) >= 3) {
-  warn "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead.\n";
-  exit 1;
-}
+sub init {
+  my $self = shift;
+  my ($spd_p, $sa_p) = ($self->{spampd}, $self->{assassin});
+  my $is_reloading = !!$ENV{'BOUND_SOCKETS'};
 
-# These paths are already untainted but do a more careful check JIC.
-$_ = untaint_path($_) for ($socket, $relaysocket, $pidfile, $logfile, $sa_config);
+  # Clean up environment.
+  delete @ENV{qw(IFS CDPATH ENV BASH_ENV HOME)};
+  eval {
+    # Try to safely untaint the PATH instead of resetting it. Also prevents SA from duplicating this step when it starts.
+    require Mail::SpamAssassin::Util;
+    Mail::SpamAssassin::Util::clean_path_in_taint_mode();
+  } or do {
+    $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
+  };
 
-$setsid = 0 if !$background;
+  # Untaint $0 and each member of @ARGV, and save untainted copies for HUPping. This saves the original
+  #   command line, including any configuration files, which would be re-read upon a HUP. commandline() is in Net::Server.
+  $self->commandline([untaint_var($0), @{untaint_var(\@ARGV)}]);
 
-my $ns_logfile;
-my $sa_debug = $use_sa_logger ? 'info' : 0;
-my $use_user_prefs = ($sa_config ne '');
-my $using_syslog = ($logfile eq 'syslog');
-my $using_stderr = (!$using_syslog && $logfile eq 'stderr');
+  # SA v3.1.0 changed debug logging to be more granular and introduced Logger module which we can use.
+  my $use_logger = eval {
+    require Mail::SpamAssassin::Logger;
+    LOGGER_SA;
+  } or LOGGER_DEFAULT;
 
-if ($debug) {
-  # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
-  # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
-  # In case of old SA version, just set the debug flag to true.
-  $debug = 'all' if ($debug eq '1');
-  $debug = join(',', $debug, $logidentity) if ($debug !~ /(?:\A|,)$logidentity/i);
-  $sa_debug = $use_sa_logger ? $debug : 1;
-  $nsloglevel = 4;  # set Net::Server log level to debug
-}
+  # We actually call Getopt::Long::GetOptions three (!) times. First time is to check for presence of config file option(s).
+  # If we get any, then we parse the file(s) into @ARGV, in front of any existing @ARGV options (so command-line overrides).
+  $self->handle_cfg_file_opts();
 
-my @tmp = split(/:/, $relayhost);
-$relayhost = $tmp[0];
-$relayport = $tmp[1] if $tmp[1];
+  # Run GetOptions a 2nd time to check for help/usage/version/debug requests, but don't bother if we're HUPping. We may not return from here.
+  $self->handle_help_opts() if !$is_reloading;
 
-@tmp = split(/:/, $host);
-$host = $tmp[0];
-$port = $tmp[1] if $tmp[1];
-
-# Net::Server wants UNIX sockets passed via port too. This part
-# decides what we want to pass.
-my @ports = (defined($socket) ? ($socket . '|unix') : $port);
-
-# Need to configure SA Logger?
-if ($use_sa_logger) {
-  # Remove the stderr logger first (unless we're using it) to avoid any initial messages from Logger.
-  Mail::SpamAssassin::Logger::remove('stderr') if !$using_stderr;
-  if ($using_syslog) {
-    Mail::SpamAssassin::Logger::add(
-      method => 'syslog',
-      socket => $logsock,
-      facility => $logfacility,
-      ident => $logidentity
-    );
+  # Handle "--show defaults" debugging request here (while we still know them).
+  if ($spd_p->{show_dbg} && grep(/^(defaults?|all)$/i, @{$spd_p->{show_dbg}})) {
+    # make sure we don't "show defaults" again
+    @{$spd_p->{show_dbg}} = grep {$_ !~ /^defaults?$/i} @{$spd_p->{show_dbg}};
+    # show defaults and exit here if that's all the user wanted to see
+    print_options({$self->options_map()}, 'default', (@{$spd_p->{show_dbg}} ? -1 : 0));
   }
-  elsif (!$using_stderr) {
-    Mail::SpamAssassin::Logger::add(
-      method => 'file',
-      filename => $logfile
-    );
+
+  # save final ARGV for debug (handle_main_opts() will clear @ARGV)
+  my @startup_args = @ARGV;
+
+  # Now (finally) process all the actual options passed on @ARGV (including anything from config files).
+  # Options on the actual command line will override anything loaded from the file(s).
+  $self->handle_main_opts($use_logger, $is_reloading);
+
+  # If debug output requested, do it now, before logging is set up, and exit.
+  show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args, \%$self) && exit(0) if $spd_p->{show_dbg};
+
+  # Configure logging.
+  $self->setup_logging();
+
+  $self->dbg(__PACKAGE__." v$VERSION ". ($is_reloading ? "reloading": "starting") ." with: @startup_args \n");
+
+  # Redirect all warnings to logger
+  $SIG{__WARN__} = sub { $self->log(1, $_[0]); };
+
+  # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
+  $sa_p = Mail::SpamAssassin->new($sa_p);
+
+  $self->{spampd}->{sa_awl} and eval {
+    require Mail::SpamAssassin::DBBasedAddrList;
+    # create a factory for the persistent address list
+    $sa_p->set_persistent_address_list_factory(Mail::SpamAssassin::DBBasedAddrList->new());
+  };
+
+  $sa_p->compile_now(!!$sa_p->{userprefs_filename});
+
+  return $self;
+}
+
+sub handle_cfg_file_opts {
+  my $self = shift;
+  my @config_files;
+  # Configure Getopt::Long to pass through any unknown options.
+  Getopt::Long::Configure(qw(ignore_case no_permute no_auto_abbrev no_require_order pass_through));
+  # Check for config file option(s) only.
+  GetOptions('conf|config|cfg|conf-file|config-file|cfg-file=s' => \@config_files);
+  # Handle config files. Note that options on the actual command line will override anything loaded from the file(s).
+  if (@config_files) {
+    # files could be passed as a list separated by ":"
+    trimmed(@config_files = split(/:/, join(':', @config_files)));
+    $self->log(2, "Loading config from file(s): @config_files \n");
+    read_args_from_file(\@config_files, \@ARGV);
   }
-  # Add SA logging facilities
-  Mail::SpamAssassin::Logger::add_facilities($sa_debug);
-  $sa_debug = undef;  # don't need this anymore
-  Mail::SpamAssassin::Logger::log_message(
-    "dbg", "SpamPD v$VERSION starting with: @clean_argv"
-  ) if $nsloglevel >= 4;
-}
-elsif ($using_syslog) {
-  $ns_logfile = 'Sys::Syslog';
-}
-elsif (!$using_stderr) {
-  $ns_logfile = $logfile;
 }
 
-my $sa_options = {
-  'dont_copy_prefs'      => 1,
-  'debug'                => $sa_debug,  # this should already be undef when using SA Logger
-  'local_tests_only'     => $sa_local_only,
-  'home_dir_for_helpers' => $sa_home_dir,
-  'userstate_dir'        => $sa_home_dir,
-  'username'             => $user,
-  'userprefs_filename'   => ($use_user_prefs ? $sa_config : undef)
-};
+sub handle_help_opts {
+  my $self = shift;
+  my $spd_p = $self->{spampd};
+  # Configure Getopt::Long to pass through any unknown options.
+  Getopt::Long::Configure(qw(ignore_case no_permute no_auto_abbrev no_require_order pass_through));
+  # Check for help/version/show option(s) only. These all cause an exit(0), except --show which is processed later.
+  GetOptions(
+    'show=s@'         => \$spd_p->{show_dbg},
+    'help|h|?:s'      => sub { usage(0, 1, $_[1]); },
+    'hh|??:s'         => sub { usage(0, 2, $_[1]); },
+    'hhh|???:s'       => sub { usage(0, 3, $_[1]); },
+    'hhhh|????|man:s' => sub { usage(0, 4, $_[1]); },
+    'version'         => \&version,
+  );
+  # "--show" could be a CSV list
+  trimmed(@{$spd_p->{show_dbg}} = split(/,/, join(',', @{$spd_p->{show_dbg}}))) if defined($spd_p->{show_dbg});
+}
 
-my $assassin = Mail::SpamAssassin->new($sa_options);
+# Main command-line options mapping; this is for Getopt::Long::GetOptions and also to generate config dumps.
+sub options_map {
+  my ($self) = @_;
+  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
+  $spd_p->{logspec} = logtype2file($spd_p->{logtype}, $srv_p->{log_file}, ':'); # set a valid default for print_options()
 
-$sa_awl and eval {
-  require Mail::SpamAssassin::DBBasedAddrList;
+  # To support setting boolean options with "--opt", "--opt=1|0", as well as the "no-" prefix,
+  #   we make them accept an optional integer and add the "no" variants manually. Because Getopt::Long doesn't support that :(
+  return (
+    # Net::Server
+    'host=s'                   => \$srv_p->{host},
+    'port=i'                   => \$srv_p->{port},
+    'children|c=i'             => \$srv_p->{max_servers},
+    'maxrequests|mr|r=i'       => \$srv_p->{max_requests},
+    'pid|p=s'                  => \$srv_p->{pid_file},
+    'user|u=s'                 => \$srv_p->{user},
+    'group|g=s'                => \$srv_p->{group},
+    'logsock|ls=s'             => \$srv_p->{syslog_logsock},
+    'logident|li=s'            => \$srv_p->{syslog_ident},
+    'logfacility|lf=s'         => \$srv_p->{syslog_facility},
+    'detach:1'                 => \$srv_p->{background},
+    'no-detach|nodetach'       => sub { $srv_p->{background} = 0; },
+    'setsid:1'                 => \$srv_p->{setsid},
+    'no-setsid|nosetsid'       => sub { $srv_p->{setsid} = 0; },
+    # SpamPD
+    'socket=s'                 => \$spd_p->{socket},
+    'socket-perms=s'           => \$spd_p->{socket_mode},
+    'relayhost=s'              => \$spd_p->{relayhost},
+    'relayport=i'              => \$spd_p->{relayport},
+    'relaysocket=s'            => \$spd_p->{relaysocket},
+    'childtimeout=i'           => \$spd_p->{childtimeout},
+    'satimeout=i'              => \$spd_p->{satimeout},
+    'maxsize=i'                => \$spd_p->{maxsize},
+    'logfile|o=s@'             => \$spd_p->{logspec},
+    'tagall|a:1'               => \$spd_p->{tagall},
+    'no-tagall|no-a'           => sub { $spd_p->{tagall} = 0; },
+    'log-rules-hit|rh:1'       => \$spd_p->{rh},
+    'no-log-rules-hit|no-rh'   => sub { $spd_p->{rh} = 0; },
+    'dose:1'                   => \$spd_p->{dose},
+    'no-dose|nodose'           => sub { $spd_p->{dose} = 0; },
+    'auto-whitelist|aw:1'      => \$spd_p->{sa_awl},
+    'set-envelope-headers|seh:1'     => \$spd_p->{envelopeheaders},
+    'no-set-envelope-headers|no-seh' => sub { $spd_p->{envelopeheaders} = 0; },
+    'set-envelope-from|sef:1'        => \$spd_p->{setenvelopefrom},
+    'no-set-envelope-from|no-sef'    => sub { $spd_p->{setenvelopefrom} = 0; },
+    # SA
+    'debug|d:s'                => \$sa_p->{debug},
+    'saconfig=s'               => \$sa_p->{userprefs_filename},
+    'homedir=s'                => \$sa_p->{userstate_dir},
+    'local-only|l:1'           => \$sa_p->{local_tests_only},
+    'no-local-only|no-l'       => sub { $sa_p->{local_tests_only} = 0; },
+    # others
+    'dead-letters=s'           => \&deprecated_opt,
+    'heloname=s'               => \&deprecated_opt,
+    'stop-at-threshold'        => \&deprecated_opt,
+    'add-sc-header|ash'        => \&deprecated_opt,
+    'hostname=s'               => \&deprecated_opt,
+  );
+}
 
-  # create a factory for the persistent address list
-  my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
-  $assassin->set_persistent_address_list_factory($addrlistfactory);
-};
+sub handle_main_opts {
+  my ($self, $use_logger, $is_reloading) = @_;
+  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
 
-$assassin->compile_now($use_user_prefs);
+  # Reconfigure GoL for stricter parsing and check for all other options on ARGV, including anything parsed from config file(s).
+  Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
+  GetOptions($self->options_map()) or ($is_reloading ? $self->fatal("Could not parse command line!\n") : usage(1));
 
-my $server = bless {
-  server => {
-    host              => $host,
-    port              => \@ports,
-    unix_socket       => $socket,
-    unix_socket_perms => $socket_perms,
-    log_file          => $ns_logfile,
-    log_level         => $nsloglevel,
-    syslog_logsock    => $logsock,
-    syslog_ident      => $logidentity,
-    syslog_facility   => $logfacility,
-    syslog_logopt     => 'pid,ndelay',
-    background        => $background,
-    setsid            => $setsid,
-    pid_file          => $pidfile,
-    user              => $user,
-    group             => $group,
-    max_servers       => $children,
-    max_requests      => $maxrequests,
-    commandline       => [$clean_arg0, @clean_argv],
-    leave_children_open_on_hup => 1,
-  },
-  spampd => {
-    relayhost        => $relayhost,
-    relayport        => $relayport,
-    unix_relaysocket => $relaysocket,
-    tagall           => $tagall,
-    maxsize          => $maxsize,
-    assassin         => $assassin,
-    childtimeout     => $childtimeout,
-    satimeout        => $satimeout,
-    rh               => $rh,
-    dose             => $dose,
-    instance         => 0,
-    envelopeheaders  => $envelopeheaders,
-    setenvelopefrom  => $setenvelopefrom,
-    sa_version       => version->parse($assassin->VERSION()),
-    using_syslog     => $using_syslog,
-  },
-}, 'SpamPD';
+  # Validation
 
-# Redirect all warnings and errors to logger
-$SIG{__WARN__} = sub { $server->log(1, $_[0]); };
+  if ($srv_p->{max_servers} < 1)
+    { die "Option --children must be greater than zero!\n"; }
 
-# call Net::Server to start up the daemon inside
-$server->run;
+  if ($self->{spampd}->{sa_awl} && $spd_p->{sa_version} >= 3)
+    { die "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead.\n"; }
 
-exit 1;  # shouldn't get here
+  # validate syslog socket option
+  if ($spd_p->{logtype} & LOG_SYSLOG) {
+    # in theory this check could be made more adaptive based on OS or something...
+    my $allowed_syslog_socks = 'native|eventlog|tcp|udp|inet|unix|stream|pipe|console';
+    if ($srv_p->{syslog_logsock} && $srv_p->{syslog_logsock} !~ /^($allowed_syslog_socks)$/) {
+      die "--logsock parameter not recognized, must be one of ($allowed_syslog_socks).\n";
+    }
+    elsif (!$srv_p->{syslog_logsock} && $use_logger != LOGGER_SA) {
+      # log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
+      # note that SA::Logger has own fallback for cases where the default syslog selection fails.
+      eval {
+        my $osname = `uname -s`;
+        $srv_p->{syslog_logsock} = "inet" if ($osname =~ 'HP-UX' || $osname =~ 'SunOS');
+      };
+    }
+  }
+
+  # These paths are already untainted but do a more careful check JIC.
+  for ($spd_p->{socket}, $spd_p->{relaysocket}, $srv_p->{pid_file}, $sa_p->{userprefs_filename})
+    { $_ = untaint_path($_); }
+
+  # /Validation
+
+  # set up logging specs based on options ($logspec is only an array if --logfile option(s) existed)
+  if (ref($spd_p->{logspec}) eq 'ARRAY') {
+    # Handle ":" record separator and trim values.
+    trimmed(@{$spd_p->{logspec}} = split(/:/, join(':', @{$spd_p->{logspec}})));
+    $spd_p->{logtype} = LOG_NONE;  # reset
+    for (@{$spd_p->{logspec}}) {
+      if ($_ eq 'syslog') {
+        $spd_p->{logtype} |= LOG_SYSLOG;
+      }
+      elsif ($_ eq 'stderr') {
+        $spd_p->{logtype} |= LOG_STDERR;
+      }
+      elsif ($_ = untaint_path($_)) {
+        $spd_p->{logtype} |= LOG_FILE;
+        $srv_p->{log_file} = $_;
+      }
+    }
+  }
+  # be sure to add the logger type
+  $spd_p->{logtype} |= $use_logger;
+
+  # Net::Server wants UNIX sockets passed via port too. This part decides what we want to pass.
+  if ($spd_p->{socket}) {
+    $srv_p->{port} = join('|', $spd_p->{socket}, 'unix');
+  }
+  else {
+    my @tmp = split(/:/, $srv_p->{host});
+    $srv_p->{host} = $tmp[0];
+    $srv_p->{port} = $tmp[1] if $tmp[1];
+  }
+  # Set IP relay host/port if they're passed together, only if not using a socket.
+  if (!$spd_p->{relaysocket}) {
+    my @tmp = split(/:/, $spd_p->{relayhost});
+    $spd_p->{relayhost} = $tmp[0];
+    $spd_p->{relayport} = $tmp[1] if $tmp[1];
+  }
+
+  # Configure debugging
+  if ($sa_p->{debug} ne '0') {
+    $srv_p->{log_level} = 4;  # set Net::Server log level to debug
+    # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
+    # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
+    # In case of old SA version, just set the debug flag to true.
+    if ($use_logger == LOGGER_SA) {
+      my ($ident, $debug) = ($srv_p->{syslog_ident}, \$sa_p->{debug});
+      ${$debug} = 'all' if (!${$debug} || ${$debug} eq '1');
+      ${$debug} .= ','.$ident if (${$debug} !~ /(?:all|(?:\A|,)$ident)/i);
+    }
+    else {
+      $sa_p->{debug} = 1;
+    }
+  }
+
+  # Set misc. options based on other options.
+  $srv_p->{setsid}= 0 if !$srv_p->{background};
+  $sa_p->{home_dir_for_helpers} = $sa_p->{userstate_dir};
+  $sa_p->{username} = $srv_p->{user};
+
+}
+
+sub setup_logging {
+  my $self = shift;
+  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
+
+  if ($spd_p->{logtype} & LOGGER_SA) {
+    # Stderr logger method is active by default, remove it unless we're using it.
+    unless ($spd_p->{logtype} & LOG_STDERR) {
+      Mail::SpamAssassin::Logger::remove('stderr');
+    }
+    # Add syslog method?
+    if ($spd_p->{logtype} & LOG_SYSLOG) {
+      Mail::SpamAssassin::Logger::add(
+        method => 'syslog',
+        socket => $srv_p->{syslog_logsock},
+        facility => $srv_p->{syslog_facility},
+        ident => $srv_p->{syslog_ident}
+      );
+    }
+    # Add file method?
+    if ($spd_p->{logtype} & LOG_FILE) {
+      Mail::SpamAssassin::Logger::add(method => 'file', filename => $srv_p->{log_file});
+      push(@{$srv_p->{chown_files}}, $srv_p->{log_file});  # make sure we own the file
+    }
+    # Add SA logging facilities
+    Mail::SpamAssassin::Logger::add_facilities($sa_p->{debug});
+    $sa_p->{debug} = undef;   # clear this otherwise SA will re-add the facilities in new()
+    $srv_p->{log_file} = undef;  # disable Net::Server logging (use our write_to_log_hook() instead)
+  }
+  # using Net::Server default logging
+  else {
+    if ($spd_p->{logtype} & LOG_SYSLOG) {
+      $srv_p->{log_file} = 'Sys::Syslog';
+    }
+    elsif ($spd_p->{logtype} & LOG_STDERR) {
+      $srv_p->{log_file} = undef;  # tells Net::Server to log to stderr
+    }
+  }
+}
 
 
-##################   METHODS   ######################
+##################   SERVER METHODS   ######################
 
 sub process_message {
   my ($self, $fh) = @_;
@@ -690,7 +807,7 @@ sub process_message {
   # start a timer
   my $start = time;
   # use the assassin object created during startup
-  my $assassin   = $prop->{assassin};
+  my $assassin   = $self->{assassin};
 
   # this gets info about the message temp file
   my $size = ($fh->stat)[7] or die "Can't stat mail file: $!";
@@ -874,7 +991,7 @@ sub process_request {
     my $client = SpamPD::Client->new(
       interface   => $prop->{relayhost},
       port        => $prop->{relayport},
-      unix_socket => $prop->{unix_relaysocket}
+      unix_socket => $prop->{relaysocket}
     );
     die "Failed to create sending Client: $!" unless (defined $client);
 
@@ -983,11 +1100,10 @@ sub process_request {
 # Net::Server hook
 # After binding listening sockets
 sub post_bind_hook {
-  my $self   = shift;
-  my $server = $self->{server};
-  if (defined $server->{unix_socket} and defined $server->{unix_socket_perms}) {
-    my $mode = oct($server->{unix_socket_perms});
-    chmod $mode, $server->{unix_socket} or die $@;
+  my $prop = $_[0]->{spampd};
+  if (defined($prop->{socket}) and defined($prop->{socket_mode})) {
+    chmod(oct($prop->{socket_mode}), $prop->{socket})
+      or die $_[0]->fatal("Couldn't chmod '$prop->{socket}' [$!]\n");
   }
 }
 
@@ -1007,16 +1123,90 @@ sub child_finish_hook {
 # Only called when we're using SA Logger and bypassing Net::Server logging entirely.
 sub write_to_log_hook {
   my ($self, $level, $msg) = @_;
-  if (!$self->{spampd}->{using_syslog})
+  if (!($self->{spampd}->{logtype} & LOG_SYSLOG) && $self->{server}->{syslog_ident})
     { $msg = join(': ', $self->{server}->{syslog_ident}, $msg); }
-  Mail::SpamAssassin::Logger::log_message($sa_level{$level}, $msg);
+  if ($self->{spampd}->{logtype} & LOGGER_SA)
+    { Mail::SpamAssassin::Logger::log_message(SA_LOG_LEVELS->{$level}, $msg); }
+  else
+    { $self->SUPER::write_to_log_hook($level, $msg); }
 }
 
 sub dbg {
   shift()->log(4, @_);
 }
 
+
 ##################   FUNCTIONS   ######################
+
+# =item read_args_from_file(<files array>, <dest array ref>)
+# Loads all options from a list of files into destination array (typically \@ARGV).
+# Options loaded from file(s) are placed before any existing items in the destination array
+#  (this is done to preserve precedence of any command-line arguments). Options in subsequent
+#  files will override (or add to) the same option in any previous file(s).
+# All options found in files following a lone "--" separator are appended to the very end
+#   of the destination array, after a "--" item. This is meant to mimick the behavior of
+#   Getopt::Long passthrough argument handling.
+sub read_args_from_file() {
+  my ($config_files, $to_args) = @_;
+  return if !($config_files && $to_args);
+  my @extra_args;  # store any passthrough args to add at the end
+  # loop over files in reverse order so that precedence is maintained
+  for (reverse(@$config_files)) {
+    # load arguments from file
+    my ($args, $ptargs) = read_conf_file(untaint_path($_), '=');
+    # add to beginning of array, this way command line arg override config files
+    unshift(@{$to_args}, @{$args});
+    unshift(@extra_args, @{$ptargs});  # save any passthrough args for later
+  }
+  # add any passthrough args at the end, after processing all the files
+  if (@extra_args) {
+    push(@{$to_args}, '--');  # separator for Getopt::Long
+    push(@{$to_args}, @extra_args);
+  }
+}
+
+# =item read_conf_file(file [, separator = "="] [, prefix = "--"])
+# Parses a basic configuration file into an array of options suitable for use in a command line.
+# By default the result key/value separator is an "=" sign. This can be overriden by providing a second argument.
+#   If a blank value is passed as separator, the keys and values will be added as separate array items.
+# Returns 2 arrays: one with all options before encountering a lone "--" separator, and another (possibly blank)
+#   with any options found after the "--" separator. (This is for handling "passthrough" options since they must be
+#   placed at the end of a command line. The actual "--" separator is not included. See Getopt::Long for more details
+#   about passthrough options).
+# Config files support commented and blank lines, with one name/value pair per line. Values are optional.
+#   Preceeding option names with "-" or "--" is optional. An optional prefix (default "--") will be prepended to the
+#   name if it does not begin with at least one "-". Names and values can be separated by space(s)/tab(s) or "=" sign.
+#
+sub read_conf_file {
+  my ($file, $sep, $prfx) = @_;
+  my (@args, @ptargs);
+  my $dest = \@args;
+  $sep = '=' if !defined($sep);
+  $prfx = '--' if !defined($prfx);
+  open(my $fh, '<', $file) or die "Couldn't open config file '$file' [$!]";
+  while (defined(my $line = <$fh>)) {
+    next if ($line !~ m/^\s* ((?:--?)?[\w\@-]+) (?:[=:\t ]+ (\S+) \s*)?$/xo);
+    ($dest = \@ptargs) && next if $1 eq '--';
+    my $k = $1;
+    $k = join('', $prfx, $k) if $prfx && substr($k, 0, 1) ne '-';
+    $k = join($sep, $k, $2) if $sep && $2;
+    push (@{$dest}, $k);
+    push (@{$dest}, $2) if !$sep && $2;
+  }
+  close $fh;
+  return (\@args, \@ptargs);
+}
+
+# Converts a bitfield of logging type, plus optional file name, to an array/list
+# of values which would be suitable for the commandline --logfile (-o) option.
+sub logtype2file {
+  my ($type, $file, $sep) = @_;
+  my @ret;
+  push(@ret, 'syslog') if ($type & LOG_SYSLOG);
+  push(@ret, 'stderr') if ($type & LOG_STDERR);
+  push(@ret, $file)    if ($type & LOG_FILE) && $file;
+  return wantarray ? @ret : join($sep || ', ', @ret);
+}
 
 # Untaint a scalar (or ref to one) or an array ref (most code "borrowed" from spamd)
 sub untaint_var {
@@ -1051,6 +1241,76 @@ sub untaint_path {
   local $1;
   return $1 if ($path =~ $re);
   die "refusing to untaint suspicious path: '$path'\n";
+}
+
+# Trims a string or array of strings. Modifies whatever was passed in!
+sub trimmed { s{^\s+|\s+$}{}g foreach @_; };
+
+# =item print_options(\%options [, type = "default"] [, exit = -1])
+# Prints out names and values from a hash of option {name => \$value} pairs, such as might
+#   be passed to Getopt::Long::GetOptions(). Fairly limited, eg. it cannot handle hash values.
+# Any value that is not a ref to a scalar or to an array ref is ignored. The first version of the
+#   option name, before the first "|", is used as the option name. Any option spec is also excluded.
+sub print_options {
+  my $opts = shift;
+  my $type = ($_[0] && $_[0] !~ /^\d+$/ ? shift : 'default');
+  my $exit = @_ ? $_[0] : -1;
+  print "\n";
+  print "# Configuration options for ".__PACKAGE__." v".$VERSION." with ".$type." values.\n";
+  print "# This format is suitable as a configuration file. Just remove\n".
+        "# the '#' marks (comment characters) and change values as needed.\n\n" if $exit > -1;
+  for my $k (sort keys %{$opts}) {
+    my $v = %{$opts}{$k};
+    next if ref($v) !~ /SCALAR|REF/;
+    $k = $1 if $k =~ /([\w-]+).*/;
+    $v = defined(${$v}) ? ${$v} : "(undefined)";
+    $v = join(":", @{$v}) if ref($v) eq 'ARRAY';
+    printf("# %-24s %s\n", $k, $v);
+  }
+  print "\n";
+  exit $exit if $exit > -1;
+}
+
+# =item show_debug($what, [ \%options, \@startup_args, %$self | \$thing_to_dump [,\$another_thing[,...]] ])
+# Debug helper, print some values and exit. $what can be an array or single string or CSV list.
+# $what values: [ all | [conf(ig), argv, start(args), self] ] | obj(ect)
+#   "all" means everything except "object".
+#   "obj" means just dump the rest of the argument(s); ignores rest of $what, basically Data::Dumper->Dump([@_])
+# Always returns true, even if there is an error, so can be used eg.: show_debug(...) && exit(0);
+sub show_debug {
+  eval {
+    my ($what, $opts, $clargs, $self) = (shift);
+    my ($ok, @dumps, @dnames) = (0);
+    trimmed(@$what = split(/,/, join(',', @$what)));
+    if (grep(/^obj(ect)?$/i, @$what)) {
+      push(@dumps, @_);
+    }
+    else {
+      ($opts, $clargs, $self) = @_;
+      if (grep(/^(conf(ig)?|all)$/i, @$what) && $opts)
+        { print_options($opts, 'current', -1); $ok = 1; }
+      if (grep(/^(argv|all)$/i, @$what))
+        { push(@dumps, \@ARGV);   push(@dnames, '*ARGV'); }
+      if (grep(/^(start\w*|all)$/i, @$what))
+        { push(@dumps, $clargs); push(@dnames, '*startup_args'); }
+      if (grep(/^(self|all)$/i, @$what))
+        { push(@dumps, %$self);   push(@dnames, qw(object *values object *values object *values)); }
+    }
+    if (@dumps) {
+      eval {
+        require Data::Dumper;
+        $Data::Dumper::Quotekeys = 0; $Data::Dumper::Bless = '';
+        $Data::Dumper::Sortkeys = $Data::Dumper::Sparseseen = 1;
+        print("\n". Data::Dumper->Dump(\@dumps, \@dnames) ."\n");
+      };
+      warn "Data::Dumper error:\n\t$@\n\n" if $@;
+    }
+    elsif (!$ok) {
+      warn "Don't know how to show '@$what', sorry.\n\n";
+    }
+  };
+  warn $@ if $@;
+  return 1;
 }
 
 sub version {
@@ -1144,6 +1404,8 @@ sub usage {
 sub deprecated_opt {
   warn "Note: option '". shift() ."' is deprecated and will be ignored.\n";
 }
+
+1;
 
 __END__
 
