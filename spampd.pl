@@ -1427,6 +1427,8 @@ B<spampd> I<[ options ]>
 
 Options:
 
+  --config <filename>       Load options from file(s).
+
   --host <host>[:<port>]    Hostname/IP and optional port to listen on.
   --port <n>                Port to listen on (alternate syntax to above).
   --socket <socketpath>     UNIX socket to listen on.
@@ -1434,6 +1436,7 @@ Options:
   --relayhost <hst>[:<prt>] Host and optional port to relay mail to.
   --relayport <n>           Port to relay to (alternate syntax to above).
   --relaysocket <sockpath>  UNIX socket to relay to.
+
   --children or -c <n>      Number of concurrent scanner processes to run.
   --maxrequests or -r <n>   Maximum requests that each child can process.
   --childtimeout <n>        Time out children after this many seconds.
@@ -1654,6 +1657,7 @@ and deprecated options.  Also be sure to check out the change log.
 =head1 USAGE
 
   spampd [
+    [ --config | --cfg | --config-file | --cfg-file [<filename>] ][...]
 
     [ --host <host>[:<port>]      | --socket <path> --socket-perms <mode> ]
     [ --relayhost <host>[:<port>] | --relaysocket <path>                  ]
@@ -1661,25 +1665,45 @@ and deprecated options.  Also be sure to check out the change log.
     [--children      | -c <n>] [--saconfig <filename>] [--user  | -u <user> ]
     [--maxrequests   | -r <n>] [--satimeout <n>      ] [--group | -g <group>]
     [--childtimeout       <n>] [--dose               ] [--pid   | -p <file> ]
-    [--tagall        | -a    ] [--maxsize   <n>      ] [--[no]detach        ]
-    [--log-rules-hit | -rh   ] [--local-only | -L    ] [--[no]setsid        ]
+    [--tagall        | -a    ] [--maxsize   <n>      ] [--detach            ]
+    [--log-rules-hit | -rh   ] [--local-only | -L    ] [--setsid            ]
     [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
 
-    [ --logfile | -o (syslog|stderr|<filename>) ]...
+    [ --logfile | -o (syslog|stderr|<filename>) ][...]
     [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
     [ --debug   | -d [<area,...>|1|0] ]  [ --logfacility | -lf <name> ]
+    [ --show ( all | (defaults, config, argv, start, self) ) ][...]
   ]
   spampd --version
   spampd [--help | -?] | -?? [txt] | -??? [txt] | [-???? | --man [html|txt]]
 
 Options are case-insensitive. "=" can be used as name/value separator
-instead of space (--name=value). Single or double dash prefix can be used
+instead of space (--name=value). "-" or "--" prefix can be used
 for all options. Shortest unique option name can be used. All options must
-be listed individually (no "bundling" of single-letter options).
+be listed individually (no "bundling"). All boolean options can take an
+optional argument of 1 or 0, or can be negated by adding a "no-" prefix
+in front of the name. An option specified on the command line overrides the
+same option loaded from config file(s).
 
 =head1 OPTIONS
 
+Please be sure to also read the general information about specifying option
+arguments in the L</USAGE> section.
+
 =over 5
+
+=item B<--config> or B<--cfg> or B<--config-file> or B<--cfg-file> I<<filename>> C<(new in v2.60)>
+
+Load options from one or more configuration file(s). This option can be specified
+multiple times. The C<filename> can also be a list of files separated by a C<:>
+(colon). If multiple files specify the same option, the last one loaded
+will take precedence. Also any options specified on the actual command line will
+take precedence (regardless of where they appear relative to the C<--config> option).
+B<--config can only be specified on the command line>, one cannot use it within
+another configuration file.
+
+See L</"CONFIGURATION FILE"> section for more details.
+
 
 =item B<--host=> I<< (<ip>|<hostname>)[:<port>] >>
 
@@ -1689,20 +1713,24 @@ on 127.0.0.1 (localhost) on port 10025.
 B<Important!> You should NOT enable I<spampd> to listen on a
 public interface (IP address) unless you know exactly what you're doing!
 
+
 =item B<--port> I<<n>>
 
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
+
 
 =item B<--socket> I<<socketpath>>
 
 Specifies what UNIX socket I<spampd> listens on. If this is specified,
 --host and --port are ignored.
 
+
 =item B<--socket-perms> I<<mode>>
 
 The file mode for the created UNIX socket (see --socket) in octal
 format, e.g. 700 to specify acces only for the user I<spampd> is run as.
+
 
 =item B<--relayhost> I<< (<ip>|<hostname>)[:<port>] >>
 
@@ -1710,15 +1738,18 @@ Specifies the hostname/IP to which I<spampd> will relay all
 messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
 defaults to 25.
 
+
 =item B<--relayport> I<<n>>
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an
 alternate to using the above --relayhost=ip:port notation.
 
+
 =item B<--relaysocket> I<<socketpath>>
 
 Specifies what UNIX socket spampd will relay to. If this is specified
 --relayhost and --relayport will be ignored.
+
 
 =item B<--user> or B<-u> I<<username>>
 
@@ -1726,6 +1757,7 @@ Specifies what UNIX socket spampd will relay to. If this is specified
 
 Specifies the user and/or group that the proxy will run as. Default is
 I<mail>/I<mail>.
+
 
 =item B<--children> or B<-c> I<<n>>
 
@@ -1741,6 +1773,7 @@ number of concurrent connections to I<spampd> to match this setting (for
 Postfix this is the C<xxxx_destination_concurrency_limit> setting where
 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
 
+
 =item B<--maxrequests> or B<-mr> or B<-r> I<<n>>
 
 I<spampd> works by forking child servers to handle each message. The
@@ -1748,6 +1781,7 @@ B<maxrequests> parameter specifies how many requests will be handled
 before the child exits. Since a child never gives back memory, a large
 message can cause it to become quite bloated; the only way to reclaim
 the memory is for the child to exit. The default is 20.
+
 
 =item B<--childtimeout> I<<n>>
 
@@ -1757,6 +1791,7 @@ This timeout includes time it would take to send the message data, so it should
 not be too short.  Note that it's more likely the origination or destination
 mail servers will timeout first, which is fine.  This is just a "sane" failsafe.
 Default is 360 seconds (6 minutes).
+
 
 =item B<--satimeout> I<<n>>
 
@@ -1771,6 +1806,7 @@ on anyway (w/out spam tagging, obviously).  To fail the message with a temp
 450 error, see the --dose (die-on-sa-errors) option, below.
 Default is 285 seconds.
 
+
 =item B<--pid> or B<-p> I<<filename>>
 
 Specifies a filename where I<spampd> will write its process ID so
@@ -1778,9 +1814,10 @@ that it is easy to kill it later. The directory that will contain this
 file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
+
 =item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<(new in v2.60)>
 
-Logging method to use. May be one of:
+Logging method to use. May be one or more of:
 
 =over 5
 
@@ -1801,12 +1838,19 @@ or even C</dev/null> to disable logging entirely.
 
 =back
 
+B<This option may be specified multiple times.> You may also specify multiple
+destination by separating them with a ":" (color): C<--logfile stderr:/var/log/spampd.log>
+
+Simultaneous logging to C<syslog>, C<stderr>, and one C<filename> is possible.
+At this time only one log file can be used at a time (if several are specified
+then the last one takes precedence).
+
 
 =item B<--logsock> or B<-ls> I<<type>> C<(new in v2.20)>  C<(updated in v2.60)>
 
 Syslog socket to use if C<--logfile> is set to I<syslog>.
 
-C<(since v2.60)>
+C<Since v2.60:>
 
 The I<type> can be any of the socket types or logging mechanisms as accepted by
 the subroutine Sys::Syslog::setlogsock(). Depending on the version of Sys::Syslog and
@@ -1828,26 +1872,31 @@ The default was C<unix>. To preserve backwards-compatibility, the default on HP-
 
 For more information please consult the L<Sys::Syslog|https://metacpan.org/pod/Sys::Syslog> documentation.
 
+
 =item B<--logident> or B<-li> I<<name>> C<(new in v2.60)>
 
 Syslog identity name to use. This may also be used in log files written directly (w/out syslog). Default is C<spampd>.
+
 
 =item B<--logfacility> or B<--lf> I<<name>> C<(new in v2.60)>
 
 Syslog facility name to use. This is typically the name of the system-wide log file to be written to. Default is C<mail>.
 
-=item B<--[no]detach> C<(new in v2.20)>
+
+=item B<--[no]detach> I<[0|1]> C<(new in v2.20)>
 
 By default I<spampd> will detach from the console and fork into the
 background ("daemonize"). Use C<--nodetach> to override this.
 This can be useful for running under control of some daemon
 management tools or testing from a command line.
 
-=item B<--[no]setsid> C<(new in v2.51)>
+
+=item B<--[no]setsid> I<[0|1]> C<(new in v2.51)>
 
 If C<--setsid> is specified then I<spampd> will fork after the bind method to release
 itself from the command line and then run the POSIX::setsid() command to truly
 daemonize. Only used if C<--nodetach> isn't specified.
+
 
 =item B<--maxsize> I<<n>>
 
@@ -1855,7 +1904,8 @@ The maximum message size to send to SpamAssassin, in KBytes. By default messages
 over 64KB are not scanned at all, and an appropriate message is logged
 indicating this.  The size includes headers and attachments (if any).
 
-=item B<--dose>
+
+=item B<--dose> I<[0|1]>
 
 Acronym for (d)ie (o)n (s)pamAssassin (e)rrors.  By default if I<spampd>
 encounters a problem with processing the message through Spam Assassin (timeout
@@ -1864,7 +1914,8 @@ you specify this option however, the mail is instead rejected with a temporary
 error (code 450, which means the origination server should keep retrying to send
 it).  See the related --satimeout option, above.
 
-=item B<--tagall> or B<-a>
+
+=item B<--tagall> or B<-a> I<[0|1]>
 
 Tells I<spampd> to have SpamAssassin add headers to all scanned mail,
 not just spam.  By default I<spampd> will only rewrite messages which
@@ -1873,12 +1924,14 @@ for this option to work as of SA-2.50, the I<always_add_report> and/or
 I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be
 set to 1/true.
 
-=item B<--log-rules-hit> or B<--rh>
+
+=item B<--log-rules-hit> or B<--rh> I<[0|1]>
 
 Logs the names of each SpamAssassin rule which matched the message being
 processed.  This list is returned by SA.
 
-=item B<--set-envelope-headers> or B<--seh> C<(new in v2.30)>
+
+=item B<--set-envelope-headers> or B<--seh> I<[0|1]> C<(new in v2.30)>
 
 Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
 being scanned before it is passed to SpamAssassin. The idea is to help SA
@@ -1891,11 +1944,13 @@ I<NOTE>: Even though I<spampd> tries to prevent this leakage by removing the
 X-Envelope-To header after scanning, SpamAssassin itself might add headers
 that report recipient(s) listed in X-Envelope-To.
 
-=item B<--set-envelope-from> or B<--sef> C<(new in v2.30)>
+
+=item B<--set-envelope-from> or B<--sef> I<[0|1]> C<(new in v2.30)>
 
 Same as above option but only enables the addition of X-Envelope-From header.
 For those that don't feel comfortable with the possible information exposure
 of X-Envelope-To.  The above option overrides this one.
+
 
 =item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
 
@@ -1911,11 +1966,13 @@ B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
 a different mechanism (such as SQLBasedAddrList), the I<spampd> code will
 need to be modified in 2 instances (search the source for DBBasedAddrList).
 
-=item B<--local-only> or B<-L>
+
+=item B<--local-only> or B<-L> I<[0|1]>
 
 Turn off all SA network-based tests (DNS, Razor, etc).
 
-=item B<--homedir> I<<directory>>
+
+=item B<--homedir> I<<directory>> C<(new in v2.40)>
 
 Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
@@ -1923,13 +1980,15 @@ written to here.
 Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
 place your bayes_path SA config setting points to (if any).  Make sure this
 directory is accessible to the user that spampd is running as (default: mail).
-New in v2.40. Thanks to Alexander Wirt for this fix.
+Thanks to Alexander Wirt for this fix.
+
 
 =item B<--saconfig> I<<filename>>
 
 Use the specified file for SpamAssassin configuration options in addition to the
 default local.cf file.  Any options specified here will override the same
 option from local.cf.  Default is to not use any additional configuration file.
+
 
 =item B<--debug> or B<-d> I<< [<area,...>|1|0] >> C<(updated in v2.60)>
 
@@ -1938,7 +1997,7 @@ Turns on SpamAssassin debug messages which print to the system mail log
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 
-C<(new in v2.60)>
+C<New in v2.60:>
 
 Setting the value to 1 (one) is the same as using no parameter (eg. simply I<-d>).
 The value of 0 (zero) disables debug logging (this is the default).
@@ -1967,15 +2026,58 @@ L<SpamAssassin Wiki::DebugChannels|http://wiki.apache.org/spamassassin/DebugChan
 
 L<Mail::SpamAssassin::Logger::add_facilities()|https://spamassassin.apache.org/doc/Mail_SpamAssassin_Logger.html#METHODS>
 
+
+=item B<--show> I<<thing>>[,I<<thing>>[,...]] C<(new in v2.60)>
+
+Meant primarily for debugging configuration settings (or code), this will print some information
+to the console and then exit.
+
+I<<thing>> may be one or more of:
+
+=over 4
+
+=item *
+
+C<defaults>: Show default values for all options, in a format suitable for a config file.
+
+=item *
+
+C<config>: Shows option values after processing all given command-line arguments, including
+anything loaded from config file(s).
+
+=item *
+
+C<start>: Shows the final configuration arguments after processing any config file(s).
+
+=item *
+
+C<argv>: Shows anything remaining on command line (@ARGV) after processing all known arguments
+(this will be passed onto Net::Server).
+
+=item *
+
+C<self>: Dumps the whole SpamPD object, including all settings. Trés geek.
+
+=item *
+
+C<all>: Prints all of the above.
+
+=back
+
+Multiple C<thing>s may be specified by using the I<--show> option multiple times, or
+separating the items with a comma: C<--show config,start,argv>.
+
+
 =item B<--version> C<(new in v2.52)>
 
 Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
+
 =item B<--help> or B<-h> or B<-?> I<[txt]>
 
-=item B<-hh> or B<-??> I<[txt]>
+=item B<--hh> or B<-??> I<[txt]>
 
-=item B<-hhh> or B<-???> I<[txt]>
+=item B<--hhh> or B<-???> I<[txt]>
 
 =item B<--man> or B<-hhhh> or B<-????> I<[html|txt]>
 
@@ -1995,6 +2097,7 @@ module I<HTML::Display> is used to (try to) open a browser.
 
 =back
 
+
 =head2 Deprecated Options
 
 The following options are no longer used but still accepted for backwards
@@ -2013,6 +2116,58 @@ compatibility with prevoius I<spampd> versions:
 =item  B<--hostname>
 
 =back
+
+=head1 CONFIGURATION FILE
+
+I<spampd> allows for the use of a configuration file to read in server parameters.
+The format of this conf file is simple key value pairs. Comments (starting with # or ;)
+and blank lines are ignored. The option names are exactly as they appear above.
+They can be listed with or w/out the "-"/"--" prefixes.
+Key/value separator can be one or more of space, tab, or "=" (equal) sign.
+
+Multiple configuration files can be loaded, with the latter ones being able to
+override options loaded earlier. Any options specified on the command line will
+take precedence over options from file(s). You may also provide "passthrough"
+options directly to Net::Server by putting them after a "--" on a line by itself
+(this is just like using the lonesome "--" on a command line.)
+
+Note that one cannot use the C<--config> option to load a file from within
+another file. B<A config file can only be specified on the command line.>
+
+Use the C<< spampd --show defaults > spampd.config >> command to generate a sample
+configuration file showing all default values. The example below demonstrates various
+valid syntax for the file.
+
+  # Sample configuration file for SpamPD.
+
+  # Double dashes
+  --user    spampd
+
+  # Single dash and = separator with spaces
+  -pid = /var/run/spampd/spampd.pid
+
+  # No dashes required, equals separator no spaces
+  homedir=/var/cache/spampd
+
+  # No dashes, space separator
+  host  127.0.0.1
+
+  # Disabled option (after comment character)
+  #port  10025
+
+  # Boolean values can be set/unset a number of ways:
+  tagall      1
+  local-only  0
+  set-envelope-from
+  no-log-rules-hit
+
+  # Passthrough arguments for Net::Server[::PreForkSimple] could go here.
+  # Be sure to also uncomment the "--" if using any.
+  # --
+  # cidr_allow      127.0.0.1/32
+
+This feature was added in C<(v2.60)>.
+
 
 =head1 SIGNALS
 
@@ -2038,6 +2193,12 @@ the number of children by one, and TTOU signal will decrease it by one.
 
 Sending INT or TERM signal to the master process will kill all the
 children immediately and shut down the daemon.
+
+=item QUIT
+
+Sending QUIT signal to the master process will perform a graceful shutdown,
+waiting for all children to finish processing any current transactions and
+then shutting down the daemon.
 
 =back
 
