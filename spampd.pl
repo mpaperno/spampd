@@ -1946,21 +1946,6 @@ For those that don't feel comfortable with the possible information exposure
 of X-Envelope-To.  The above option overrides this one.
 
 
-=item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
-
-This option is no longer relevant with SA version 3.0 and above, which
-controls auto whitelist use via config file settings. Do not use it unless
-you must use an older SA version. An error will be generated if attempting
-to use this option with SA 3.0 or above.
-
-For SA version < 3.0, turns on the SpamAssassin global whitelist feature.
-See the SA docs. Note that per-user whitelists are not available.
-
-B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
-a different mechanism (such as SQLBasedAddrList), the I<spampd> code will
-need to be modified in 2 instances (search the source for DBBasedAddrList).
-
-
 =item B<--local-only> or B<-L> I<[0|1]>
 
 Turn off all SA network-based tests (DNS, Razor, etc).
@@ -2091,6 +2076,33 @@ module I<HTML::Display> is used to (try to) open a browser.
 
 =back
 
+=head2 Other Net::Server Options
+
+I<Net::Server> supports some other options which I<spampd> doesn't accept directly.
+For example there are access control options, an option to run chrooted, and a few more (see below).
+Such options can be passed through to I<Net::Server> by specifying them at the end
+of the I<spampd> command line (or in a configuration file) following two dashes
+C< -- > by themselves (this is a failry typicaly convention for passing options onto
+another program). As an example, it may look something like this:
+
+  spampd --host 10.0.0.1 -port 10025 -- --cidr_allow 10.0.0.0/24
+
+The C<--cidr_allow> after the C< -- > is passed onto I<Net::Server>. If the C< -- > were
+not there, you would get an error from I<spampd> about an unknown option.
+
+To specify I<Net::Server> options in a configuration file, place them after two
+dashes (C<-->) on a line by themselves. See L</"CONFIGURATION FILE"> for an example.
+
+This only makes sense with the few options not directly controlled by/through I<spampd>.
+As of I<Net::Server> and I<Net::Server::PreForkSimple> v2.009 the list is:
+
+  reverse_lookups, allow, deny, cidr_allow, cidr_deny, chroot, ipv, conf_file,
+  serialize, lock_file, check_for_dead, max_dequeue, check_for_dequeue
+
+See the L<Net::Server(3)|https://metacpan.org/pod/distribution/Net-Server/lib/Net/Server.pod#DEFAULT-ARGUMENTS-FOR-Net::Server>
+and L<Net::Server::PreForkSimple(3)|https://metacpan.org/pod/Net::Server::PreForkSimple#COMMAND-LINE-ARGUMENTS>
+documentation for details.
+
 
 =head2 Deprecated Options
 
@@ -2109,7 +2121,22 @@ compatibility with prevoius I<spampd> versions:
 
 =item  B<--hostname>
 
+=item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
+
+This option is no longer relevant with SA version 3.0 and above, which
+controls auto whitelist use via config file settings. Do not use it unless
+you must use an older SA version. An error will be generated if attempting
+to use this option with SA 3.0 or above.
+
+For SA version < 3.0, turns on the SpamAssassin global whitelist feature.
+See the SA docs. Note that per-user whitelists are not available.
+
+B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
+a different mechanism (such as SQLBasedAddrList), the I<spampd> code will
+need to be modified in 2 instances (search the source for DBBasedAddrList).
+
 =back
+
 
 =head1 CONFIGURATION FILE
 
@@ -2123,7 +2150,7 @@ Multiple configuration files can be loaded, with the latter ones being able to
 override options loaded earlier. Any options specified on the command line will
 take precedence over options from file(s). You may also provide "passthrough"
 options directly to Net::Server by putting them after a "--" on a line by itself
-(this is just like using the lonesome "--" on a command line.)
+(this is just like using the lonesome "--" on a command line; see L</"Other Net::Server Options">).
 
 Note that one cannot use the C<--config> option to load a file from within
 another file. B<A config file can only be specified on the command line.>
