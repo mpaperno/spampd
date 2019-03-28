@@ -399,8 +399,8 @@ BEGIN {
 
 use constant {
   # Logging type constants: low byte for destination(s), high byte for logger type.
-  LOG_NONE => 0, LOG_SYSLOG => 0x01, LOG_FILE => 0x02, LOG_STDERR => 0x04,
-  LOGGER_DEFAULT => 0, LOGGER_SA => 0x0100, LOGGER_L4P => 0x0200,
+  LOG_NONE => 0, LOG_SYSLOG => 0x01, LOG_FILE => 0x02, LOG_STDERR => 0x04, LOG_TYPE_MASK => 0xFF,
+  LOGGER_DEFAULT => 0, LOGGER_SA => 0x0100, LOGGER_L4P => 0x0200, LOGGER_TYPE_MASK => 0xFF00,
   # Map Net::Server logging levels to SpamAssassin::Logger level names.
   SA_LOG_LEVELS => {0 => 'error', 1 => 'warn', 2 => 'notice', 3 => 'info', 4 => 'dbg'},
 };
@@ -489,8 +489,8 @@ sub init {
   #   command line, including any configuration files, which would be re-read upon a HUP. commandline() is in Net::Server.
   $self->commandline([untaint_var($0), @{untaint_var(\@ARGV)}]);
 
-  # SA v3.1.0 changed debug logging to be more granular and introduced Logger module which we can use.
-  my $use_logger = eval {
+  # Set the logger type. SA v3.1.0 changed debug logging to be more granular and introduced Logger module which we can use.
+  $spd_p->{logtype} |= eval {
     require Mail::SpamAssassin::Logger;
     LOGGER_SA;
   } or LOGGER_DEFAULT;
@@ -515,7 +515,7 @@ sub init {
 
   # Now (finally) process all the actual options passed on @ARGV (including anything from config files).
   # Options on the actual command line will override anything loaded from the file(s).
-  $self->handle_main_opts($use_logger, $is_reloading);
+  $self->handle_main_opts();
 
   # If debug output requested, do it now, before logging is set up, and exit.
   show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args, \%$self) && exit(0) if $spd_p->{show_dbg};
@@ -578,9 +578,9 @@ sub handle_help_opts {
 
 # Main command-line options mapping; this is for Getopt::Long::GetOptions and also to generate config dumps.
 sub options_map {
-  my ($self) = @_;
+  my $self = $_[0];
   my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
-  $spd_p->{logspec} = logtype2file($spd_p->{logtype}, $srv_p->{log_file}, ':'); # set a valid default for print_options()
+  $spd_p->{logspec} = logtype2logfile($spd_p->{logtype}, $srv_p->{log_file}); # set a valid default for print_options()
 
   # To support setting boolean options with "--opt", "--opt=1|0", as well as the "no-" prefix,
   #   we make them accept an optional integer and add the "no" variants manually. Because Getopt::Long doesn't support that :(
@@ -637,12 +637,13 @@ sub options_map {
 }
 
 sub handle_main_opts {
-  my ($self, $use_logger, $is_reloading) = @_;
+  my $self = shift;
+  my %options = $_[0] || $self->options_map();
   my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
 
   # Reconfigure GoL for stricter parsing and check for all other options on ARGV, including anything parsed from config file(s).
   Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
-  GetOptions($self->options_map()) or ($is_reloading ? $self->fatal("Could not parse command line!\n") : usage(1));
+  GetOptions(%options) or ($self->is_reloading ? $self->fatal("Could not parse command line!\n") : usage(1));
 
   # Validation
 
@@ -652,6 +653,12 @@ sub handle_main_opts {
   if ($self->{spampd}->{sa_awl} && $spd_p->{sa_version} >= 3)
     { die "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead.\n"; }
 
+  # set up logging specs based on options ($logspec is only an array if --logfile option(s) existed)
+  # in theory this could die if a log file path looks "suspicious" to untaint_path()
+  if (ref($spd_p->{logspec}) eq 'ARRAY') {
+    ($spd_p->{logtype}, $srv_p->{log_file}) = logfile2logtype($spd_p->{logspec}, $spd_p->{logtype});
+  }
+
   # validate syslog socket option
   if ($spd_p->{logtype} & LOG_SYSLOG) {
     # in theory this check could be made more adaptive based on OS or something...
@@ -659,7 +666,7 @@ sub handle_main_opts {
     if ($srv_p->{syslog_logsock} && $srv_p->{syslog_logsock} !~ /^($allowed_syslog_socks)$/) {
       die "--logsock parameter not recognized, must be one of ($allowed_syslog_socks).\n";
     }
-    elsif (!$srv_p->{syslog_logsock} && $use_logger != LOGGER_SA) {
+    elsif (!$srv_p->{syslog_logsock} && !($spd_p->{logtype} & LOGGER_SA)) {
       # log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
       # note that SA::Logger has own fallback for cases where the default syslog selection fails.
       eval {
@@ -685,27 +692,6 @@ sub handle_main_opts {
 
   # /Validation
 
-  # set up logging specs based on options ($logspec is only an array if --logfile option(s) existed)
-  if (ref($spd_p->{logspec}) eq 'ARRAY') {
-    # Handle ":" record separator and trim values.
-    trimmed(@{$spd_p->{logspec}} = split(/:/, join(':', @{$spd_p->{logspec}})));
-    $spd_p->{logtype} = LOG_NONE;  # reset
-    for (@{$spd_p->{logspec}}) {
-      if ($_ eq 'syslog') {
-        $spd_p->{logtype} |= LOG_SYSLOG;
-      }
-      elsif ($_ eq 'stderr') {
-        $spd_p->{logtype} |= LOG_STDERR;
-      }
-      elsif ($_ = untaint_path($_)) {
-        $spd_p->{logtype} |= LOG_FILE;
-        $srv_p->{log_file} = $_;
-      }
-    }
-  }
-  # be sure to add the logger type
-  $spd_p->{logtype} |= $use_logger;
-
   if ($spd_p->{socket}) {
     # Net::Server wants UNIX sockets passed via port option.
     $srv_p->{port} = join('|', $spd_p->{socket}, 'unix');
@@ -723,7 +709,7 @@ sub handle_main_opts {
     # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
     # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
     # In case of old SA version, just set the debug flag to true.
-    if ($use_logger == LOGGER_SA) {
+    if ($spd_p->{logtype} & LOGGER_SA) {
       my ($ident, $debug) = ($srv_p->{syslog_ident}, \$sa_p->{debug});
       ${$debug} = 'all' if (!${$debug} || ${$debug} eq '1');
       ${$debug} .= ','.$ident if (${$debug} !~ /(?:all|(?:\A|,)$ident)/i);
@@ -1177,15 +1163,41 @@ sub read_conf_file {
   return (\@args, \@ptargs);
 }
 
+# Converts a string or array of --logfile options to a log type bitfield of LOG_* constants.
+# Returns the log type and either an actual logfile name, or undef if there wasn't one.
+sub logfile2logtype {
+  my ($spec, $type, $sep) = @_;
+  $spec = @{$spec} if !ref($spec);
+  $sep = ":" if !defined($sep);
+  $type &= ~LOG_TYPE_MASK;  # reset the low byte containing LOG_ constant
+  my $file;
+  # Handle ":" record separator and trim values.
+  trimmed(@$spec = split(qr($sep), join($sep, @$spec)));
+  for (@$spec) {
+    if ($_ eq 'syslog') {
+      $type |= LOG_SYSLOG;
+    }
+    elsif ($_ eq 'stderr') {
+      $type |= LOG_STDERR;
+    }
+    elsif ($_ = untaint_path($_)) {
+      $type |= LOG_FILE;
+      $file = $_;
+    }
+  }
+  return ($type, $file);
+}
+
 # Converts a bitfield of logging type, plus optional file name, to an array/list
 # of values which would be suitable for the commandline --logfile (-o) option.
-sub logtype2file {
+sub logtype2logfile {
   my ($type, $file, $sep) = @_;
   my @ret;
   push(@ret, 'syslog') if ($type & LOG_SYSLOG);
   push(@ret, 'stderr') if ($type & LOG_STDERR);
   push(@ret, $file)    if ($type & LOG_FILE) && $file;
-  return wantarray ? @ret : join($sep || ', ', @ret);
+  my $q = @ret > 1 ? '"' : '';
+  return wantarray ? @ret : $q.join($sep || ' : ', @ret).$q;
 }
 
 # Untaint a scalar (or ref to one) or an array ref (most code "borrowed" from spamd)
@@ -1225,6 +1237,9 @@ sub untaint_path {
 
 # Trims a string or array of strings. Modifies whatever was passed in!
 sub trimmed { s{^\s+|\s+$}{}g foreach @_; };
+
+# returns true if server is being restarted with a SIGHUP.
+sub is_reloading { return !!$ENV{'BOUND_SOCKETS'}; };
 
 # =item print_options(\%options [, type = "default"] [, exit = -1])
 # Prints out names and values from a hash of option {name => \$value} pairs, such as might
