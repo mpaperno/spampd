@@ -90,7 +90,7 @@ use IO::File ();
 #
 # Changed by MP: This now emulates Net::SMTP::Server::Client for use with
 #   Net::Server which passes an already open socket.
-# The #socket listen on must be specified. If this call
+# The $socket to listen on must be specified. If this call
 # succeeds, it returns a server structure. If it fails it dies, so
 # if you want anything other than an exit with an explanatory error
 # message, wrap the constructor call in an eval block and pull the
@@ -101,18 +101,14 @@ use IO::File ();
 
 sub new {
   my ($this, $socket) = @_;
-
-  my $class = ref($this) || $this;
-  my $self = {};
-  $self->{sock} = $socket;
-
-  bless($self, $class);
-
-  die "$0: socket bind failure: $!\n" unless defined $self->{sock};
-  $self->{state} = 'started';
-  $self->{proto} = 'unknown';
-  $self->{helo} = 'unknown.host';
-  return $self;
+  my $class = ref($this) || $this || die "Missing class";
+  die "Invalid $socket argument in ".__PACKAGE__."->new()" unless defined $socket;
+  return bless {
+    sock  => $socket,
+    state => 'started',
+    proto => 'unknown',
+    helo  => 'unknown.host',
+  }, $class;
 }
 
 # =item chat;
@@ -123,7 +119,7 @@ sub new {
 # 'mail' (case insensitive), then the attribute 'from' has been filled
 # in, and may be checked; if the return value begins with 'rcpt' then
 # both from and to have been been filled in with scalars, and should
-# be checked, then either 'ok' or 'fail' should be called to accept
+# be checked, then C<reply("(2|5)50 [OK|Error]")> should be called to accept
 # or reject the given sender/recipient pair. If the return value is
 # 'data', then the attributes from and to are populated; in this case,
 # the 'to' attribute is a reference to an anonymous array containing
@@ -198,43 +194,27 @@ sub chat {
         return $self->{state} = '.';
       }
       s/^\.\./\./;
-      $self->{data}->print($_) or die "$0: write error saving data\n";
+      $self->{data}->print($_) or die "Server error while saving data: $!\n";
     }
     return 0;
   }
   return $self->{state};
 }
 
-# =item ok([message]);
+# =item reply([message]);
 #
-# Approves of the data given to date, either the recipient or the
-# data, in the context of the sender [and, for data, recipients]
-# already given and available as attributes. If a message is given, it
-# will be sent instead of the internal default.
+# Send a response back to the connected peer. Default message is a confirmation
+# response: "250 ok."
 #
 # =cut
 
-sub ok {
+sub reply {
   my ($self, @msg) = @_;
   @msg = ("250 ok.") unless @msg;
-  $self->_print("@msg\r\n") or
-    die "$0: write error acknowledging $self->{state}: $!\n";
-}
-
-# =item fail([message]);
-#
-# Rejects the current info; if processing from, rejects the sender; if
-# processing 'to', rejects the current recipient; if processing data,
-# rejects the entire message. If a message is specified it means the
-# exact same thing as "ok" --- simply send that message to the sender.
-#
-# =cut
-
-sub fail {
-  my ($self, @msg) = @_;
-  @msg = ("550 no.") unless @msg;
-  $self->_print("@msg\r\n") or
-    die "$0: write error acknowledging $self->{state}: $!\n";
+  chomp(@msg);
+  $self->{sock}->print("@msg\r\n") or
+    die "Server error while sending response '@msg' (state = $self->{state}): $!\n";
+  # $self->{debug}->print(@msg) if defined $self->{debug};
 }
 
 # utility functions
@@ -247,12 +227,6 @@ sub _getline {
     $self->{debug}->print($tmp) if ($tmp);
   }
   return $tmp;
-}
-
-sub _print {
-  my ($self, @msg) = @_;
-  $self->{debug}->print(@msg) if defined $self->{debug};
-  $self->{sock}->print(@msg);
 }
 
 1;
@@ -305,7 +279,7 @@ sub new {
   my ($this, @opts) = @_;
   my $class = ref($this) || $this;
   my $self = bless {timeout => 300, @opts}, $class;
-  if (defined $self->{unix_socket}) {
+  if ($self->{unix_socket}) {
     require IO::Socket::UNIX;
     $self->{sock} = IO::Socket::UNIX->new(
       Peer    => $self->{unix_socket},
@@ -323,7 +297,7 @@ sub new {
       Type     => IO::Socket::IP->SOCK_STREAM,
     );
   }
-  die "$0: socket connect failure: $!\n" unless defined $self->{sock};
+  die "Client connection failure to ". ($self->{unix_socket} || $self->{interface}) .": $!\n" unless defined $self->{sock};
   return $self;
 }
 
@@ -358,7 +332,8 @@ sub hear {
 sub say {
   my ($self, @msg) = @_;
   return unless @msg;
-  $self->{sock}->print("@msg", "\r\n") or die "$0: write error: $!";
+  chomp(@msg);
+  $self->_print("@msg", "\r\n");
 }
 
 # =item yammer(FILEHANDLE)
@@ -383,10 +358,15 @@ sub yammer {
   $self->{sock}->autoflush(0);  # use fewer writes (thx to Sam Horrocks for the tip)
   while (<$fh>) {
     s/^\./../;
-    $self->{sock}->print($_) or die "$0: write error: $!\n";
+    $self->_print($_);
   }
   $self->{sock}->autoflush(1);  # restore unbuffered socket operation
-  $self->{sock}->print(".\r\n") or die "$0: write error: $!\n";
+  $self->_print(".\r\n");
+}
+
+sub _print {
+  return unless @_ > 1;
+  shift()->{sock}->print(@_) or die "Client socket write error: $!\n";
 }
 
 1;
@@ -1004,8 +984,7 @@ sub process_request {
 
     # pass on initial client response
     # $client->hear can handle multiline responses so no need to loop
-    $smtp_server->ok($client->hear)
-      or die "Error in initial server->ok(client->hear): $!";
+    $smtp_server->reply($client->hear);
 
     $self->dbg("smtp_server state: '" . $smtp_server->{state} . "'");
 
@@ -1016,8 +995,7 @@ sub process_request {
 
       # until end of DATA is sent, just pass the commands on transparently
       if ($what ne '.') {
-        $client->say($what)
-          or die "Failure in client->say(what): $!";
+        $client->say($what);
       }
       # but once the data is sent now we want to process it
       else {
@@ -1030,11 +1008,10 @@ sub process_request {
           $smtp_server->{data}->seek(0, 0)
             or die "Can't rewind mail file: $!";
           # now send the data on through the client
-          $client->yammer($smtp_server->{data})
-            or die "Failure in client->yammer(smtp_server->{data}): $!";
+          $client->yammer($smtp_server->{data});
         }
         else {
-          $smtp_server->ok("450 Temporary failure processing message, please try again later");
+          $smtp_server->reply("450 Temporary failure processing message, please try again later");
           last;
         }
 
@@ -1048,8 +1025,7 @@ sub process_request {
       # pass on whatever the relayhost said in response
       # $client->hear can handle multiline responses so no need to loop
       my $destresp = $client->hear;
-      $smtp_server->ok($destresp)
-        or die "Error in server->ok(client->hear): $!";
+      $smtp_server->reply($destresp);
 
       $self->dbg("Destination response: '" . $destresp . "'");
 
@@ -1069,8 +1045,7 @@ sub process_request {
         if ($smtp_server->{state} eq '.') {
           while (--$rcpt_ok) {
             $destresp = $client->hear;
-            $smtp_server->ok($destresp)
-              or die "Error in server->ok(client->hear): $!";
+            $smtp_server->reply($destresp);
             $self->dbg("Destination response: '" . $destresp . "'");
           }
         }
@@ -1083,9 +1058,9 @@ sub process_request {
 
     # close connections
     $client->{sock}->close
-      or die "Couldn't close client->{sock}: $!";
+      or die "Couldn't close Client socket: $!";
     $smtp_server->{sock}->close
-      or die "Couldn't close smtp_server->{sock}: $!";
+      or die "Couldn't close Server socket: $!";
 
     $self->dbg("Closed connections");
 
