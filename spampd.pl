@@ -473,7 +473,6 @@ sub new {
 sub init {
   my $self = shift;
   my ($spd_p, $sa_p) = ($self->{spampd}, $self->{assassin});
-  my $is_reloading = !!$ENV{'BOUND_SOCKETS'};
 
   # Clean up environment.
   delete @ENV{qw(IFS CDPATH ENV BASH_ENV HOME)};
@@ -495,12 +494,9 @@ sub init {
     LOGGER_SA;
   } or LOGGER_DEFAULT;
 
-  # We actually call Getopt::Long::GetOptions three (!) times. First time is to check for presence of config file option(s).
+  # We actually call Getopt::Long::GetOptions twice. First time is to check for presence of config file option(s).
   # If we get any, then we parse the file(s) into @ARGV, in front of any existing @ARGV options (so command-line overrides).
-  $self->handle_cfg_file_opts();
-
-  # Run GetOptions a 2nd time to check for help/usage/version/debug requests, but don't bother if we're HUPping. We may not return from here.
-  $self->handle_help_opts() if !$is_reloading;
+  $self->handle_initial_opts();
 
   # Handle "--show defaults" debugging request here (while we still know them).
   if ($spd_p->{show_dbg} && grep(/^(defaults?|all)$/i, @{$spd_p->{show_dbg}})) {
@@ -523,7 +519,7 @@ sub init {
   # Configure logging.
   $self->setup_logging();
 
-  $self->dbg(__PACKAGE__." v$VERSION ". ($is_reloading ? "reloading": "starting") ." with: @startup_args \n");
+  $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
 
   # Redirect all warnings to logger
   $SIG{__WARN__} = sub { $self->log(1, $_[0]); };
@@ -539,39 +535,51 @@ sub init {
 
   $sa_p->compile_now(!!$sa_p->{userprefs_filename});
 
+  # clean up a bit
+  delete $spd_p->{config_files};
+  delete $spd_p->{logspec};
+  delete $spd_p->{show_dbg};
+
   return $self;
 }
 
-sub handle_cfg_file_opts {
+sub initial_options_map {
   my $self = shift;
-  my @config_files;
-  # Configure Getopt::Long to pass through any unknown options.
-  Getopt::Long::Configure(qw(ignore_case no_permute no_auto_abbrev no_require_order pass_through));
-  # Check for config file option(s) only.
-  GetOptions('conf|config|cfg|conf-file|config-file|cfg-file=s' => \@config_files);
-  # Handle config files. Note that options on the actual command line will override anything loaded from the file(s).
-  if (@config_files) {
-    # files could be passed as a list separated by ":"
-    trimmed(@config_files = split(/:/, join(':', @config_files)));
-    $self->log(2, "Loading config from file(s): @config_files \n");
-    read_args_from_file(\@config_files, \@ARGV);
+  my $spd_p = $self->{spampd};
+  my %options = (
+    'conf|config|cfg|conf-file|config-file|cfg-file=s@' => \$spd_p->{config_files},
+  );
+  # Also a good place to check for help/version/show option(s), but not if we're HUPping.
+  # These all cause an exit(0) (--show is processed later but still exits).
+  if (!$self->is_reloading()) {
+    %options = (
+      %options,
+      'show=s@'         => \$spd_p->{show_dbg},
+      'help|h|?:s'      => sub { usage(0, 1, $_[1]); },
+      'hh|??:s'         => sub { usage(0, 2, $_[1]); },
+      'hhh|???:s'       => sub { usage(0, 3, $_[1]); },
+      'hhhh|????|man:s' => sub { usage(0, 4, $_[1]); },
+      'version|vers'    => \&version,
+    );
   }
+  return %options;
 }
 
-sub handle_help_opts {
+sub handle_initial_opts {
   my $self = shift;
+  my %options = $_[0] || $self->initial_options_map();
   my $spd_p = $self->{spampd};
   # Configure Getopt::Long to pass through any unknown options.
   Getopt::Long::Configure(qw(ignore_case no_permute no_auto_abbrev no_require_order pass_through));
-  # Check for help/version/show option(s) only. These all cause an exit(0), except --show which is processed later.
-  GetOptions(
-    'show=s@'         => \$spd_p->{show_dbg},
-    'help|h|?:s'      => sub { usage(0, 1, $_[1]); },
-    'hh|??:s'         => sub { usage(0, 2, $_[1]); },
-    'hhh|???:s'       => sub { usage(0, 3, $_[1]); },
-    'hhhh|????|man:s' => sub { usage(0, 4, $_[1]); },
-    'version'         => \&version,
-  );
+  # Check for config file option(s) only.
+  GetOptions(%options);
+  # Handle config files. Note that options on the actual command line will override anything loaded from the file(s).
+  if (defined($spd_p->{config_files})) {
+    # files could be passed as a list separated by ":"
+    trimmed(@{$spd_p->{config_files}} = split(/:/, join(':', @{$spd_p->{config_files}})));
+    $self->log(2, "Loading config from file(s): @{$spd_p->{config_files}} \n");
+    read_args_from_file(\@{$spd_p->{config_files}}, \@ARGV);
+  }
   # "--show" could be a CSV list
   trimmed(@{$spd_p->{show_dbg}} = split(/,/, join(',', @{$spd_p->{show_dbg}}))) if defined($spd_p->{show_dbg});
 }
@@ -764,7 +772,6 @@ sub setup_logging {
     }
   }
 }
-
 
 ##################   SERVER METHODS   ######################
 
