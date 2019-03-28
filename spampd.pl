@@ -689,6 +689,16 @@ sub handle_main_opts {
     }
   }
 
+  # Validate that required modules for relay server exist (better now than later).
+  if ($spd_p->{relaysocket}) {
+    eval { require IO::Socket::UNIX; }
+    or die "Error loading IO::Socket::UNIX module, required for --relaysocket option.\n\t$@ \n";
+  }
+  else {
+    eval { require IO::Socket::IP; }
+    or die "Error loading IO::IP::UNIX module, required for --relayhost option.\n\t$@ \n";
+  }
+
   # These paths are already untainted but do a more careful check JIC.
   for ($spd_p->{socket}, $spd_p->{relaysocket}, $srv_p->{pid_file}, $sa_p->{userprefs_filename})
     { $_ = untaint_path($_); }
@@ -716,20 +726,15 @@ sub handle_main_opts {
   # be sure to add the logger type
   $spd_p->{logtype} |= $use_logger;
 
-  # Net::Server wants UNIX sockets passed via port too. This part decides what we want to pass.
   if ($spd_p->{socket}) {
+    # Net::Server wants UNIX sockets passed via port option.
     $srv_p->{port} = join('|', $spd_p->{socket}, 'unix');
   }
-  else {
-    my @tmp = split(/:/, $srv_p->{host});
+  elsif ($srv_p->{host}) {
+    # Set IP host/port if they're passed together. A port as part of the host option wins over port option.
+    my @tmp = split(/:(\d+)$/, $srv_p->{host});  # this split should handle IPv6 addresses also.
     $srv_p->{host} = $tmp[0];
     $srv_p->{port} = $tmp[1] if $tmp[1];
-  }
-  # Set IP relay host/port if they're passed together, only if not using a socket.
-  if (!$spd_p->{relaysocket}) {
-    my @tmp = split(/:/, $spd_p->{relayhost});
-    $spd_p->{relayhost} = $tmp[0];
-    $spd_p->{relayport} = $tmp[1] if $tmp[1];
   }
 
   # Configure debugging
@@ -1705,10 +1710,16 @@ another configuration file.
 See L</"CONFIGURATION FILE"> section for more details.
 
 
-=item B<--host=> I<< (<ip>|<hostname>)[:<port>] >>
+=item B<--host> I<< (<ip>|<hostname>)[:<port>] >>
 
 Specifies what hostname/IP and port I<spampd> listens on. By default, it listens
 on 127.0.0.1 (localhost) on port 10025.
+
+As of v2.60 this option can also handle IPv6 addresses in the form of
+C<--host n:n:n> or, with port, C<--host [n:n:n]:port> (the square brackets are optional
+in both forms but recommended in the latter case).
+
+Note that the I<port> specified this way implicitly overrides the C<--port> option.
 
 B<Important!> You should NOT enable I<spampd> to listen on a
 public interface (IP address) unless you know exactly what you're doing!
@@ -1718,6 +1729,7 @@ public interface (IP address) unless you know exactly what you're doing!
 
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
+Note that a I<port> specified in the C<--host> option will override this one.
 
 
 =item B<--socket> I<<socketpath>>
@@ -1738,11 +1750,18 @@ Specifies the hostname/IP to which I<spampd> will relay all
 messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
 defaults to 25.
 
+As of v2.60 this option can also handle IPv6 addresses in the form of
+C<--relayhost n:n:n> or, with port, C<--relayhost [n:n:n]:port> (the square brackets
+are optional in both forms but recommended in the latter case).
+
+Note that the I<port> specified this way implicitly overrides the C<--relayport> option.
+
 
 =item B<--relayport> I<<n>>
 
 Specifies what port I<spampd> will relay to. Default is 25. This is an
-alternate to using the above --relayhost=ip:port notation.
+alternate to using the above --relayhost=ip:port notation. Note that a I<port>
+specified in the C<--relayhost> option will override this one.
 
 
 =item B<--relaysocket> I<<socketpath>>
@@ -1839,7 +1858,7 @@ or even C</dev/null> to disable logging entirely.
 =back
 
 B<This option may be specified multiple times.> You may also specify multiple
-destination by separating them with a ":" (color): C<--logfile stderr:/var/log/spampd.log>
+destination by separating them with a C<:> (colon): C<--logfile stderr:/var/log/spampd.log>
 
 Simultaneous logging to C<syslog>, C<stderr>, and one C<filename> is possible.
 At this time only one log file can be used at a time (if several are specified
@@ -1865,7 +1884,7 @@ syslog socket. This is the recommended usage for Sys::Syslog (since v0.15).
     The default is to try native, tcp, udp, unix, pipe, stream, console. Under systems with the
     Win32 API, eventlog will be added as the first mechanism to try if Win32::EventLog is available.
 
-C<(prior to v2.60)>
+C<Prior to v2.60:>
 
 The default was C<unix>. To preserve backwards-compatibility, the default on HP-UX and SunOS
 (Solaris) systems is C<inet>.
