@@ -1103,9 +1103,12 @@ sub write_to_log_hook {
     { $self->SUPER::write_to_log_hook($level, $msg); }
 }
 
-sub dbg {
-  shift()->log(4, @_);
-}
+# Convenience logging aliases
+sub err { shift()->log(0, @_); }
+sub wrn { shift()->log(1, @_); }
+sub inf { shift()->log(2, @_); }
+sub nte { shift()->log(3, @_); }
+sub dbg { shift()->log(4, @_); }
 
 
 ##################   FUNCTIONS   ######################
