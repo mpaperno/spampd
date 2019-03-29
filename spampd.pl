@@ -1152,19 +1152,20 @@ sub read_args_from_file() {
 #
 sub read_conf_file {
   my ($file, $sep, $prfx) = @_;
+  return ([], []) if !$file;
   my (@args, @ptargs);
   my $dest = \@args;
-  $sep = '=' if !defined($sep);
-  $prfx = '--' if !defined($prfx);
+  $sep //= '=';
+  $prfx //= '--';
   open(my $fh, '<', $file) or die "Couldn't open config file '$file' [$!]";
   while (defined(my $line = <$fh>)) {
     next if ($line !~ m/^\s* ((?:--?)?[\w\@-]+) (?:[=:\t ]+ (\S+) \s*)?$/xo);
     ($dest = \@ptargs) && next if $1 eq '--';
     my $k = $1;
     $k = join('', $prfx, $k) if $prfx && substr($k, 0, 1) ne '-';
-    $k = join($sep, $k, $2) if $sep && $2;
+    $k = join($sep, $k, $2) if $sep && $2 ne '';
     push (@{$dest}, $k);
-    push (@{$dest}, $2) if !$sep && $2;
+    push (@{$dest}, $2) if !$sep && $2 ne '';
   }
   close $fh;
   return (\@args, \@ptargs);
