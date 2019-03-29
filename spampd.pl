@@ -499,14 +499,6 @@ sub init {
   # If we get any, then we parse the file(s) into @ARGV, in front of any existing @ARGV options (so command-line overrides).
   $self->handle_initial_opts();
 
-  # Handle "--show defaults" debugging request here (while we still know them).
-  if ($spd_p->{show_dbg} && grep(/^(defaults?|all)$/i, @{$spd_p->{show_dbg}})) {
-    # make sure we don't "show defaults" again
-    @{$spd_p->{show_dbg}} = grep {$_ !~ /^defaults?$/i} @{$spd_p->{show_dbg}};
-    # show defaults and exit here if that's all the user wanted to see
-    print_options({$self->options_map()}, 'default', (@{$spd_p->{show_dbg}} ? -1 : 0));
-  }
-
   # save final ARGV for debug (handle_main_opts() will clear @ARGV)
   my @startup_args = @ARGV;
 
@@ -514,16 +506,22 @@ sub init {
   # Options on the actual command line will override anything loaded from the file(s).
   $self->handle_main_opts();
 
-  # If debug output requested, do it now, before logging is set up, and exit.
-  show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args, \%$self) && exit(0) if $spd_p->{show_dbg};
-
   # Configure logging ASAP.
   $self->setup_logging();
 
-  $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
+  # Validate options.
+  my (@errs, @warns) = $self->validate_main_opts();
+  if (@errs) {
+    $self->err("CONFIG ERROR! ".$_."\n") for @errs;
+    $self->server_close(1) if $self->is_reloading();
+    $self->server_exit(1);
+  }
+  $self->wrn("CONFIG WARNING! ".$_."\n") for @warns;
 
-  # Redirect all warnings to logger
-  $SIG{__WARN__} = sub { $self->log(1, $_[0]); };
+  # If debug output requested, do it now and exit.
+  show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args) && exit(0) if $spd_p->{show_dbg};
+
+  $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
 
   # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
   $sa_p = Mail::SpamAssassin->new($sa_p);
@@ -572,19 +570,31 @@ sub handle_initial_opts {
   my $self = shift;
   my %options = $_[0] || $self->initial_options_map();
   my $spd_p = $self->{spampd};
+
   # Configure Getopt::Long to pass through any unknown options.
   Getopt::Long::Configure(qw(ignore_case no_permute no_auto_abbrev no_require_order pass_through));
   # Check for config file option(s) only.
   GetOptions(%options);
+
+  # Handle "--show <things>"
+  if ($spd_p->{show_dbg}) {
+    my $shw = \@{$spd_p->{show_dbg}};
+    trimmed(@$shw = split(/,/, join(',', @$shw)));  # could be a CSV list
+    if (@$shw && grep(/^(defaults?|all)$/i, @$shw)) {
+      # Handle "--show defaults" debugging request here (while we still know them).
+      @$shw = grep {$_ !~ /^defaults?$/i} @$shw;   # remove "defaults" from list
+      # show defaults and exit here if that's all the user wanted to see
+      print_options({$self->options_map()}, 'default', (@$shw ? -1 : 0));
+    }
+  }
+
   # Handle config files. Note that options on the actual command line will override anything loaded from the file(s).
   if (defined($spd_p->{config_files})) {
     # files could be passed as a list separated by ":"
     trimmed(@{$spd_p->{config_files}} = split(/:/, join(':', @{$spd_p->{config_files}})));
-    $self->log(2, "Loading config from file(s): @{$spd_p->{config_files}} \n");
+    $self->inf("Loading config from file(s): @{$spd_p->{config_files}} \n");
     read_args_from_file(\@{$spd_p->{config_files}}, \@ARGV);
   }
-  # "--show" could be a CSV list
-  trimmed(@{$spd_p->{show_dbg}} = split(/,/, join(',', @{$spd_p->{show_dbg}}))) if defined($spd_p->{show_dbg});
 }
 
 # Main command-line options mapping; this is for Getopt::Long::GetOptions and also to generate config dumps.
@@ -656,52 +666,19 @@ sub handle_main_opts {
   Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
   GetOptions(%options) or ($self->is_reloading ? $self->fatal("Could not parse command line!\n") : usage(1));
 
-  # Validation
-
-  if ($srv_p->{max_servers} < 1)
-    { die "Option --children must be greater than zero!\n"; }
-
-  if ($self->{spampd}->{sa_awl} && $spd_p->{sa_version} >= 3)
-    { die "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead.\n"; }
-
-  # set up logging specs based on options ($logspec is only an array if --logfile option(s) existed)
-  # in theory this could die if a log file path looks "suspicious" to untaint_path()
-  if (ref($spd_p->{logspec}) eq 'ARRAY') {
-    ($spd_p->{logtype}, $srv_p->{log_file}) = logfile2logtype($spd_p->{logspec}, $spd_p->{logtype});
-  }
-
-  # validate syslog socket option
-  if ($spd_p->{logtype} & LOG_SYSLOG) {
-    # in theory this check could be made more adaptive based on OS or something...
-    my $allowed_syslog_socks = 'native|eventlog|tcp|udp|inet|unix|stream|pipe|console';
-    if ($srv_p->{syslog_logsock} && $srv_p->{syslog_logsock} !~ /^($allowed_syslog_socks)$/) {
-      die "--logsock parameter not recognized, must be one of ($allowed_syslog_socks).\n";
-    }
-    elsif (!$srv_p->{syslog_logsock} && !($spd_p->{logtype} & LOGGER_SA)) {
-      # log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
-      # note that SA::Logger has own fallback for cases where the default syslog selection fails.
-      eval {
-        my $osname = `uname -s`;
-        $srv_p->{syslog_logsock} = "inet" if ($osname =~ 'HP-UX' || $osname =~ 'SunOS');
-      };
-    }
-  }
-
-  # Validate that required modules for relay server exist (better now than later).
-  if ($spd_p->{relaysocket}) {
-    eval { require IO::Socket::UNIX; }
-    or die "Error loading IO::Socket::UNIX module, required for --relaysocket option.\n\t$@ \n";
-  }
-  else {
-    eval { require IO::Socket::IP; }
-    or die "Error loading IO::IP::UNIX module, required for --relayhost option.\n\t$@ \n";
-  }
-
   # These paths are already untainted but do a more careful check JIC.
   for ($spd_p->{socket}, $spd_p->{relaysocket}, $srv_p->{pid_file}, $sa_p->{userprefs_filename})
     { $_ = untaint_path($_); }
 
-  # /Validation
+  # set up logging specs based on options ($logspec is only an array if --logfile option(s) existed)
+  if (ref($spd_p->{logspec}) eq 'ARRAY') {
+    $spd_p->{logtype} &= ~LOG_TYPE_MASK;  # reset the low byte containing LOG_<type> constant
+    ($spd_p->{logtype}, $srv_p->{log_file}) = logfile2logtype($spd_p->{logspec}, $spd_p->{logtype});
+  }
+  elsif (!$srv_p->{background}) {
+    # set default logging to stderr if not daemonizing and user didn't specify.
+    $spd_p->{logtype} = $spd_p->{logtype} & (~LOG_TYPE_MASK) | LOG_STDERR;
+  }
 
   # fixup listening socket/host/port if needed
   if ($spd_p->{socket}) {
@@ -715,38 +692,65 @@ sub handle_main_opts {
     $srv_p->{port} = $tmp[1] if $tmp[1];
   }
 
-  # Configure debugging
-  if ($sa_p->{debug} ne '0') {
-    $srv_p->{log_level} = 4;  # set Net::Server log level to debug
-    # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
-    # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
-    # In case of old SA version, just set the debug flag to true.
-    if ($spd_p->{logtype} & LOGGER_SA) {
-      my ($ident, $debug) = ($srv_p->{syslog_ident}, \$sa_p->{debug});
-      ${$debug} = 'all' if (!${$debug} || ${$debug} eq '1');
-      ${$debug} .= ','.$ident if (${$debug} !~ /(?:all|(?:\A|,)$ident)/i);
-    }
-    else {
-      $sa_p->{debug} = 1;
-    }
-  }
-
   # Set misc. options based on other options.
   $srv_p->{setsid}= 0 if !$srv_p->{background};
   $sa_p->{home_dir_for_helpers} = $sa_p->{userstate_dir};
   $sa_p->{username} = $srv_p->{user};
+}
 
+sub validate_main_opts {
+  my $self = shift;
+  my ($srv_p, $spd_p) = ($self->{server}, $self->{spampd});
+  my (@errs, @warns);
+
+  if ($srv_p->{max_servers} < 1)
+    { push (@errs, "Option --children must be greater than zero!"); }
+
+  if ($self->{spampd}->{sa_awl} && $spd_p->{sa_version} >= 3)
+    { push (@errs, "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead."); }
+
+  # Validate that required modules for relay server exist (better now than later).
+  if ($spd_p->{relaysocket}) {
+    eval { require IO::Socket::UNIX; }
+    or push (@errs, "Error loading IO::Socket::UNIX module, required for --relaysocket option.\n\t$@");
+  }
+  else {
+    eval { require IO::Socket::IP; }
+    or push (@errs, "Error loading IO::IP::UNIX module, required for --relayhost option.\n\t$@");
+  }
+
+  return (@errs, @warns);
 }
 
 sub setup_logging {
   my $self = shift;
   my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
 
-  if ($spd_p->{logtype} & LOGGER_SA) {
-    # Stderr logger method is active by default, remove it unless we're using it.
-    unless ($spd_p->{logtype} & LOG_STDERR) {
-      Mail::SpamAssassin::Logger::remove('stderr');
+  if ($spd_p->{logtype} & LOG_SYSLOG) {
+    # Need to validate logsock option otherwise SA Logger barfs. In theory this check could be made more adaptive based on OS or something.
+    if ($srv_p->{syslog_logsock} && $srv_p->{syslog_logsock} !~ /^(native|eventlog|tcp|udp|inet|unix|stream|pipe|console)$/) {
+      $self->wrn("WARNING! Option '--logsock' parameter \"$srv_p->{syslog_logsock}\" not recognized, reverting to default.\n");
+      $srv_p->{syslog_logsock} = undef;
     }
+    # set log socket default for HP-UX and SunOS (thanks to Kurt Andersen for the 'uname -s' fix)
+    # `uname` throws errors (and fails anyway) when HUPping, so we do not repeat it, but do "cache" any new default in our 'commandline'.
+    if (!($srv_p->{syslog_logsock} || $self->is_reloading())) {
+      eval { push(@{$srv_p->{commandline}}, "--logsock=" . ($srv_p->{syslog_logsock} = "inet")) if (`uname -s` =~ /HP\-UX|SunOS/); };
+    }
+  }
+
+  # Configure debugging
+  if ($sa_p->{debug} ne '0') {
+    $srv_p->{log_level} = 4;  # set Net::Server log level to debug
+    # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
+    # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
+    if ($spd_p->{logtype} & LOGGER_SA) { $sa_p->{debug} = 'all' if (!$sa_p->{debug} || $sa_p->{debug} eq '1'); }
+    else { $sa_p->{debug} = 1; }  # In case of old SA version, just set the debug flag to true.
+  }
+
+  if ($spd_p->{logtype} & LOGGER_SA) {
+    # Add SA logging facilities
+    Mail::SpamAssassin::Logger::add_facilities($sa_p->{debug});
     # Add syslog method?
     if ($spd_p->{logtype} & LOG_SYSLOG) {
       Mail::SpamAssassin::Logger::add(
@@ -761,21 +765,25 @@ sub setup_logging {
       Mail::SpamAssassin::Logger::add(method => 'file', filename => $srv_p->{log_file});
       push(@{$srv_p->{chown_files}}, $srv_p->{log_file});  # make sure we own the file
     }
-    # Add SA logging facilities
-    Mail::SpamAssassin::Logger::add_facilities($sa_p->{debug});
+    # Stderr logger method is active by default, remove it unless we're using it.
+    unless ($spd_p->{logtype} & LOG_STDERR) {
+      Mail::SpamAssassin::Logger::remove('stderr');
+    }
     $sa_p->{debug} = undef;   # clear this otherwise SA will re-add the facilities in new()
     $srv_p->{log_file} = undef;  # disable Net::Server logging (use our write_to_log_hook() instead)
   }
   # using Net::Server default logging
-  else {
-    if ($spd_p->{logtype} & LOG_SYSLOG) {
-      $srv_p->{log_file} = 'Sys::Syslog';
-    }
-    elsif ($spd_p->{logtype} & LOG_STDERR) {
-      $srv_p->{log_file} = undef;  # tells Net::Server to log to stderr
-    }
+  elsif ($spd_p->{logtype} & LOG_SYSLOG) {
+    $srv_p->{log_file} = 'Sys::Syslog';
   }
+  elsif ($spd_p->{logtype} & LOG_STDERR) {
+    $srv_p->{log_file} = undef;  # tells Net::Server to log to stderr
+  }
+
+  # Redirect all warnings to logger
+  $SIG{__WARN__} = sub { $self->wrn($_[0]); };
 }
+
 
 ##################   SERVER METHODS   ######################
 
@@ -1843,12 +1851,12 @@ Logging method to use. May be one or more of:
 
 =item *
 
-C<syslog>: Use the system's syslogd (via Sys::Syslog). B<default>
+C<syslog>: Use the system's syslogd (via Sys::Syslog). B<Default> when running as daemon.
 
 =item *
 
 C<stderr>: Direct all logging to stderr (if running in background mode
-these may still end up in the default system log).
+these may still end up in the default system log).  B<Default> when not running as daemon (C<--nodetach>).
 
 =item *
 
