@@ -450,6 +450,7 @@ sub new {
       dose              => 0,                     # die-on-sa-errors flag
       envelopeheaders   => 0,                     # Set X-Envelope-To & X-Envelope-From headers in the mail before passing it to SA (--seh option)
       setenvelopefrom   => 0,                     # Set X-Envelope-From header only (--sef option)
+      sa_awl            => 0,                     # SA auto-whitelist (deprecated)
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
       instance          => 0,                     # child instance count
       sa_version        => version->parse(Mail::SpamAssassin->VERSION)  # may be used while processing messages
@@ -509,14 +510,14 @@ sub init {
   # save final ARGV for debug (handle_main_opts() will clear @ARGV)
   my @startup_args = @ARGV;
 
-  # Now (finally) process all the actual options passed on @ARGV (including anything from config files).
+  # Now process all the actual options passed on @ARGV (including anything from config files).
   # Options on the actual command line will override anything loaded from the file(s).
   $self->handle_main_opts();
 
   # If debug output requested, do it now, before logging is set up, and exit.
   show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args, \%$self) && exit(0) if $spd_p->{show_dbg};
 
-  # Configure logging.
+  # Configure logging ASAP.
   $self->setup_logging();
 
   $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
@@ -527,10 +528,11 @@ sub init {
   # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
   $sa_p = Mail::SpamAssassin->new($sa_p);
 
-  $self->{spampd}->{sa_awl} and eval {
+  $spd_p->{sa_awl} and eval {
     require Mail::SpamAssassin::DBBasedAddrList;
     # create a factory for the persistent address list
-    $sa_p->set_persistent_address_list_factory(Mail::SpamAssassin::DBBasedAddrList->new());
+    my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
+    $sa_p->set_persistent_address_list_factory($addrlistfactory);
   };
 
   $sa_p->compile_now(!!$sa_p->{userprefs_filename});
@@ -539,6 +541,7 @@ sub init {
   delete $spd_p->{config_files};
   delete $spd_p->{logspec};
   delete $spd_p->{show_dbg};
+  delete $spd_p->{sa_awl};
 
   return $self;
 }
@@ -700,6 +703,7 @@ sub handle_main_opts {
 
   # /Validation
 
+  # fixup listening socket/host/port if needed
   if ($spd_p->{socket}) {
     # Net::Server wants UNIX sockets passed via port option.
     $srv_p->{port} = join('|', $spd_p->{socket}, 'unix');
@@ -1070,13 +1074,12 @@ sub process_request {
   $prop->{instance}++;
 }
 
-# Net::Server hook
-# After binding listening sockets
+# Net::Server hook: After binding listening sockets
 sub post_bind_hook {
   my $prop = $_[0]->{spampd};
   if (defined($prop->{socket}) and defined($prop->{socket_mode})) {
     chmod(oct($prop->{socket_mode}), $prop->{socket})
-      or die $_[0]->fatal("Couldn't chmod '$prop->{socket}' [$!]\n");
+      or $_[0]->fatal("Couldn't chmod '$prop->{socket}' [$!]\n");
   }
 }
 
@@ -1086,18 +1089,14 @@ sub child_init_hook {
   $0 = 'spampd child';
 }
 
-# Net::Server hook
-# about to exit child process
+# Net::Server hook: about to exit child process
 sub child_finish_hook {
   $_[0]->dbg("Exiting child process after handling " . $_[0]->{spampd}->{instance} . " requests");
 }
 
-# Net::Server hook
-# Only called when we're using SA Logger and bypassing Net::Server logging entirely.
+# Net::Server hook: called when we're using SA Logger or falling back to Net::Server logging.
 sub write_to_log_hook {
   my ($self, $level, $msg) = @_;
-  if (!($self->{spampd}->{logtype} & LOG_SYSLOG) && $self->{server}->{syslog_ident})
-    { $msg = join(': ', $self->{server}->{syslog_ident}, $msg); }
   if ($self->{spampd}->{logtype} & LOGGER_SA)
     { Mail::SpamAssassin::Logger::log_message(SA_LOG_LEVELS->{$level}, $msg); }
   else
@@ -1175,9 +1174,9 @@ sub read_conf_file {
 # Returns the log type and either an actual logfile name, or undef if there wasn't one.
 sub logfile2logtype {
   my ($spec, $type, $sep) = @_;
-  $spec = @{$spec} if !ref($spec);
-  $sep = ":" if !defined($sep);
-  $type &= ~LOG_TYPE_MASK;  # reset the low byte containing LOG_ constant
+  $spec = [$spec] if !ref($spec);
+  $sep //= ":";
+  $type //= 0;
   my $file;
   # Handle ":" record separator and trim values.
   trimmed(@$spec = split(qr($sep), join($sep, @$spec)));
@@ -1833,7 +1832,7 @@ file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
 
-=item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<(new in v2.60)>
+=item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<new in v2.60>
 
 Logging method to use. May be one or more of:
 
@@ -1864,7 +1863,7 @@ At this time only one log file can be used at a time (if several are specified
 then the last one takes precedence).
 
 
-=item B<--logsock> or B<-ls> I<<type>> C<(new in v2.20)>  C<(updated in v2.60)>
+=item B<--logsock> or B<-ls> I<<type>> C<new in v2.20>  C<updated in v2.60>
 
 Syslog socket to use if C<--logfile> is set to I<syslog>.
 
@@ -1875,20 +1874,21 @@ the subroutine Sys::Syslog::setlogsock(). Depending on the version of Sys::Syslo
 the underlying operating system, one of the following values (or their subset) can
 be used:
 
-    native, tcp, udp, inet, unix, stream, pipe, console, eventlog (Win32 only)
+  native, tcp, udp, inet, unix, stream, pipe, console, eventlog (Win32 only)
 
-The default behavior since I<spampd> v2.60 is to let Sys::Syslog pick the default
-syslog socket. This is the recommended usage for Sys::Syslog (since v0.15).
+The default behavior since I<spampd> v2.60 is to let I<Sys::Syslog> pick the default
+syslog socket. This is the recommended usage for I<Sys::Syslog> (since v0.15), which chooses thusly:
 
-    The default is to try native, tcp, udp, unix, pipe, stream, console. Under systems with the
-    Win32 API, eventlog will be added as the first mechanism to try if Win32::EventLog is available.
+  The default is to try native, tcp, udp, unix, pipe, stream, console. Under systems with the
+  Win32 API, eventlog will be added as the first mechanism to try if Win32::EventLog is available.
+
+For more information please consult the L<Sys::Syslog|https://metacpan.org/pod/Sys::Syslog> documentation.
+
+To preserve backwards-compatibility, the default on HP-UX and SunOS (Solaris) systems is C<inet>.
 
 C<Prior to v2.60:>
 
-The default was C<unix>. To preserve backwards-compatibility, the default on HP-UX and SunOS
-(Solaris) systems is C<inet>.
-
-For more information please consult the L<Sys::Syslog|https://metacpan.org/pod/Sys::Syslog> documentation.
+The default was C<unix> except on HP-UX and SunOS (Solaris) systems it is C<inet>.
 
 
 =item B<--logident> or B<-li> I<<name>> C<(new in v2.60)>
@@ -2070,6 +2070,8 @@ C<all>: Prints all of the above.
 Multiple C<thing>s may be specified by using the I<--show> option multiple times, or
 separating the items with a comma: C<--show config,start,argv>.
 
+Note that all I<thing> options besides C<defaults> and C<config> require the Perl module I<Data::Dumper> installed.
+
 
 =item B<--version> C<(new in v2.52)>
 
@@ -2145,7 +2147,7 @@ compatibility with prevoius I<spampd> versions:
 
 =item  B<--hostname>
 
-=item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
+=item B<--auto-whitelist> or B<--aw> C<deprecated with SpamAssassin v3+>
 
 This option is no longer relevant with SA version 3.0 and above, which
 controls auto whitelist use via config file settings. Do not use it unless
