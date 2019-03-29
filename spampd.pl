@@ -519,7 +519,7 @@ sub init {
   $self->wrn("CONFIG WARNING! ".$_."\n") for @warns;
 
   # If debug output requested, do it now and exit.
-  show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args) && exit(0) if $spd_p->{show_dbg};
+  $self->show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args) && exit(0) if $spd_p->{show_dbg};
 
   $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
 
@@ -556,11 +556,11 @@ sub initial_options_map {
     %options = (
       %options,
       'show=s@'         => \$spd_p->{show_dbg},
-      'help|h|?:s'      => sub { usage(0, 1, $_[1]); },
-      'hh|??:s'         => sub { usage(0, 2, $_[1]); },
-      'hhh|???:s'       => sub { usage(0, 3, $_[1]); },
-      'hhhh|????|man:s' => sub { usage(0, 4, $_[1]); },
-      'version|vers'    => \&version,
+      'help|h|?:s'      => sub { $self->usage(0, 1, $_[1]); },
+      'hh|??:s'         => sub { $self->usage(0, 2, $_[1]); },
+      'hhh|???:s'       => sub { $self->usage(0, 3, $_[1]); },
+      'hhhh|????|man:s' => sub { $self->usage(0, 4, $_[1]); },
+      'version|vers'    => sub { $self->version(); },
     );
   }
   return %options;
@@ -584,7 +584,7 @@ sub handle_initial_opts {
       # Handle "--show defaults" debugging request here (while we still know them).
       @$shw = grep {$_ !~ /^defaults?$/i} @$shw;   # remove "defaults" from list
       # show defaults and exit here if that's all the user wanted to see
-      print_options({$self->options_map()}, 'default', (@$shw ? -1 : 0));
+      $self->print_options({$self->options_map()}, 'default', (@$shw ? -1 : 0));
     }
   }
 
@@ -664,7 +664,7 @@ sub handle_main_opts {
 
   # Reconfigure GoL for stricter parsing and check for all other options on ARGV, including anything parsed from config file(s).
   Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
-  GetOptions(%options) or ($self->is_reloading ? $self->fatal("Could not parse command line!\n") : usage(1));
+  GetOptions(%options) or ($self->is_reloading ? $self->fatal("Could not parse command line!\n") : $self->usage(1));
 
   # These paths are already untainted but do a more careful check JIC.
   for ($spd_p->{socket}, $spd_p->{relaysocket}, $srv_p->{pid_file}, $sa_p->{userprefs_filename})
@@ -1257,6 +1257,12 @@ sub untaint_path {
 # Trims a string or array of strings. Modifies whatever was passed in!
 sub trimmed { s{^\s+|\s+$}{}g foreach @_; };
 
+sub deprecated_opt {
+  warn "Note: option '".$_[0]."' is deprecated and will be ignored.\n";
+}
+
+##################   UTILITY METHODS   ######################
+
 # returns true if server is being restarted with a SIGHUP.
 sub is_reloading { return !!$ENV{'BOUND_SOCKETS'}; };
 
@@ -1266,11 +1272,11 @@ sub is_reloading { return !!$ENV{'BOUND_SOCKETS'}; };
 # Any value that is not a ref to a scalar or to an array ref is ignored. The first version of the
 #   option name, before the first "|", is used as the option name. Any option spec is also excluded.
 sub print_options {
-  my $opts = shift;
+  my ($self, $opts) = (shift, shift);
   my $type = ($_[0] && $_[0] !~ /^\d+$/ ? shift : 'default');
   my $exit = @_ ? $_[0] : -1;
   print "\n";
-  print "# Configuration options for ".__PACKAGE__." v".$VERSION." with ".$type." values.\n";
+  print "# Configuration options for ".ref($self)." v".$self->VERSION." with ".$type." values.\n";
   print "# This format is suitable as a configuration file. Just remove\n".
         "# the '#' marks (comment characters) and change values as needed.\n\n" if $exit > -1;
   for my $k (sort keys %{$opts}) {
@@ -1285,24 +1291,25 @@ sub print_options {
   exit $exit if $exit > -1;
 }
 
-# =item show_debug($what, [ \%options, \@startup_args, %$self | \$thing_to_dump [,\$another_thing[,...]] ])
+# =item show_debug($what, [ \%options, \@startup_args | \$thing_to_dump [,\$another_thing[,...]] ])
 # Debug helper, print some values and exit. $what can be an array or single string or CSV list.
 # $what values: [ all | [conf(ig), argv, start(args), self] ] | obj(ect)
 #   "all" means everything except "object".
-#   "obj" means just dump the rest of the argument(s); ignores rest of $what, basically Data::Dumper->Dump([@_])
+#   "obj" means just dump the rest of the argument(s); ignores rest of $what, basically Data::Dumper->Dump(@_)
 # Always returns true, even if there is an error, so can be used eg.: show_debug(...) && exit(0);
 sub show_debug {
   eval {
-    my ($what, $opts, $clargs, $self) = (shift);
+    my ($self, $what, $opts, $clargs) = (shift, shift);
     my ($ok, @dumps, @dnames) = (0);
+    $what = [$what] if !ref($what);
     trimmed(@$what = split(/,/, join(',', @$what)));
     if (grep(/^obj(ect)?$/i, @$what)) {
       push(@dumps, @_);
     }
     else {
-      ($opts, $clargs, $self) = @_;
+      ($opts, $clargs) = @_;
       if (grep(/^(conf(ig)?|all)$/i, @$what) && $opts)
-        { print_options($opts, 'current', -1); $ok = 1; }
+        { $self->print_options($opts, 'current', -1); $ok = 1; }
       if (grep(/^(argv|all)$/i, @$what))
         { push(@dumps, \@ARGV);   push(@dnames, '*ARGV'); }
       if (grep(/^(start\w*|all)$/i, @$what))
@@ -1337,11 +1344,12 @@ sub version {
 
 # =item usage([exit_value=2, [help_level=1, [help_format=man]]])
 sub usage {
+  my $self = shift;
   my ($exitval, $hlevel, $helpfmt) = @_;
   $exitval = 2 if !defined($exitval);
   $hlevel ||= 1;
   $helpfmt ||= 'man';
-  my ($width, $indent, $quotes) = (78, 2, "‘’");
+  my ($type, $width, $indent, $quotes) = (ref($self), 78, 2, "`");
   my (@sections, $msg, $outfile, $pdoc_opts);
 
   eval {
@@ -1365,7 +1373,7 @@ sub usage {
     }
     elsif ($helpfmt =~ /^man$/i) {
       $pdoc_opts = "-o man -w quotes:$quotes -w section:8 -w release:$VERSION ".
-                   "-w center:".__PACKAGE__." -w name:".lc(__PACKAGE__);
+                   "-w center:".$type." -w name:".lc($type);
     }
     elsif ($helpfmt =~ /^txt$/i) {
       $pdoc_opts = "-o text -T -w width:$width -w indent:$indent -w quotes:$quotes";
@@ -1375,7 +1383,7 @@ sub usage {
     push(@sections, "USAGE")    if $hlevel == 1 || $hlevel == 3;
     push(@sections, "SYNOPSIS") if $hlevel == 2;
     push(@sections, "OPTIONS")  if $hlevel == 3;
-    $msg = "\n".__PACKAGE__." version $VERSION\n";
+    $msg = "\n".$type." version $VERSION\n";
   }
 
   Pod::Usage::pod2usage(
@@ -1413,10 +1421,6 @@ sub usage {
     print "Consider installing the HTML::Display Perl module.\n" if !defined($HTML::Display::VERSION);
   }
   exit $exitval;
-}
-
-sub deprecated_opt {
-  warn "Note: option '". shift() ."' is deprecated and will be ignored.\n";
 }
 
 1;
