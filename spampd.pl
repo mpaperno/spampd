@@ -1240,7 +1240,8 @@ sub untaint_path {
   my $re = qr{^\s*([$chars][${chars}~ ]*)\z}io;
   local $1;
   return $1 if ($path =~ $re);
-  die "refusing to untaint suspicious path: '$path'\n";
+  warn "WARNING! Refusing to untaint suspicious path: '$path'\n";
+  return '';
 }
 
 # Trims a string or array of strings. Modifies whatever was passed in!
