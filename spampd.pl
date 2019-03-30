@@ -724,9 +724,9 @@ sub validate_main_opts {
 
 sub setup_logging {
   my $self = shift;
-  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
+  my ($srv_p, $ltype, $debug) = ($self->{server}, $self->{spampd}->{logtype}, \$self->{assassin}->{debug});
 
-  if ($spd_p->{logtype} & LOG_SYSLOG) {
+  if ($ltype & LOG_SYSLOG) {
     # Need to validate logsock option otherwise SA Logger barfs. In theory this check could be made more adaptive based on OS or something.
     if ($srv_p->{syslog_logsock} && $srv_p->{syslog_logsock} !~ /^(native|eventlog|tcp|udp|inet|unix|stream|pipe|console)$/) {
       $self->wrn("WARNING! Option '--logsock' parameter \"$srv_p->{syslog_logsock}\" not recognized, reverting to default.\n");
@@ -740,20 +740,21 @@ sub setup_logging {
   }
 
   # Configure debugging
-  if ($sa_p->{debug} ne '0') {
+  if ($$debug ne '0') {
     $srv_p->{log_level} = 4;  # set Net::Server log level to debug
     # SA since v3.1.0 can do granular debug logging based "channels" which can be passed to us via --debug option parameters.
     # --debug can also be specified w/out any parameters, in which case we enable the "all" channel.
-    if ($spd_p->{logtype} & LOGGER_SA) { $sa_p->{debug} = 'all' if (!$sa_p->{debug} || $sa_p->{debug} eq '1'); }
-    else { $sa_p->{debug} = 1; }  # In case of old SA version, just set the debug flag to true.
+    if ($ltype & LOGGER_SA) { $$debug = 'all' if (!$$debug || $$debug eq '1'); }
+    else { $$debug = 1; }  # In case of old SA version, just set the debug flag to true.
   }
 
-  if ($spd_p->{logtype} & LOGGER_SA) {
+  if ($ltype & LOGGER_SA) {
     # Add SA logging facilities
-    Mail::SpamAssassin::Logger::add_facilities($sa_p->{debug});
+    Mail::SpamAssassin::Logger::add_facilities($$debug);
+    my $have_log = 0;
     # Add syslog method?
-    if ($spd_p->{logtype} & LOG_SYSLOG) {
-      Mail::SpamAssassin::Logger::add(
+    if ($ltype & LOG_SYSLOG) {
+      $have_log = Mail::SpamAssassin::Logger::add(
         method => 'syslog',
         socket => $srv_p->{syslog_logsock},
         facility => $srv_p->{syslog_facility},
@@ -761,22 +762,22 @@ sub setup_logging {
       );
     }
     # Add file method?
-    if ($spd_p->{logtype} & LOG_FILE) {
-      Mail::SpamAssassin::Logger::add(method => 'file', filename => $srv_p->{log_file});
+    if (($ltype & LOG_FILE) && Mail::SpamAssassin::Logger::add(method => 'file', filename => $srv_p->{log_file})) {
+      $have_log = 1;
       push(@{$srv_p->{chown_files}}, $srv_p->{log_file});  # make sure we own the file
     }
-    # Stderr logger method is active by default, remove it unless we're using it.
-    unless ($spd_p->{logtype} & LOG_STDERR) {
+    # Stderr logger method is active by default, remove it unless we need it.
+    if (!($ltype & LOG_STDERR) && $have_log) {
       Mail::SpamAssassin::Logger::remove('stderr');
     }
-    $sa_p->{debug} = undef;   # clear this otherwise SA will re-add the facilities in new()
+    $$debug = undef;   # clear this otherwise SA will re-add the facilities in new()
     $srv_p->{log_file} = undef;  # disable Net::Server logging (use our write_to_log_hook() instead)
   }
   # using Net::Server default logging
-  elsif ($spd_p->{logtype} & LOG_SYSLOG) {
+  elsif ($ltype & LOG_SYSLOG) {
     $srv_p->{log_file} = 'Sys::Syslog';
   }
-  elsif ($spd_p->{logtype} & LOG_STDERR) {
+  elsif ($ltype & LOG_STDERR) {
     $srv_p->{log_file} = undef;  # tells Net::Server to log to stderr
   }
 
