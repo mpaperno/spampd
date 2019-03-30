@@ -377,10 +377,6 @@ package SpamPD;
 
 use strict;
 use warnings;
-use version;
-use Getopt::Long qw(GetOptions);
-use Time::HiRes qw(time);
-use Mail::SpamAssassin ();
 
 our $VERSION = '2.60';
 
@@ -396,6 +392,10 @@ BEGIN {
   import SpamPD::Server;
   import SpamPD::Client;
 }
+
+use Getopt::Long qw(GetOptions);
+use Time::HiRes qw(time);
+use Mail::SpamAssassin ();
 
 use constant {
   # Logging type constants: low byte for destination(s), high byte for logger type.
@@ -453,7 +453,7 @@ sub new {
       sa_awl            => 0,                     # SA auto-whitelist (deprecated)
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
       instance          => 0,                     # child instance count
-      sa_version        => version->parse(Mail::SpamAssassin->VERSION)  # may be used while processing messages
+      sa_version        => $Mail::SpamAssassin::VERSION,  # may be used while processing messages
     },
     # this hash is eventually passed to SpamAssassin->new() so it must use valid SA option names. This also becomes the SA object afterwards.
     assassin => {
