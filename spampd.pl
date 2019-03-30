@@ -1111,6 +1111,9 @@ sub write_to_log_hook {
     { $self->SUPER::write_to_log_hook($level, $msg); }
 }
 
+# Net::Server override: default behavior on HUP is to delete $ENV{'PATH'}, but we like our PATH as it is.
+sub hup_delete_env_keys { return ''; }
+
 # Convenience logging aliases
 sub err { shift()->log(0, @_); }
 sub wrn { shift()->log(1, @_); }
