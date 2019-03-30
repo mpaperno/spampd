@@ -1,7 +1,7 @@
 #!/usr/bin/perl -T
 
 ######################
-# SpamPD - spam proxy daemon
+# SpamPD - Spam Proxy Daemon
 #
 # v2.53  - 25-Feb-19
 # v2.52  - 10-Nov-18
@@ -2140,7 +2140,7 @@ As of I<Net::Server> and I<Net::Server::PreForkSimple> v2.009 the list is:
   reverse_lookups, allow, deny, cidr_allow, cidr_deny, chroot, ipv, conf_file,
   serialize, lock_file, check_for_dead, max_dequeue, check_for_dequeue
 
-See the L<Net::Server(3)|https://metacpan.org/pod/distribution/Net-Server/lib/Net/Server.pod#DEFAULT-ARGUMENTS-FOR-Net::Server>
+See the L<Net::Server(3)|https://https://metacpan.org/pod/Net::Server#DEFAULT-ARGUMENTS-FOR-Net::Server>
 and L<Net::Server::PreForkSimple(3)|https://metacpan.org/pod/Net::Server::PreForkSimple#COMMAND-LINE-ARGUMENTS>
 documentation for details.
 
@@ -2264,6 +2264,7 @@ then shutting down the daemon.
 
 =back
 
+
 =head1 EXAMPLES
 
 =over 5
@@ -2301,6 +2302,7 @@ permissions on the relaysocket!
 
 =back
 
+
 =head1 CREDITS
 
 I<spampd> is written and maintained by Maxim Paperno <MPaperno@WorldDesign.com>.
@@ -2334,6 +2336,7 @@ in the change log, as appropriate.
 
 See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
 
+
 =head1 COPYRIGHT, LICENSE, AND DISCLAIMER
 
 I<spampd> is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno;
@@ -2361,13 +2364,6 @@ along with this program.  If not, see L<https://www.gnu.org/licenses/>.
 
 Use GitHub issue tracking: L<https://github.com/mpaperno/spampd/issues>
 
-=head1 TO DO
-
-Figure out how to use Net::Server::PreFork because it has cool potential for
-load management.  I tried but either I'm missing something or PreFork is
-somewhat broken in how it works.  If anyone has experience here, please let
-me know. (It looks like some things have been fixed in Net::Server::PreFork since this
-note was originally written, so it may be worth trying again.)
 
 =head1 SEE ALSO
 
@@ -2375,7 +2371,7 @@ L<spamassassin(1)>
 
 L<Mail::SpamAssassin(3)|https://spamassassin.apache.org/doc/Mail_SpamAssassin.html>
 
-L<Net::Server(3)|https://metacpan.org/pod/distribution/Net-Server/lib/Net/Server.pod>
+L<Net::Server(3)|https://metacpan.org/pod/Net::Server>
 
 L<SpamAssassin Site|http://www.spamassassin.org/>
 
@@ -2442,29 +2438,3 @@ L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spa
 =end html
 
 =cut
-
-=begin comment
-
-This documents a feature which may be implemented later.
-
-=item B<--maxchildren=n> or B<--mc=n>
-
-Maximum number of children to spawn if needed (where n >= --children).  When
-I<spampd> starts it will spawn a number of child servers as specified by
---children. If all those servers become busy, a new child is spawned up to the
-number specified in --maxchildren. Default is to have --maxchildren equal to
---children so extra child processes aren't started. Also see the --children
-option, above.  You may want to set your origination mail server to limit the
-number of concurrent connections to I<spampd> to match this setting (for
-Postfix this is the C<xxxx_destination_concurrency_limit> setting where
-'xxxx' is the transport being used, usually 'smtp', and the default is 100).
-
-Note that extra servers after the initial --children will only spawn on very
-busy systems.  This is because the check to see if a new server is needed (ie.
-all current ones are busy) is only done around once per minute (this is
-controlled by the Net::Server::PreFork module, in case you want to
-hack at it :).  It can still be useful as an "overflow valve," and is
-especially nice since the extra child servers will die off once they're not
-needed.
-
-=end comment
