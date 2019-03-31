@@ -380,9 +380,6 @@ use warnings;
 
 our $VERSION = '2.60';
 
-# Global flag, if true prevents automatic execution of script.
-our $LoadAsModule;
-
 BEGIN {
   require Net::Server; Net::Server->VERSION(0.89);
   require Net::Server::PreForkSimple;
@@ -407,7 +404,7 @@ use constant {
 
 ##################   RUN   ######################
 
-unless ($LoadAsModule) {
+unless (caller) {
   # Create, init, and go.
   SpamPD->new()->init()->run();
   exit 1;  # shouldn't get here
