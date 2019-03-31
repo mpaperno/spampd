@@ -1267,6 +1267,36 @@ sub deprecated_opt {
   warn "Note: option '".$_[0]."' is deprecated and will be ignored.\n";
 }
 
+# Try to display a temporary HTML file in a browser (used to show "--man html").
+sub show_html_file {
+  (my $tmpfile = shift) || return;  # should be a File::Temp type
+
+  # if we get here, handle html output: first try to show it in a browser.
+  my $disp_ok = eval {
+    require HTML::Display;
+    print "Using HTML::Display to display HTML.\n";
+    HTML::Display::display(file => $tmpfile->filename());
+  };
+  # if HTML::Display is not installed, just try Debian or OSX style, or bail out.
+  if (!$disp_ok) {
+    my ($deb, $mac) = (-x "/usr/bin/x-www-browser"), ($^O =~ qr/darwin/i);
+    if (my $cmdline = ($deb ? "x-www-browser " : ($mac ? "open " : undef))) {
+      $cmdline .= $tmpfile->filename()." > /dev/null 2>&1" if $cmdline;
+      if ($disp_ok = (system($cmdline) == 0))
+        { print "Waiting to delete temp file...\n"; sleep 3; }
+    }
+  }
+  if ($disp_ok) {
+    $tmpfile->unlink_on_destroy(1);
+    print "Removing temporary perldoc file ".$tmpfile->filename()."\n";
+  }
+  else {
+    print "Unable to start a browser, open the generated HTML file manually.\n";
+    print "Consider installing the HTML::Display Perl module.\n" if !defined($HTML::Display::VERSION);
+  }
+}
+
+
 ##################   UTILITY METHODS   ######################
 
 # returns true if server is being restarted with a SIGHUP.
@@ -1355,17 +1385,19 @@ sub usage {
   $exitval = 2 if !defined($exitval);
   $hlevel ||= 1;
   $helpfmt ||= 'man';
-  my ($type, $width, $indent, $quotes) = (ref($self), 78, 2, "`");
+  my ($width, $indent, $quotes, $type, $vers) = (78, 2, "`", ref($self), $self->VERSION());
   my (@sections, $msg, $outfile, $pdoc_opts);
 
   eval {
-    no warnings 'once';  # silence useless "$Pod::Usage::Formatter used only once: possible typo" warning
-    $Pod::Usage::Formatter = 'Pod::Text::Termcap' if $helpfmt !~ /^txt$/i;
+    if ($helpfmt !~ /^txt$/i) {
+      no warnings 'once';  # silence useless "$Pod::Usage::Formatter used only once: possible typo" warning
+      $Pod::Usage::Formatter = 'Pod::Text::Termcap';
+    }
     require Pod::Usage;
   } or die "Could not load Pod::Usage!\n\t$@";
 
-  # check if html version is requested (currently only works with full docs due to Pod::Usage behavior of -verbose < 2)
   if ($hlevel == 4) {
+    # decide which perldoc formatter (-o) to use (currently only works with full docs due to Pod::Usage behavior of -verbose < 2)
     if ($helpfmt =~ /^html?$/i) {
       eval {
         require File::Temp; require File::Spec;
@@ -1378,7 +1410,7 @@ sub usage {
       warn "Could not create temp file for html output: $@\n" if $@;
     }
     elsif ($helpfmt =~ /^man$/i) {
-      $pdoc_opts = "-o man -w quotes:$quotes -w section:8 -w release:$VERSION ".
+      $pdoc_opts = "-o man -w quotes:$quotes -w section:8 -w release:".$vers." ".
                    "-w center:".$type." -w name:".lc($type);
     }
     elsif ($helpfmt =~ /^txt$/i) {
@@ -1389,7 +1421,7 @@ sub usage {
     push(@sections, "USAGE")    if $hlevel == 1 || $hlevel == 3;
     push(@sections, "SYNOPSIS") if $hlevel == 2;
     push(@sections, "OPTIONS")  if $hlevel == 3;
-    $msg = "\n".$type." version $VERSION\n";
+    $msg = "\n".$type." version ".$vers."\n";
   }
 
   Pod::Usage::pod2usage(
@@ -1401,31 +1433,7 @@ sub usage {
     # text formatter options
     width => $width, indent => $indent, quotes => $quotes, errors => "none"
   );
-  exit $exitval if !$outfile;
-
-  # if we get here, handle html output: first try to show it in a browser.
-  my $disp_ok = eval {
-    require HTML::Display;
-    print "Using HTML::Display to display HTML.\n";
-    HTML::Display::display(file => $outfile->filename());
-  };
-  # if HTML::Display is not installed, just try Debian or OSX style, or bail out.
-  if (!$disp_ok) {
-    my ($deb, $mac) = (-x "/usr/bin/x-www-browser"), ($^O =~ qr/darwin/i);
-    if (my $cmdline = ($deb ? "x-www-browser " : ($mac ? "open " : undef))) {
-      $cmdline .= $outfile->filename()." > /dev/null 2>&1" if $cmdline;
-      if ($disp_ok = (system($cmdline) == 0))
-        { print "Waiting to delete temp file...\n"; sleep 3; }
-    }
-  }
-  if ($disp_ok) {
-    $outfile->unlink_on_destroy(1);
-    print "Removing temporary perldoc file ".$outfile->filename()."\n";
-  }
-  else {
-    print "Unable to start a browser, open the generated HTML file manually.\n";
-    print "Consider installing the HTML::Display Perl module.\n" if !defined($HTML::Display::VERSION);
-  }
+  show_html_file($outfile) if $outfile;
   exit $exitval;
 }
 
