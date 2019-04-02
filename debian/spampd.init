@@ -193,11 +193,24 @@ case "$1" in
 		check_pid $PROGRAM $PIDFILE verbose
 		exit $?
 		;;
-	reload)
-		log_warning_msg "reload not implemented, try force-reload/restart instead"
-		exit 3
+  reload|force-reload)
+		check_pid $PROGRAM $PIDFILE || exit 0
+		echo -n "Reloading $DESC: $NAME "
+		start-stop-daemon --stop --exec $EXECUTABLE \
+			--pidfile $PIDFILE --signal HUP
+		if [ "$?" = '0' ]; then
+			log_end_msg 0
+			exit 0
+		else
+			if [ "$1" = "force-reload" ]; then
+				exec $0 restart
+			else
+				log_end_msg 7
+				exit 7
+			fi
+		fi
 		;;
-	force-reload|try-restart)
+	try-restart)
 		if check_pid $PROGRAM $PIDFILE ; then
 			exec $0 restart
 		else
@@ -213,10 +226,10 @@ case "$1" in
 		exec $0 start
 		;;
 	help)
-		echo "Usage: $0 (start|stop|restart|try-restart|force-reload|status)"
+		echo "Usage: $0 (start|stop|restart|try-restart|reload|force-reload|status)"
 		exit 0
 		;;
-	*)	echo "Usage: $0 (start|stop|restart|try-restart|force-reload|status|help)"
+	*)	echo "Usage: $0 (start|stop|restart|try-restart|reload|force-reload|status|help)"
 		exit 2
 		;;
 
