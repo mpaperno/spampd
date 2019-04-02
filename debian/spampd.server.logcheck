@@ -9,4 +9,4 @@
 ^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Setting gid to "[[:digit:]]+"$
 ^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Setting uid to "[[:digit:]]+"$
 ^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: [[:digit:]/:-]{19} Server closing!$
-^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: [[:digit:]/:-]{19} SpamPD \(type Net::Server::PreForkSimple\) starting! pid\([[:digit:]]+\)$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: [[:digit:]/:-]{19} SpamPD \(type Net::Server::PreFork(Simple)?\) starting! pid\([[:digit:]]+\)$

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-service spampd restart
+service spampd reload
 
 exit 0
 

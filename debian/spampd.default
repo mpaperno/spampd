@@ -55,5 +55,12 @@ LOGINET=0
 # by spampd which can be used to override parameters from
 # the system-wide SpamAssassin configuration
 #
-#ADDOPTS="--config=/etc/spampd.conf"
+#ADDOPTS="--saconfig=/etc/spampd.sa.cf"
+#
+# All spampd configuration options can also be loaded from a file
+# by using the --config argument. Check the contents of this file
+# and SpamPD documentation for more details.
+#
+#ADDOPTS="--config=/etc/spampd.cfg"
+
 ADDOPTS=""

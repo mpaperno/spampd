@@ -32,8 +32,7 @@ build-stamp: configure-stamp
 	pod2man --section=8 --center="Spam Proxy Daemon" spampd.pl > spampd.8
 	gzip -9 < spampd.8 > spampd.8.gz
 
-	[ -f spampd.html.bck ] || mv -f spampd.html spampd.html.bck
-	pod2html --outfile spampd.html --header --norecurse --backlink '[Back to top]' --infile spampd.pl
+	pod2html --outfile spampd.html --header --norecurse --backlink --infile spampd.pl
 	rm -f pod2htm?.tmp
 
 	touch build-stamp
@@ -43,12 +42,11 @@ clean-patched:
 	rm -f build-stamp configure-stamp
 
 	# Add here commands to clean up after the build process.
-	rm -f spampd.8 spampd.8.gz
+	rm -f spampd.8 spampd.8.gz spampd.html
 
 	dh_clean
 
 clean: clean-patched unpatch
-	[ ! -f spampd.html.bck ] || mv -f spampd.html.bck spampd.html
 
 install: build
 	dh_testdir
