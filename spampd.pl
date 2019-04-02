@@ -1525,55 +1525,62 @@ B<spampd> I<[ options ]>
 
 Options:
 
-  --config <filename>       Load options from file(s).
+  --config <filename>        Load options from file(s).
 
-  --host <host>[:<port>]    Hostname/IP and optional port to listen on.
-  --port <n>                Port to listen on (alternate syntax to above).
-  --socket <socketpath>     UNIX socket to listen on.
-  --socket-perms <mode>     The octal mode to set on the UNIX socket.
-  --relayhost <hst>[:<prt>] Host and optional port to relay mail to.
-  --relayport <n>           Port to relay to (alternate syntax to above).
-  --relaysocket <sockpath>  UNIX socket to relay to.
+  --host <host>[:<port>]     Hostname/IP and optional port to listen on.
+  --port <n>                 Port to listen on (alternate syntax to above).
+  --socket <socketpath>      UNIX socket to listen on.
+  --socket-perms <mode>      The octal mode to set on the UNIX socket.
+  --relayhost <hst>[:<prt>]  Host and optional port to relay mail to.
+  --relayport <n>            Port to relay to (alternate syntax to above).
+  --relaysocket <sockpath>   UNIX socket to relay to.
 
-  --children or -c <n>      Number of concurrent scanner processes to run.
-  --maxrequests or -r <n>   Maximum requests that each child can process.
-  --childtimeout <n>        Time out children after this many seconds.
-  --satimeout <n>           Time out SpamAssassin after this many seconds.
+  --min-servers | -mns  <n>  The minimum number of servers to keep running.
+  --min-spare   | -mnsp <n>  The minimum number of servers to have waiting.
+  --max-spare   | -mxsp <n>  The maximum number of servers to have waiting.
+  --max-servers | -mxs  <n>  The maximum number of child servers to start.
+  --maxrequests or -r <n>    Maximum requests that each child can process.
+  --childtimeout <n>         Time out children after this many seconds.
+  --satimeout <n>            Time out SpamAssassin after this many seconds.
 
-  --pid   or -p <filename>  Store the daemon's process ID in this file.
-  --user  or -u <user>      Specifies the user that the daemon runs as.
-  --group or -g <group>     Specifies the group that the daemon runs as.
+  --pid   or -p <filename>   Store the daemon's process ID in this file.
+  --user  or -u <user>       Specifies the user that the daemon runs as.
+  --group or -g <group>      Specifies the group that the daemon runs as.
 
-  --[no]detach              Detach from the console daemonize (default).
-  --[no]setsid              Completely detach from stderr with setsid().
+  --[no]detach               Detach from the console daemonize (default).
+  --[no]setsid               Completely detach from stderr with setsid().
 
-  --maxsize n               Maximum size of mail to scan (in KB).
-  --dose                    (D)ie (o)n (s)pamAssassin (e)rrors.
-  --tagall                  Tag all messages with SA headers, not just spam.
-  --set-envelope-headers    Set X-Envelope-From and X-Envelope-To headers.
-  --set-envelope-from       Set X-Envelope-From header only.
+  --maxsize n                Maximum size of mail to scan (in KB).
+  --dose                     (D)ie (o)n (s)pamAssassin (e)rrors.
+  --tagall                   Tag all messages with SA headers, not just spam.
+  --set-envelope-headers     Set X-Envelope-From and X-Envelope-To headers.
+  --set-envelope-from        Set X-Envelope-From header only.
 
-  --local-only or -L        Turn off all SA network-based tests.
-  --homedir path            Use the specified directory as SA home.
-  --saconfig <filename>     Use the file for SA "user_prefs" configuration.
+  --local-only or -L         Turn off all SA network-based tests.
+  --homedir path             Use the specified directory as SA home.
+  --saconfig <filename>      Use the file for SA "user_prefs" configuration.
 
-  --logfile or -o <dest>    Destination for logs (syslog|stderr|<filename>).
-  --logsock or -ls <sock>   Allows specifying the syslog socket type.
-  --logident or -li <name>  Specify syslog identity name.
-  --logfacility or -lf <nm> Specify syslog facility (log name).
-  --log-rules-hit or -rh    Log the names of each matched SA test per mail.
-  --debug or -d [<areas>]   Controls extra debug logging.
+  --logfile or -o <dest>     Destination for logs (syslog|stderr|<filename>).
+  --logsock or -ls <sock>    Allows specifying the syslog socket type.
+  --logident or -li <name>   Specify syslog identity name.
+  --logfacility or -lf <nm>  Specify syslog facility (log name).
+  --log-rules-hit or -rh     Log the names of each matched SA test per mail.
+  --debug or -d [<areas>]    Controls extra debug logging.
 
-  --help | -h | -?   [txt]  Show basic command-line usage.
-          -hh | -??  [txt]  Show short option descriptions (this text).
-         -hhh | -??? [txt]  Show usage summary and full option descriptions.
-  --man [html|txt]          Show full documentation as a man page or HTML/txt.
-  --show defaults|<thing>   Print default option values (or <thing>) and exit.
-  --version                 Print version information and exit.
+  --help | -h | -?   [txt]   Show basic command-line usage.
+          -hh | -??  [txt]   Show short option descriptions (this text).
+         -hhh | -??? [txt]   Show usage summary and full option descriptions.
+  --man [html|txt]           Show full docs a man page or HTML/plain text.
+  --show defaults|<thing>    Print default option values or <thing> and exit.
+  --version                  Print version information and exit.
+
+Compatibility with previous SpamPD versions:
+
+  --children or -c <n>       Same as --max-servers | -mxs (since v2.60).
 
 Deprecated since SpamAssassin v3:
 
-  --auto-whitelist or -aw   Use the SA global auto-whitelist feature.
+  --auto-whitelist or -aw    Use the SA global auto-whitelist feature.
 
 =head1 DESCRIPTION
 
@@ -1605,7 +1612,9 @@ Perl modules:
 
 =item B<Mail::SpamAssassin>
 
-=item B<Net::Server::PreForkSimple> (>= v0.89)
+=item B<Net::Server> (>= v0.89, 2.009 recommended)
+
+With <Net::Server::PreForkSimple> and/or B<Net::Server::PreFork> submodules.
 
 =item B<IO::File>
 
@@ -1665,6 +1674,33 @@ need to have a version of Postfix which supports this (ideally v.2 and up).
 Note that these examples only show incoming mail delivery.  Since it is
 often unnecessary to scan mail coming from your network, it may be desirable
 to set up a separate outbound route which bypasses I<spampd>.
+
+=head2 Scalable Mode
+
+Since v2.60 I<spampd> can optionally run in "scalable mode" which dynamically adjusts the number
+of child servers which can process requests simultaneously. This is activated automatically if the
+C<--min-servers> option is specifically set to be lower than C<--max-servers>.
+
+Historically I<SpamPD> inherited from the module I<Net::Server::PreForkSimple> which only allows for
+a static number of child servers to be running at once. This new option essentially allows for inheriting from
+I<Net::Server::PreFork> which features dynamic allocation of child servers, with some tunable parameters.
+(The reason I<PreFork> wasn't used to begin with is because older versions of it didn't seem to work...
+it was an old TODO to try again later.)
+
+Here is what the I<Net::Server::PreFork> documentation has to say (option names changed to match I<spampd>):
+
+I<"This personality binds to one or more ports and then forks C<--min-servers> child process.  The server
+will make sure that at any given time there are C<--min-spare> servers available to receive a client
+request, up to C<--max-servers>. Each of these children will process up to C<--maxrequests> client
+connections. This type is good for a heavily hit site, and should scale well for most applications.">
+
+Some experimentation and tuning will likely be needed to get the best performance vs. efficiency. Keep in mind
+that a SIGHUP sent to the parent process will reload configuration files and restart child servers gracefully
+(handy for tuning a busy site).
+
+See the documentation for C<--min-servers>, C<--max-servers>, C<--min-spare>, and C<--max-spare> options,
+and also the section about L</"Other Net::Server Options"> for tuning parameters and links to further documentation.
+
 
 =head1 INSTALLATION AND CONFIGURATION
 
@@ -1740,17 +1776,28 @@ I<spampd> is set up for the default Postfix timeout values.
 The following guide has some more specific setup instructions:
 B<L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>>
 
+
 =head1 UPGRADING
 
-If upgrading from a version prior to 2.2, please note that the --add-sc-header
+Always consult the F<changelog.txt> file which should be included in the I<spampd> repository/distribution.
+
+If upgrading from a version B<prior to 2.2>, please note that the --add-sc-header
 option is no longer supported.  Use SA's built-in header manipulation features
 instead (as of SA v2.6).
 
-Upgrading from version 1 simply involves replacing the F<spampd> program file
+Upgrading from B<version 1> simply involves replacing the F<spampd> program file
 with the latest one.  Note that the I<dead-letters> folder is no longer being
 used and the --dead-letters option is no longer needed (though no errors are
 thrown if it's present).  Check the L</OPTIONS> list below for a full list of new
 and deprecated options.  Also be sure to check out the change log.
+
+B<Since v2.60> I<spampd> has a new L</"Scalable Mode"> feature which varies the number of running
+child servers based on demand. This is disabled by default. The option previosly known as
+C<--children> (or C<-c>) is now called C<--max-servers> (or C<-mxs>), but the old style is still accepted.
+See descriptions of the C<max-servers> and C<min-servers> options for details.
+
+Also note that v2.60 added the ability to use a L</"CONFIGURATION FILE"> for specifying all options.
+
 
 =head1 USAGE
 
@@ -1760,11 +1807,12 @@ and deprecated options.  Also be sure to check out the change log.
     [ --host <host>[:<port>]      | --socket <path> --socket-perms <mode> ]
     [ --relayhost <host>[:<port>] | --relaysocket <path>                  ]
 
-    [--children      | -c <n>] [--saconfig <filename>] [--user  | -u <user> ]
-    [--maxrequests   | -r <n>] [--satimeout <n>      ] [--group | -g <group>]
-    [--childtimeout       <n>] [--dose               ] [--pid   | -p <file> ]
-    [--tagall        | -a    ] [--maxsize   <n>      ] [--detach            ]
-    [--log-rules-hit | -rh   ] [--local-only | -L    ] [--setsid            ]
+    [--min-servers | -mns  <n>] [--saconfig  <file>] [--user  | -u <user>  ]
+    [--min-spare   | -mnsp <n>] [--satimeout <n>   ] [--group | -g <group> ]
+    [--max-spare   | -mxsp <n>] [--dose            ] [--pid   | -p <file>  ]
+    [--max-servers | -mxs  <n>] [--maxsize   <n>   ] [--[no]detach         ]
+    [--maxrequests | -r    <n>] [--local-only | -L ] [--[no]setsid         ]
+    [--childtimeout        <n>] [--tagall     | -a ] [--log-rules-hit | -rh]
     [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
 
     [ --logfile | -o (syslog|stderr|<filename>) ][...]
@@ -1873,17 +1921,56 @@ I<mail>/I<mail>.
 
 =item B<--children> or B<-c> I<<n>>
 
+=item B<--max-servers> or B<-mxs> I<<n>> C<new in v2.60>
+
 Number of child servers to start and maintain (where n > 0). Each child will
-process up to --maxrequests (below) before exiting and being replaced by
+process up to C<--maxrequests> (below) before exiting and being replaced by
 another child.  Keep this number low on systems w/out a lot of memory.
-Default is 5 (which seems OK on a 512MB lightly loaded system).  Note that
-there is always a parent process running, so if you specify 5 children you
+Note that there is always a parent process running, so if you specify 5 children you
 will actually have 6 I<spampd> processes running.
+
+B<Note:> If C<--min-servers> option is also set, and is less than C<--max-servers>,
+then the server runs in L</"Scalable Mode"> and the meaning of this option changes.
+In scalable mode, the number of actual running servers will fluctuate between C<--min-servers>
+and C<--max-servers>, based on demand.
 
 You may want to set your origination mail server to limit the
 number of concurrent connections to I<spampd> to match this setting (for
 Postfix this is the C<xxxx_destination_concurrency_limit> setting where
 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
+
+See also C<--min-servers>, C<--min-spare>, and C<--max-spare> options.
+
+
+=item B<--min-servers> or B<-mns> I<<n>> C<new in v2.60>
+
+Minimum number of child servers to start and maintain (where n > 0).
+
+B<Note:> If this option is set, and it is less than C<--max-servers> option,
+then the server runs in L</"Scalable Mode">. By default this option is undefined,
+meaning I<spampd> runs only a set number of servers specified in C<--max-servers>.
+In scalable mode, the number of actual running servers will fluctuate between C<--min-servers>
+and C<--max-servers>, based on demand.
+
+See also C<--max-servers>, C<--min-spare>, and C<--max-spare> options.
+
+
+=item B<--min-spare> or B<-mnsp> I<<n>> C<new in v2.60>
+
+The minimum number of servers to have waiting for requests.  Minimum
+and maximum numbers should not be set to close to each other or the
+server will fork and kill children too often. (I<- Copied from C<Net::Server::PreFork>>)
+
+B<Note:> This option is only used when running in L</"Scalable Mode">. See C<--min-servers>
+and C<--max-servers> options.
+
+
+=item B<--max-spare> or B<-mxsp> I<<n>> C<new in v2.60>
+
+The maximum number of servers to have waiting for requests. (I<- Copied from C<Net::Server::PreFork>>)
+
+B<Note:> This option is only used when running in L</"Scalable Mode">. See C<--min-servers>
+and C<--max-servers> options.
 
 
 =item B<--maxrequests> or B<-mr> or B<-r> I<<n>>
@@ -2200,8 +2287,8 @@ module I<HTML::Display> is used to (try to) open a browser.
 =head2 Other Net::Server Options
 
 I<Net::Server> supports some other options which I<spampd> doesn't accept directly.
-For example there are access control options, an option to run chrooted, and a few more (see below).
-Such options can be passed through to I<Net::Server> by specifying them at the end
+For example there are access control options, child process tuning, and a few more (see below).
+Such options can be passed through to I<Net::Server> (and subtypes) by specifying them at the end
 of the I<spampd> command line (or in a configuration file) following two dashes
 C< -- > by themselves (this is a failry typicaly convention for passing options onto
 another program). As an example, it may look something like this:
@@ -2215,13 +2302,21 @@ To specify I<Net::Server> options in a configuration file, place them after two
 dashes (C<-->) on a line by themselves. See L</"CONFIGURATION FILE"> for an example.
 
 This only makes sense with the few options not directly controlled by/through I<spampd>.
-As of I<Net::Server> and I<Net::Server::PreForkSimple> v2.009 the list is:
+As of I<Net::Server> v2.009 the list is:
 
   reverse_lookups, allow, deny, cidr_allow, cidr_deny, chroot, ipv, conf_file,
   serialize, lock_file, check_for_dead, max_dequeue, check_for_dequeue
 
-See the L<Net::Server(3)|https://https://metacpan.org/pod/Net::Server#DEFAULT-ARGUMENTS-FOR-Net::Server>
-and L<Net::Server::PreForkSimple(3)|https://metacpan.org/pod/Net::Server::PreForkSimple#COMMAND-LINE-ARGUMENTS>
+If running in L</"Scalable Mode"> then these settings from I<Net::Server::PreFork> can also be very relevant to performance tuning:
+
+  check_for_waiting, check_for_spawn, min_child_ttl
+
+Keep in mind that the I<Net::Server> types inherit from each other: C<PreFork> inherits from C<PreForkSimple>
+which inherits from C<Net::Server> itself. Which means all the options are also inherited.
+
+See the L<Net::Server(3)|https://https://metacpan.org/pod/Net::Server#DEFAULT-ARGUMENTS-FOR-Net::Server>,
+L<Net::Server::PreForkSimple(3)|https://metacpan.org/pod/Net::Server::PreForkSimple#COMMAND-LINE-ARGUMENTS>,
+and L<Net::Server::PreFork(3)|https://metacpan.org/pod/Net::Server::PreFork#COMMAND-LINE-ARGUMENTS>
 documentation for details.
 
 
