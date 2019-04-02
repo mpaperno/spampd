@@ -1395,7 +1395,7 @@ sub print_options {
 
 # =item show_debug($what, [ \%options, \@startup_args | \$thing_to_dump [,\$another_thing[,...]] ])
 # Debug helper, print some values and exit. $what can be an array or single string or CSV list.
-# $what values: [ all | [conf(ig), argv, start(args), self] ] | obj(ect)
+# $what values: [ all | [vers(ion), conf(ig), argv, start(args), self] ] | obj(ect)
 #   "all" means everything except "object".
 #   "obj" means just dump the rest of the argument(s); ignores rest of $what, basically Data::Dumper->Dump(@_)
 # Always returns true, even if there is an error, so can be used eg.: show_debug(...) && exit(0);
@@ -1410,6 +1410,8 @@ sub show_debug {
     }
     else {
       ($opts, $clargs) = @_;
+      if (grep(/^(vers(ion)?|all)$/i, @$what))
+        { $self->version(-1); $ok = 1; }
       if (grep(/^(conf(ig)?|all)$/i, @$what) && $opts)
         { $self->print_options($opts, 'current', -1); $ok = 1; }
       if (grep(/^(argv|all)$/i, @$what))
@@ -1437,11 +1439,12 @@ sub show_debug {
 }
 
 sub version {
+  my ($self, $exit) = (shift, @_ ? $_[0] : 0);
   print __PACKAGE__." version $VERSION\n";
-  print "  using Net::Server $Net::Server::VERSION\n";
-  print "  using SpamAssassin " . Mail::SpamAssassin::Version() . "\n";
-  print "  using Perl " . join(".", map(0+($_||0), ($] =~ /(\d)\.(\d{3})(\d{3})?/))) . "\n\n";
-  exit 0;
+  print "  using ".$self->net_server_type()." ".Net::Server->VERSION()."\n";
+  print "  using SpamAssassin ".Mail::SpamAssassin::Version()."\n";
+  print "  using Perl ".(split(/v/, $^V))[-1]."\n\n";
+  exit $exit if $exit > -1;
 }
 
 # =item usage([exit_value=2, [help_level=1, [help_format=man]]])
@@ -1818,7 +1821,7 @@ Also note that v2.60 added the ability to use a L</"CONFIGURATION FILE"> for spe
     [ --logfile | -o (syslog|stderr|<filename>) ][...]
     [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
     [ --debug   | -d [<area,...>|1|0] ]  [ --logfacility | -lf <name> ]
-    [ --show ( all | (defaults, config, argv, start, self) ) ][...]
+    [ --show ( all | (defaults, config, version, argv, start, self) ) ][...]
   ]
   spampd --version
   spampd [--help | -?] | -?? [txt] | -??? [txt] | [-???? | --man [html|txt]]
@@ -2233,6 +2236,11 @@ anything loaded from config file(s).
 =item *
 
 C<start>: Shows the final configuration arguments after processing any config file(s).
+
+=item *
+
+C<version>: Same as C<--version> switch but runs after parsing all options and shows actual I<Net::Server> type
+which would be used (I<PreFork> or I<PreForkSimple>).
 
 =item *
 
