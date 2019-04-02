@@ -378,12 +378,9 @@ package SpamPD;
 use strict;
 use warnings;
 
-our $VERSION = '2.60';
-
 BEGIN {
-  require Net::Server; Net::Server->VERSION(0.89);
-  require Net::Server::PreForkSimple;
-  our @ISA = qw(Net::Server::PreForkSimple);
+  require Net::Server;
+  Net::Server->VERSION(0.89);
 
   # use included modules
   import SpamPD::Server;
@@ -393,6 +390,11 @@ BEGIN {
 use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
+
+our $VERSION = '2.60';
+
+# ISA will change to a Net::Server "flavor" at runtime based on options.
+our @ISA = qw(Net::Server);
 
 use constant {
   # Logging type constants: low byte for destination(s), high byte for logger type.
@@ -419,7 +421,10 @@ sub new {
     server => {
       host              => '127.0.0.1',           # listen on ip
       port              => 10025,                 # listen on port
-      max_servers       => 5,                     # number of child processes (servers) to spawn at start
+      min_servers       => undef,                 # min num of servers to always have running (undef means use same value as max_servers, otherwise means run as PreFork)
+      min_spare_servers => 1,                     # min num of servers just sitting there (only used when running as PreFork)
+      max_spare_servers => 4,                     # max num of servers just sitting there (only used when running as PreFork)
+      max_servers       => 5,                     # max number of child processes (servers) to spawn
       max_requests      => 20,                    # max requests handled by child b4 dying
       pid_file          => '/var/run/spampd.pid', # write pid to file
       user              => 'mail',                # user to run as
@@ -464,6 +469,20 @@ sub new {
       dont_copy_prefs      => 1,                  # tell SA not to copy user pref file into its working dir
     }
   }, $class;
+}
+
+# Set the actual Net::Server flavor type we'll run as.
+sub set_server_type {
+  my $self = shift;
+  # Default behavior is to run as PreForkSimple unless min_servers is set and is != max_servers.
+  if ($self->{server}->{min_servers} && $self->{server}->{min_servers} != $self->{server}->{max_servers}) {
+    require Net::Server::PreFork;
+    @SpamPD::ISA = qw(Net::Server::PreFork);
+  }
+  else {
+    require Net::Server::PreForkSimple;
+    @SpamPD::ISA = qw(Net::Server::PreForkSimple);
+  }
 }
 
 ##################   INIT   ######################
@@ -602,11 +621,16 @@ sub options_map {
 
   # To support setting boolean options with "--opt", "--opt=1|0", as well as the "no-" prefix,
   #   we make them accept an optional integer and add the "no" variants manually. Because Getopt::Long doesn't support that :(
+  # Anything that isn't a direct reference to value (eg. a sub) will not be shown in "--show defaults|config" listings.
   return (
     # Net::Server
     'host=s'                   => \$srv_p->{host},
     'port=i'                   => \$srv_p->{port},
-    'children|c=i'             => \$srv_p->{max_servers},
+    'min-servers|mns=i'        => \$srv_p->{min_servers},
+    'min-spare|mnsp=i'         => \$srv_p->{min_spare_servers},
+    'max-spare|mxsp=i'         => \$srv_p->{max_spare_servers},
+    'max-servers|mxs=i'        => \$srv_p->{max_servers},
+    'children|c=i'             => sub { $srv_p->{max_servers} = $_[1]; },
     'maxrequests|mr|r=i'       => \$srv_p->{max_requests},
     'pid|p=s'                  => \$srv_p->{pid_file},
     'user|u=s'                 => \$srv_p->{user},
@@ -663,6 +687,8 @@ sub handle_main_opts {
   Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
   GetOptions(%options) or ($self->is_reloading ? $self->fatal("Could not parse command line!\n") : $self->usage(1));
 
+  $self->set_server_type();  # decide who we are
+
   # These paths are already untainted but do a more careful check JIC.
   for ($spd_p->{socket}, $spd_p->{relaysocket}, $srv_p->{pid_file}, $sa_p->{userprefs_filename})
     { $_ = untaint_path($_); }
@@ -698,10 +724,9 @@ sub handle_main_opts {
 sub validate_main_opts {
   my $self = shift;
   my ($srv_p, $spd_p) = ($self->{server}, $self->{spampd});
-  my (@errs, @warns);
+  my (@errs, @warns) = (@_ ? $_[0] : (), @_ > 1 ? $_[1] : ());
 
-  if ($srv_p->{max_servers} < 1)
-    { push (@errs, "Option --children must be greater than zero!"); }
+  (@errs, @warns) = $self->validate_server_type_opts(@errs, @warns);
 
   if ($self->{spampd}->{sa_awl} && $spd_p->{sa_version} >= 3)
     { push (@errs, "Option --auto-whitelist is deprecated with SpamAssassin v3.0+. Use SA configuration file instead."); }
@@ -716,6 +741,50 @@ sub validate_main_opts {
     or push (@errs, "Error loading IO::IP::UNIX module, required for --relayhost option.\n\t$@");
   }
 
+  return (@errs, @warns);
+}
+
+sub validate_server_type_opts {
+  my $self = shift;
+  return $self->validate_prefork_opts(@_)       if $self->isa(qw(Net::Server::PreFork));  # must check before Simple (PreFork inherits from it)
+  return $self->validate_preforksimple_opts(@_) if $self->isa(qw(Net::Server::PreForkSimple));
+  return @_;
+}
+
+sub validate_preforksimple_opts {
+  my ($self, @errs, @warns) = @_;
+
+  if ($self->{server}->{max_servers} < 1)
+    { push (@errs, "Option '--children' (or '--max-children') ($self->{server}->{max_servers}) must be greater than zero!"); }
+  return (@errs, @warns);
+}
+
+sub validate_prefork_opts {
+  my ($self, @errs, @warns) = @_;
+  my $prop = $self->{server};
+
+  # Even though Net::Server::PreFork validates all these options also,
+  #   their error messages can be confusing and in some cases just wrong.
+  if ($prop->{min_servers} < 1) {
+    push (@errs, "Option '--min-children' ($prop->{min_servers}) must be greater than zero!");
+  }
+  elsif ($prop->{max_servers} < 1) {
+    push (@errs, "Option '--max-children' (or '--children') ($prop->{max_servers}) must be greater than zero!");
+  }
+  elsif ($prop->{max_servers} < $prop->{min_servers}) {
+    push (@errs, "Option '--max-children' (or --children) ($prop->{max_servers}) must be >= '--min-children' ($prop->{min_servers})!");
+  }
+  else {
+    if ($prop->{max_spare_servers} >= $prop->{max_servers})
+      { push (@errs, "Option '--max-spare' ($prop->{max_spare_servers}) must be < '--max-children' ($prop->{max_servers})."); }
+
+    if (my $ms = $prop->{min_spare_servers}) {
+      if ($ms > $prop->{min_servers})
+        { push (@errs, "Option '--min-spare' ($ms) must be <= '--min-children' ($prop->{min_servers})"); }
+      if ($ms > $prop->{max_spare_servers})
+        { push (@errs, "Option '--min-spare' ($ms) must be <= '--max-spare' ($prop->{max_spare_servers})"); }
+    }
+  }
   return (@errs, @warns);
 }
 
