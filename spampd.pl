@@ -1522,6 +1522,30 @@ SpamPD - Spam Proxy Daemon
 
 Documentation for SpamPD version 2.60.
 
+
+=head1 DESCRIPTION
+
+I<spampd> is an SMTP/LMTP proxy that marks (or tags) spam using
+SpamAssassin (L<http://www.SpamAssassin.org/>). The proxy is designed
+to be transparent to the sending and receiving mail servers and at no point
+takes responsibility for the message itself. If a failure occurs within
+I<spampd> (or SpamAssassin) then the mail servers will disconnect and the
+sending server is still responsible for retrying the message for as long
+as it is configured to do so.
+
+I<spampd> uses SpamAssassin to modify (tag) relayed messages based on
+their spam score, so all SA settings apply. This is described in the SA
+documentation.  I<spampd> will by default only tell SA to tag a
+message if it exceeds the spam threshold score, however you can have
+it rewrite all messages passing through by adding the --tagall option
+(see SA for how non-spam messages are tagged).
+
+I<spampd> logs all aspects of its operation to syslog(8), using the
+mail syslog facility.
+
+The latest version can be found at L<https://github.com/mpaperno/spampd>.
+
+
 =head1 SYNOPSIS
 
 B<spampd> I<[ options ]>
@@ -1585,27 +1609,6 @@ Deprecated since SpamAssassin v3:
 
   --auto-whitelist or -aw    Use the SA global auto-whitelist feature.
 
-=head1 DESCRIPTION
-
-I<spampd> is an SMTP/LMTP proxy that marks (or tags) spam using
-SpamAssassin (L<http://www.SpamAssassin.org/>). The proxy is designed
-to be transparent to the sending and receiving mail servers and at no point
-takes responsibility for the message itself. If a failure occurs within
-I<spampd> (or SpamAssassin) then the mail servers will disconnect and the
-sending server is still responsible for retrying the message for as long
-as it is configured to do so.
-
-I<spampd> uses SpamAssassin to modify (tag) relayed messages based on
-their spam score, so all SA settings apply. This is described in the SA
-documentation.  I<spampd> will by default only tell SA to tag a
-message if it exceeds the spam threshold score, however you can have
-it rewrite all messages passing through by adding the --tagall option
-(see SA for how non-spam messages are tagged).
-
-I<spampd> logs all aspects of its operation to syslog(8), using the
-mail syslog facility.
-
-The latest version can be found at L<https://github.com/mpaperno/spampd>.
 
 =head1 REQUIRES
 
@@ -1615,9 +1618,7 @@ Perl modules:
 
 =item B<Mail::SpamAssassin>
 
-=item B<Net::Server> (>= v0.89, 2.009 recommended)
-
-With <Net::Server::PreForkSimple> and/or B<Net::Server::PreFork> submodules.
+=item B<Net::Server> (>= v0.89, v2.009+ recommended) with B<PreForkSimple> and/or B<PreFork> submodules.
 
 =item B<IO::File>
 
@@ -1837,11 +1838,13 @@ same option loaded from config file(s).
 =head1 OPTIONS
 
 Please be sure to also read the general information about specifying option
-arguments in the L</USAGE> section.
+arguments in the above L</"USAGE"> section.
+
+To show default values for all options, run C<spampd --show defaults>.
 
 =over 5
 
-=item B<--config> or B<--cfg> or B<--config-file> or B<--cfg-file> I<<filename>> C<(new in v2.60)>
+=item B<--config> or B<-cfg> or B<--config-file> or B<--cfg-file> I<<filename>> C<new in v2.60>
 
 Load options from one or more configuration file(s). This option can be specified
 multiple times. The C<filename> can also be a list of files separated by a C<:>
@@ -2076,17 +2079,17 @@ C<Prior to v2.60:>
 The default was C<unix> except on HP-UX and SunOS (Solaris) systems it is C<inet>.
 
 
-=item B<--logident> or B<-li> I<<name>> C<(new in v2.60)>
+=item B<--logident> or B<-li> I<<name>> C<new in v2.60>
 
 Syslog identity name to use. This may also be used in log files written directly (w/out syslog). Default is C<spampd>.
 
 
-=item B<--logfacility> or B<--lf> I<<name>> C<(new in v2.60)>
+=item B<--logfacility> or B<-lf> I<<name>> C<new in v2.60>
 
 Syslog facility name to use. This is typically the name of the system-wide log file to be written to. Default is C<mail>.
 
 
-=item B<--[no]detach> I<[0|1]> C<(new in v2.20)>
+=item B<--[no]detach> I<[0|1]> C<new in v2.20>
 
 By default I<spampd> will detach from the console and fork into the
 background ("daemonize"). Use C<--nodetach> to override this.
@@ -2094,7 +2097,7 @@ This can be useful for running under control of some daemon
 management tools or testing from a command line.
 
 
-=item B<--[no]setsid> I<[0|1]> C<(new in v2.51)>
+=item B<--[no]setsid> I<[0|1]> C<new in v2.51>
 
 If C<--setsid> is specified then I<spampd> will fork after the bind method to release
 itself from the command line and then run the POSIX::setsid() command to truly
@@ -2128,13 +2131,13 @@ I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be
 set to 1/true.
 
 
-=item B<--log-rules-hit> or B<--rh> I<[0|1]>
+=item B<--log-rules-hit> or B<-rh> I<[0|1]>
 
 Logs the names of each SpamAssassin rule which matched the message being
 processed.  This list is returned by SA.
 
 
-=item B<--set-envelope-headers> or B<--seh> I<[0|1]> C<(new in v2.30)>
+=item B<--set-envelope-headers> or B<-seh> I<[0|1]> C<new in v2.30>
 
 Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
 being scanned before it is passed to SpamAssassin. The idea is to help SA
@@ -2148,7 +2151,7 @@ X-Envelope-To header after scanning, SpamAssassin itself might add headers
 that report recipient(s) listed in X-Envelope-To.
 
 
-=item B<--set-envelope-from> or B<--sef> I<[0|1]> C<(new in v2.30)>
+=item B<--set-envelope-from> or B<-sef> I<[0|1]> C<new in v2.30>
 
 Same as above option but only enables the addition of X-Envelope-From header.
 For those that don't feel comfortable with the possible information exposure
@@ -2160,7 +2163,7 @@ of X-Envelope-To.  The above option overrides this one.
 Turn off all SA network-based tests (DNS, Razor, etc).
 
 
-=item B<--homedir> I<<directory>> C<(new in v2.40)>
+=item B<--homedir> I<<directory>> C<new in v2.40>
 
 Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
@@ -2215,7 +2218,7 @@ L<SpamAssassin Wiki::DebugChannels|http://wiki.apache.org/spamassassin/DebugChan
 L<Mail::SpamAssassin::Logger::add_facilities()|https://spamassassin.apache.org/doc/Mail_SpamAssassin_Logger.html#METHODS>
 
 
-=item B<--show> I<<thing>>[,I<<thing>>[,...]] C<(new in v2.60)>
+=item B<--show> I<<thing>>[,I<<thing>>[,...]] C<new in v2.60>
 
 Meant primarily for debugging configuration settings (or code), this will print some information
 to the console and then exit.
@@ -2263,7 +2266,7 @@ separating the items with a comma: C<--show config,start,argv>.
 Note that all I<thing> options besides C<defaults> and C<config> require the Perl module I<Data::Dumper> installed.
 
 
-=item B<--version> C<(new in v2.52)>
+=item B<--version> C<new in v2.52>
 
 Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
@@ -2345,7 +2348,7 @@ compatibility with prevoius I<spampd> versions:
 
 =item  B<--hostname>
 
-=item B<--auto-whitelist> or B<--aw> C<deprecated with SpamAssassin v3+>
+=item B<--auto-whitelist> or B<-aw> C<deprecated with SpamAssassin v3+>
 
 This option is no longer relevant with SA version 3.0 and above, which
 controls auto whitelist use via config file settings. Do not use it unless
@@ -2364,17 +2367,20 @@ need to be modified in 2 instances (search the source for DBBasedAddrList).
 
 =head1 CONFIGURATION FILE
 
-I<spampd> allows for the use of a configuration file to read in server parameters.
-The format of this conf file is simple key value pairs. Comments (starting with # or ;)
-and blank lines are ignored. The option names are exactly as they appear above.
+Since v2.60 I<spampd> allows for the use of a configuration file to load server parameters.
+One or more files can be specified on the command line (see C<--config> option for more details on syntax).
+The format of a configuration file is simple key/value pairs. Comments (starting with # or ;)
+and blank lines are ignored. The option names are exactly as they appear above in the L</"OPTIONS"> section.
 They can be listed with or w/out the "-"/"--" prefixes.
 Key/value separator can be one or more of space, tab, or "=" (equal) sign.
 
-Multiple configuration files can be loaded, with the latter ones being able to
-override options loaded earlier. Any options specified on the command line will
-take precedence over options from file(s). You may also provide "passthrough"
-options directly to Net::Server by putting them after a "--" on a line by itself
-(this is just like using the lonesome "--" on a command line; see L</"Other Net::Server Options">).
+Multiple configuration files can be loaded, with the latter ones being able to override options
+loaded earlier. Any options specified on the command line will take precedence over options from
+file(s). Configuration file(s) are reloaded during a HUP-induced restart (see L</"SIGNALS">),
+making it possible to adjust settings dynamically on a running server.
+
+You may also provide "B<passthrough>" options directly to I<Net::Server> by putting them after a "--" on a
+line by itself (this is just like using the lonesome "--" on a command line; see L</"Other Net::Server Options">).
 
 Note that one cannot use the C<--config> option to load a file from within
 another file. B<A config file can only be specified on the command line.>
@@ -2406,28 +2412,33 @@ valid syntax for the file.
   set-envelope-from
   no-log-rules-hit
 
-  # Passthrough arguments for Net::Server[::PreForkSimple] could go here.
+  # Passthrough arguments for Net::Server[::PreFork[Simple]] could go here.
   # Be sure to also uncomment the "--" if using any.
   # --
   # cidr_allow      127.0.0.1/32
-
-This feature was added in C<(v2.60)>.
 
 
 =head1 SIGNALS
 
 =over 5
 
-=item HUP
+=item HUP  C<updated in v2.60>
 
-Sending HUP signal to the master process will restart all the children
-gracefully (meaning the currently running requests will shut down once
-the request is complete).
+Sending HUP signal to the master process will restart all the children gracefully (meaning the currently
+running requests will shut down once the request is complete).
 
-C<(new in v2.60)>: SpamAssassin configuration IS reloaded on HUP. Any children
-currently in the middle of a transaction will finish with the previous SA config
-and then exit. A new set of children, using the new config, is spawned upon HUP
-and will serve any new requests.
+C<Since v2.60>:
+
+SpamAssassin configuration IS reloaded on HUP. Any children currently in the middle of a transaction will
+finish with the previous SA config and then exit. A new set of children, using the new config, is spawned
+immediately upon HUP and will serve any new requests.
+
+In a similar manner, I<spampd> will also reload its own settings from any configuration file(s)
+specified on the original command line with C<--config> option (see L</"OPTIONS"> and L</"CONFIGURATION FILE">).
+
+C<Since v2.52>: Children were restarted but SpamAssassin configuration was not reloaded.
+
+C<Prior to v2.52>: HUP would try to restart the server with all default settings (usually failing).
 
 =item TTIN, TTOU
 
@@ -2443,7 +2454,7 @@ children immediately and shut down the daemon.
 
 Sending QUIT signal to the master process will perform a graceful shutdown,
 waiting for all children to finish processing any current transactions and
-then shutting down the daemon.
+then shutting down the parent process.
 
 =back
 
