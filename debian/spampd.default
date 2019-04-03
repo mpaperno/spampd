@@ -1,66 +1,43 @@
 # Defaults file for spampd, the spam proxy daemon
 # (spampd is using spamassassin to scan mails)
 
-# On boolean options, 0 means off/no/false, 1 means on/yes/true
-
-# The following options are used by SysV Init only, for Systemd please configure in service file.
-
-# Whether or not to start spampd (0/1) 
+# On systems using SysV Init, this controls whether or not to start spampd (0/1)
+# With systemd (en|dis)able spampd instead by issuing:
+#   sudo systemctl (en|dis)able spampd.service
 STARTSPAMPD=1
 
-# where to put the PID file
-PIDFILE=/var/run/spampd.pid
+# Where to put the PID file. Only used for SysV init.
+# For systemd, ths is set in: /lib/systemd/system/spampd.service
+PIDFILE=/var/run/spampd/spampd.pid
 
-# Generic options start here
-
-# The IP to listen on
-LISTENHOST=127.0.0.1
-
-# The port to listen on
-LISTENPORT=10025
-
-# The host to forward the connection to
-DESTHOST=127.0.0.1
-
-# The port to forward the connection to
-DESTPORT=10026
-
-# How many parallel checks can be done in parallel
-CHILDREN=3
-
-# user ID to run as
+# User and Group ID to run as. These are passed to spampd.
+# These values are also used by SysV init script.
 USERID=spampd
-
-# group ID to run as
 GRPID=spampd
 
-# Whether or not to tag all messages (0/1)
-TAGALL=1
+# Additional arguments for spampd. Only _one_ "SPAMPD_ARGS=" line can be uncommented.
 
-# Whether or not to use auto-whitelisting (0/1)
-AUTOWHITELIST=0
+# Load all other settings from configuration file.
+SPAMPD_ARGS="--config=/etc/spampd.cfg"
 
-# Whether or not to do only local checks 
-# if this is turned on, no network based checks
-# (like DNS-Blacklists) are done. (0/1)
-LOCALONLY=1
+# And/or provide arguments here directly. These args would override anything in config file.
+# SPAMPD_ARGS="---config=/etc/spampd.cfg --homedir=/var/cache/spampd"
 
-# Whether to prefer INET (network,1) for syslog logging
-# instead of UNIX (unix domain socket,0) (0/1)
-LOGINET=0
+# Or w/out config file at all.
+# SPAMPD_ARGS="--relayport=10026 --children=3 --tagall --local-only --homedir=/var/cache/spampd"
 
-# Any additional parameters you want to pass to spampd
+
+# ! The settings below are also accepted in Debian versions of spampd (only!), for backwards
+#   compatibility with some configurations/scripts.
+# ! Do not use for new setups, use one of the SPAMPD_ARGS variants instead !
 #
-# The following sample entry enables use of a config file 
-# by spampd which can be used to override parameters from
-# the system-wide SpamAssassin configuration
-#
-#ADDOPTS="--saconfig=/etc/spampd.sa.cf"
-#
-# All spampd configuration options can also be loaded from a file
-# by using the --config argument. Check the contents of this file
-# and SpamPD documentation for more details.
-#
-#ADDOPTS="--config=/etc/spampd.cfg"
-
-ADDOPTS=""
+# LISTENHOST=127.0.0.1
+# LISTENPORT=10025
+# DESTHOST=127.0.0.1
+# DESTPORT=10026
+# CHILDREN=3
+# TAGALL=1
+# AUTOWHITELIST=0
+# LOCALONLY=1
+# LOGINET=0
+# ADDOPTS=""

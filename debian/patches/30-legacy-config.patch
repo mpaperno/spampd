@@ -1,0 +1,28 @@
+Author: Maxim Paperno <MPaperno@WorldDesign.com>
+Description: Support legacy way of setting service options using env. vars.
+
+--- a/spampd.pl
++++ b/spampd.pl
+@@ -504,6 +504,22 @@
+     $ENV{'PATH'} = '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin';
+   };
+ 
++  # Debian patch for backwards compatibility with pre v2.60 style service defaults configuration file.
++  # These env. vars should only exist if someone has modified their /etc/default/spampd and service is being started as root.
++  # !!  Do NOT use these to configure SpamPD -- this patch will likely be dropped in the future.  !!
++  if (!$self->is_reloading() && $> == 0) {
++    unshift(@ARGV, '--tagall') if $ENV{'TAGALL'};
++    unshift(@ARGV, '--local-only') if $ENV{'LOCALONLY'};
++    unshift(@ARGV, '--aw') if $ENV{'AUTOWHITELIST'};
++    unshift(@ARGV, '--logsock=inet') if $ENV{'LOGINET'};
++    unshift(@ARGV, "--port=$ENV{'LISTENPORT'}") if $ENV{'LISTENPORT'};
++    unshift(@ARGV, "--host=$ENV{'LISTENHOST'}") if $ENV{'LISTENHOST'};
++    unshift(@ARGV, "--relayport=$ENV{'DESTPORT'}") if $ENV{'DESTPORT'};
++    unshift(@ARGV, "--relayport=$ENV{'DESTHOST'}") if $ENV{'DESTHOST'};
++    unshift(@ARGV, "--max-servers=$ENV{'CHILDREN'}") if $ENV{'CHILDREN'};
++  }
++  # end patch
++
+   # Untaint $0 and each member of @ARGV, and save untainted copies for HUPping. This saves the original
+   #   command line, including any configuration files, which would be re-read upon a HUP. commandline() is in Net::Server.
+   $self->commandline([untaint_var($0), @{untaint_var(\@ARGV)}]);

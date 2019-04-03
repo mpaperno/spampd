@@ -25,13 +25,14 @@ NAME='spampd'
 PROGRAM=/usr/sbin/spampd
 #EXECUTABLE=`head -n 1 $PROGRAM | sed -e 's,^#![ 	]*/,/,;s,[ 	].*$,,'`
 EXECUTABLE=/usr/bin/perl
-PIDFILE=/var/run/spampd.pid
 
 . /lib/lsb/init-functions
 
 # set some important defaults (overridable via /etc/default/spampd)
+PIDFILE=/var/run/spampd.pid
 USERID=spampd
 GRPID=spampd
+SPAMPD_ARGS=""
 
 if [ "`id -u`" !=  "0" ]; then
 	log_failure_msg "ERROR: Insufficient privileges. Retry as root"
@@ -40,7 +41,9 @@ if [ "`id -u`" !=  "0" ]; then
 fi
 
 if [ -f /etc/default/$NAME ]; then
+	set -a
 	. /etc/default/$NAME
+	set +a
 fi
 	
 istrue () {
@@ -59,46 +62,15 @@ istrue ${STARTSPAMPD} && STARTSPAMPD='true'
 # return 5 as demanded by LSB 2.1 when program isn't installed.
 [  -x $PROGRAM ] || exit 5
 
-# 
-# Calculate final commandline
-#
-S_TAGALL=''
-S_AWL=''
-S_LOCALONLY=''
+# Daemon startup arguments. Always set PID file, user, and group.
+# (start-stop-daemon and spampd use same syntax).
+DARGS="-u ${USERID} -g ${GRPID} -p ${PIDFILE}"
 
-istrue "$TAGALL" \
-&& S_TAGALL='--tagall'
+# Spampd startup arguments, including any options set in defaults file.
+# Enforce setsid() on spampd daemon process.
+ARGS="${DARGS} ${SPAMPD_ARGS}"
 
-istrue "$AUTOWHITELIST" \
-&& S_AWL='--auto-whitelist'
-
-istrue "$LOCALONLY" \
-&& S_LOCALONLY='--L'
-
-istrue "$LOGINET" \
-&& LOGTARGET="inet" \
-|| LOGTARGET="unix"
-
-ARGS="${S_LOCALONLY} ${S_AWL} ${S_TAGALL} "
-
-[ -n "${LISTENPORT}" ] && ARGS="${ARGS} --port=${LISTENPORT}"
-
-[ -n "${LISTENHOST}" ] && ARGS="${ARGS} --host=${LISTENHOST}"
-
-[ -n "${DESTPORT}" ] && ARGS="${ARGS} --relayport=${DESTPORT}"
-
-[ -n "${DESTHOST}" ] && ARGS="${ARGS} --relayhost=${DESTHOST}"
-
-[ -n "${PIDFILE}" ] && ARGS="${ARGS} --pid=${PIDFILE}"
-
-[ -n "${CHILDREN}" ] && ARGS="${ARGS} --children=${CHILDREN}"
-
-[ -n "${USERID}" ] && ARGS="${ARGS} --user=${USERID}"
-
-[ -n "${GRPID}" ] && ARGS="${ARGS} --group=${GRPID}"
-
-[ -n "${LOGTARGET}" ] && ARGS="${ARGS} --logsock=${LOGTARGET}"
-
+# ADDOPTS might be present in legacy /etc/default/spampd setups
 [ -n "${ADDOPTS}" ] && ARGS="${ARGS} ${ADDOPTS}"
 
 function check_pid () {
@@ -147,8 +119,7 @@ case "$1" in
 		fi
 		# start daemon
 		start-stop-daemon --start --exec $EXECUTABLE \
-			--startas $PROGRAM --pidfile $PIDFILE \
-			--user $USERID --group $GRPID -- $ARGS
+			--startas $PROGRAM $DARGS -- $ARGS
 		if [ "$?" = '0' ]; then
 			log_end_msg 0
 			exit 0
