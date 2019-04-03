@@ -1729,11 +1729,13 @@ to peruse the MIAB L<setup|https://github.com/mail-in-a-box/mailinabox/tree/mast
 L<configuration|https://github.com/mail-in-a-box/mailinabox/tree/master/conf> files for reference.
 
 All I<spampd> options have reasonable defaults, especially for a Postfix-centric
-installation.  You may want to specify the --children option if you have an
+installation.  You may want to specify the C<--max-servers> option if you have an
 especially beefy or weak server box because I<spampd> is a memory-hungry
 program.  Check the L<"Options"> for details on this and all other parameters.
 
-Note that B<I<spampd> replaces I<spamd>> from the I<SpamAssassin> distribution
+To show default values for all options, run C<spampd --show defaults>.
+
+Note that B< I<spampd> replaces I<spamd> > from the I<SpamAssassin> distribution
 in function. You do not need to run I<spamd> in order for I<spampd> to work.
 This has apparently been the source of some confusion, so now you know.
 
@@ -1840,7 +1842,7 @@ same option loaded from config file(s).
 Please be sure to also read the general information about specifying option
 arguments in the above L</"USAGE"> section.
 
-To show default values for all options, run C<spampd --show defaults>.
+To view B<default values> for all options, run C<spampd --show defaults>.
 
 =over 5
 
@@ -1874,9 +1876,9 @@ public interface (IP address) unless you know exactly what you're doing!
 
 =item B<--port> I<<n>>
 
-Specifies what port I<spampd> listens on. By default, it listens on
-port 10025. This is an alternate to using the above --host=ip:port notation.
-Note that a I<port> specified in the C<--host> option will override this one.
+Specifies what port I<spampd> listens on. This is an alternate to using the above
+C<--host=ip:port> notation. Note that a I<port> specified in the C<--host> option
+will override this one.
 
 
 =item B<--socket> I<<socketpath>>
@@ -1894,8 +1896,7 @@ format, e.g. 700 to specify acces only for the user I<spampd> is run as.
 =item B<--relayhost> I<< (<ip>|<hostname>)[:<port>] >>
 
 Specifies the hostname/IP to which I<spampd> will relay all
-messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
-defaults to 25.
+messages. Defaults to 127.0.0.1 (localhost) on port 25.
 
 As of v2.60 this option can also handle IPv6 addresses in the form of
 C<--relayhost n:n:n> or, with port, C<--relayhost [n:n:n]:port> (the square brackets
@@ -1906,7 +1907,7 @@ Note that the I<port> specified this way implicitly overrides the C<--relayport>
 
 =item B<--relayport> I<<n>>
 
-Specifies what port I<spampd> will relay to. Default is 25. This is an
+Specifies what port I<spampd> will relay to. This is an
 alternate to using the above --relayhost=ip:port notation. Note that a I<port>
 specified in the C<--relayhost> option will override this one.
 
@@ -1943,7 +1944,7 @@ and C<--max-servers>, based on demand.
 You may want to set your origination mail server to limit the
 number of concurrent connections to I<spampd> to match this setting (for
 Postfix this is the C<xxxx_destination_concurrency_limit> setting where
-'xxxx' is the transport being used, usually 'smtp', and the default is 100).
+'xxxx' is the transport being used, usually 'smtp' or 'lmtp').
 
 See also C<--min-servers>, C<--min-spare>, and C<--max-spare> options.
 
@@ -1985,7 +1986,7 @@ I<spampd> works by forking child servers to handle each message. The
 B<maxrequests> parameter specifies how many requests will be handled
 before the child exits. Since a child never gives back memory, a large
 message can cause it to become quite bloated; the only way to reclaim
-the memory is for the child to exit. The default is 20.
+the memory is for the child to exit.
 
 
 =item B<--childtimeout> I<<n>>
@@ -1995,7 +1996,6 @@ a transaction. In an S/LMTP transaction the timer is reset for every command.
 This timeout includes time it would take to send the message data, so it should
 not be too short.  Note that it's more likely the origination or destination
 mail servers will timeout first, which is fine.  This is just a "sane" failsafe.
-Default is 360 seconds (6 minutes).
 
 
 =item B<--satimeout> I<<n>>
@@ -2003,21 +2003,19 @@ Default is 360 seconds (6 minutes).
 This is the number of seconds to allow for processing a message with
 SpamAssassin (including feeding it the message, analyzing it, and adding
 the headers/report if necessary).
+
 This should be less than your origination and destination servers' timeout
-settings for the DATA command. For Postfix the default is 300 seconds in both
-cases (smtp_data_done_timeout and smtpd_timeout). In the event of timeout
-while processing the message, the problem is logged and the message is passed
-on anyway (w/out spam tagging, obviously).  To fail the message with a temp
-450 error, see the --dose (die-on-sa-errors) option, below.
-Default is 285 seconds.
+settings for the DATA command. (For Postfix this is set in C<(smtp|lmtp)_data_done_timeout>
+and C<smtpd_timeout>). In the event of timeout while processing the message, the problem is
+logged and the message is passed on anyway (w/out spam tagging, obviously).  To fail the
+message with a temp 450 error, see the C<--dose> (die-on-sa-errors) option, below.
 
 
 =item B<--pid> or B<-p> I<<filename>>
 
 Specifies a filename where I<spampd> will write its process ID so
 that it is easy to kill it later. The directory that will contain this
-file must be writable by the I<spampd> user. The default is
-F</var/run/spampd.pid>.
+file must be writable by the I<spampd> user.
 
 
 =item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<new in v2.60>
@@ -2081,20 +2079,18 @@ The default was C<unix> except on HP-UX and SunOS (Solaris) systems it is C<inet
 
 =item B<--logident> or B<-li> I<<name>> C<new in v2.60>
 
-Syslog identity name to use. This may also be used in log files written directly (w/out syslog). Default is C<spampd>.
+Syslog identity name to use. This may also be used in log files written directly (w/out syslog).
 
 
 =item B<--logfacility> or B<-lf> I<<name>> C<new in v2.60>
 
-Syslog facility name to use. This is typically the name of the system-wide log file to be written to. Default is C<mail>.
+Syslog facility name to use. This is typically the name of the system-wide log file to be written to.
 
 
 =item B<--[no]detach> I<[0|1]> C<new in v2.20>
 
-By default I<spampd> will detach from the console and fork into the
-background ("daemonize"). Use C<--nodetach> to override this.
-This can be useful for running under control of some daemon
-management tools or testing from a command line.
+Tells I<spampd> to detach from the console and fork into the background ("daemonize").
+Using C<--nodetach> can be useful for running under control of some daemon management tools or testing from a command line.
 
 
 =item B<--[no]setsid> I<[0|1]> C<new in v2.51>
@@ -2106,25 +2102,25 @@ daemonize. Only used if C<--nodetach> isn't specified.
 
 =item B<--maxsize> I<<n>>
 
-The maximum message size to send to SpamAssassin, in KBytes. By default messages
-over 64KB are not scanned at all, and an appropriate message is logged
+The maximum message size to send to SpamAssassin, in KBytes. Messages
+over this size are not scanned at all, and an appropriate message is logged
 indicating this.  The size includes headers and attachments (if any).
 
 
 =item B<--dose> I<[0|1]>
 
-Acronym for (d)ie (o)n (s)pamAssassin (e)rrors.  By default if I<spampd>
-encounters a problem with processing the message through Spam Assassin (timeout
-or other error), it will still pass the mail on to the destination server.  If
-you specify this option however, the mail is instead rejected with a temporary
-error (code 450, which means the origination server should keep retrying to send
-it).  See the related --satimeout option, above.
+Acronym for (d)ie (o)n (s)pamAssassin (e)rrors. When disabled and I<spampd>
+encounters a problem with processing the message through SpamAssassin (timeout
+or other error), it will still pass the mail on to the destination server.
+When enabled, the mail is instead rejected with a temporary error (code 450,
+which means the origination server should keep retrying to send it). See the
+related C<--satimeout> option, above.
 
 
 =item B<--tagall> or B<-a> I<[0|1]>
 
 Tells I<spampd> to have SpamAssassin add headers to all scanned mail,
-not just spam.  By default I<spampd> will only rewrite messages which
+not just spam.  Otherwise I<spampd> will only rewrite messages which
 exceed the spam threshold score (as defined in the SA settings).  Note that
 for this option to work as of SA-2.50, the I<always_add_report> and/or
 I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be
@@ -2167,10 +2163,10 @@ Turn off all SA network-based tests (DNS, Razor, etc).
 
 Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
-written to here.
-Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
-place your bayes_path SA config setting points to (if any).  Make sure this
-directory is accessible to the user that spampd is running as (default: mail).
+written to here. A good place for this is in the same
+place your C<bayes_path> SA config setting points to (if any).  Make sure this
+directory is accessible to the user that spampd is running as.
+
 Thanks to Alexander Wirt for this fix.
 
 
@@ -2178,7 +2174,7 @@ Thanks to Alexander Wirt for this fix.
 
 Use the specified file for SpamAssassin configuration options in addition to the
 default local.cf file.  Any options specified here will override the same
-option from local.cf.  Default is to not use any additional configuration file.
+option from local.cf.
 
 
 =item B<--debug> or B<-d> I<< [<area,...>|1|0] >> C<(updated in v2.60)>
@@ -2191,7 +2187,7 @@ to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 C<New in v2.60:>
 
 Setting the value to 1 (one) is the same as using no parameter (eg. simply I<-d>).
-The value of 0 (zero) disables debug logging (this is the default).
+The value of 0 (zero) disables debug logging.
 
 The I<area> list is passed on directly to SpamAssassin and controls logging
 facilities. If no I<area>s are listed (and debug logging is enabled), all
