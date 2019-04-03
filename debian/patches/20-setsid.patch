@@ -1,0 +1,16 @@
+Author: Maxim Paperno <MPaperno@WorldDesign.com>
+Description: Enable setsid option by default.
+
+--- a/spampd.pl
++++ b/spampd.pl
+@@ -435,7 +435,9 @@
+       syslog_facility   => 'mail',                # syslog facility
+       log_level         => 2,                     # log level for Net::Server (in the range 0-4) (--debug option sets this to 4)
+       background        => 1,                     # specifies whether to 'daemonize' and fork into background (--[no]detach option)
+-      setsid            => 0,                     # use POSIX::setsid() command to truly daemonize.
++    # Debian patch: enable setsid by default. (was: 0)
++      setsid            => 1,                     # use POSIX::setsid() command to truly daemonize.
++    #
+       leave_children_open_on_hup => 1,            # this lets any busy children finish processing before exiting, using old SA object
+     },
+     spampd => {
