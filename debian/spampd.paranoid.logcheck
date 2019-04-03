@@ -1,0 +1,3 @@
+# Operational messages
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: clean message (<[^[:space:]]*>|\(unknown\)) \(-?[[:digit:].]+/-?[[:digit:].]+\) from (<[^[:space:]]*>|\(unknown\)) for (<[^[:space:]]*>([[:space:]]+ORCPT=[^[:space:]]+)?|\(unknown\)) in [[:digit:].]+s, [[:digit:]]+ bytes\.$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: processing message (<[^[:space:]]*>|\(unknown\)) for (<[^[:space:]]*>([[:space:]]+ORCPT=[^[:space:]]+)?|\(unknown\))$

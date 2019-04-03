@@ -1,0 +1,7 @@
+This package uses quilt for upstream source code patch management. Please read
+/usr/share/doc/quilt/README.source for more information how to apply, unapply,
+add, modify or remove patches.
+
+Please note that /usr/share/doc/quilt/README.source is only available in quilt
+version 0.46-4.1 or later.
+

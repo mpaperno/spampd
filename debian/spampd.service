@@ -1,0 +1,13 @@
+[Unit]
+Description=Spam Proxy Daemon
+After=network.target local-fs.service
+
+[Service]
+EnvironmentFile=-/var/run/spampd/spampd.arguments
+ExecStartPre=/usr/share/spampd/process_arguments.sh
+ExecStart=/usr/sbin/spampd --setsid $SPAMPD_ARGS
+Restart=on-failure
+PIDFile=/var/run/spampd/spampd.pid
+
+[Install]
+WantedBy=multi-user.target

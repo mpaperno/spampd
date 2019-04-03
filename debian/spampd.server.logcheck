@@ -1,0 +1,12 @@
+# Operational messages
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: (clean message|identified spam) (<[^[:space:]]*>|\(unknown\)) \(-?[[:digit:].]+/-?[[:digit:].]+\) from (<[^[:space:]]*>|\(unknown\)) for (<[^[:space:]]*>([[:space:]]+ORCPT=[^[:space:]]+)?|\(unknown\)) in [[:digit:].]+s, [[:digit:]]+ bytes\.$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: rules hit for (<[^[:space:]]*>|\(unknown\)): 
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: skipped large message \([[:digit:].]+KB\)$
+
+# Startup messages
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Binding to TCP port [[:digit:]]+ on host [._[:alnum:]-]+$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Process Backgrounded$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Setting gid to "[[:digit:]]+"$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: Setting uid to "[[:digit:]]+"$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: [[:digit:]/:-]{19} Server closing!$
+^\w{3} [ :[:digit:]]{11} [._[:alnum:]-]+ spampd\[[[:digit:]]+\]: [[:digit:]/:-]{19} SpamPD \(type Net::Server::PreForkSimple\) starting! pid\([[:digit:]]+\)$

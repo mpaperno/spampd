@@ -1,0 +1,30 @@
+Source: spampd
+Section: mail
+Priority: optional
+Maintainer: Michael Meskes <meskes@debian.org>
+Build-Depends: debhelper (>= 11), quilt, dh-exec
+Standards-Version: 4.3.0
+Homepage: https://github.com/mpaperno/spampd
+
+Package: spampd
+Architecture: all
+Depends: ${perl:Depends}, ${misc:Depends}, spamassassin (>= 2.6), libnet-server-perl (>= 0.89), adduser (>= 3.59), dpkg (>= 1.10.23), lsb-base (>=3.0-3)
+Description: spamassassin based SMTP/LMTP proxy daemon
+ spampd is an SMTP/LMTP server designed to be hooked into the
+ MTA processing chain (e.g. as a content filter). It is
+ written in Perl and uses the Net::Server framework. It is
+ intended to provide spam filtering at the system level (i.e.
+ ususally for all users). If you rely on per-user configuration
+ or per-user Bayes databases, spampd is not for you.
+ .
+ The major advantage of spampd over plain SpamAssassin (both
+ directly and through spamd) is that it doesn't need to load
+ all needed perl modules on every invocation or spawn
+ a C programme for every mail it receives. Compared to using
+ spamc/spamd, spampd can usually provide a 25% performance
+ increase with local-only tests.
+ .
+ The advantage of spampd over amavisd-new is that it uses the
+ original SpamAssassin header tags, which are more verbose than
+ the tags which amavisd-new provides. This allows easier
+ filtering in the mail client and easier tuning of SpamAssassin.

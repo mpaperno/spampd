@@ -1,0 +1,82 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/quilt/quilt.make
+
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -g
+endif
+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	INSTALL_PROGRAM += -s
+endif
+
+configure: configure-stamp
+configure-stamp: $(QUILT_STAMPFN)
+	dh_testdir
+	# Add here commands to configure the package.
+
+	touch configure-stamp
+
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp: configure-stamp
+	dh_testdir
+
+	# Add here commands to compile the package.
+	pod2man --section=8 --center="Spam Proxy Daemon" spampd.pl > spampd.8
+	gzip -9 < spampd.8 > spampd.8.gz
+
+	[ -f spampd.html.bck ] || mv -f spampd.html spampd.html.bck
+	pod2html --outfile spampd.html --header --norecurse --backlink '[Back to top]' --infile spampd.pl
+	rm -f pod2htm?.tmp
+
+	touch build-stamp
+
+clean-patched:
+	dh_testdir
+	rm -f build-stamp configure-stamp
+
+	# Add here commands to clean up after the build process.
+	rm -f spampd.8 spampd.8.gz
+
+	dh_clean
+
+clean: clean-patched unpatch
+	[ ! -f spampd.html.bck ] || mv -f spampd.html.bck spampd.html
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+
+# Build architecture-independent files here.
+binary-arch: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-indep: build install
+	dh_testdir
+	dh_install
+	dh_installdocs
+	dh_installsystemd spampd.service
+	dh_installinit --error-handler handle_init_errs
+	dh_installman
+	dh_installchangelogs changelog.txt
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_perl
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

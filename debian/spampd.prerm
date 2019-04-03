@@ -1,0 +1,23 @@
+#!/bin/bash -e
+
+handle_init_errs ()
+{
+	RET=$?
+	if [ "$RET" = "6" ]; then
+		return 0
+	else
+		exit $RET
+	fi
+	set -e
+}
+
+#DEBHELPER#
+
+case "$1" in
+	purge)
+		deluser spampd > /dev/null 2>&1 || true
+		delgroup spampd > /dev/null 2>&1 || true
+		;;
+	*)
+		;;
+esac
