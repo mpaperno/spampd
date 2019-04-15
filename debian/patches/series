@@ -1,9 +1,2 @@
-10-perl.patch
-30-fix-Makefile.patch
 45-fix-man-references.patch
 50-fix-fd-usage.patch
-52-fix-multidest-lmtp.patch
-55-workaround-for-syslog-regression.patch
-60-use-spampd-conf.patch
-65-use-proper-environent.patch
-70-fix-pod.patch

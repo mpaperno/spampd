@@ -29,8 +29,12 @@ build-stamp: configure-stamp
 	dh_testdir
 
 	# Add here commands to compile the package.
-	$(MAKE)
-	#/usr/bin/docbook-to-man debian/spampd.sgml > spampd.1
+	pod2man --section=8 --center="Spam Proxy Daemon" spampd.pl > spampd.8
+	gzip -9 < spampd.8 > spampd.8.gz
+
+	[ -f spampd.html.bck ] || mv -f spampd.html spampd.html.bck
+	pod2html --outfile spampd.html --header --norecurse --backlink '[Back to top]' --infile spampd.pl
+	rm -f pod2htm?.tmp
 
 	touch build-stamp
 
@@ -52,11 +56,6 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	# Add here commands to install the package into debian/spampd.
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/spampd
-	mkdir -p $(CURDIR)/debian/spampd/etc
-	cp debian/spampd.conf	$(CURDIR)/debian/spampd/etc/spampd.conf
-
 
 # Build architecture-independent files here.
 binary-arch: build install
@@ -67,8 +66,9 @@ binary-indep: build install
 	dh_testdir
 	dh_install
 	dh_installdocs
-	dh_installsystemd spampd.service
+	dh_systemd_enable spampd.service
 	dh_installinit --error-handler handle_init_errs
+	dh_systemd_start
 	dh_installman
 	dh_installchangelogs changelog.txt
 	dh_compress

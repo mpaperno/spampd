@@ -1,5 +1,5 @@
---- a/spampd.orig
-+++ b/spampd
+--- a/spampd.pl.orig
++++ b/spampd.pl
 @@ -1502,5 +1502,5 @@
  
  =head1 See Also
