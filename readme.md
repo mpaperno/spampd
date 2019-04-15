@@ -1,8 +1,6 @@
 # SpamPD
 
-__NOTE: please see <a href="https://github.com/mpaperno/spampd/downloads">Download section</a> for official release versions.  The repository version IS NOT THOUROUGHLY TESTED.__
-
-__Testers wanted!__
+Check the [Releases](https://github.com/mpaperno/spampd/releases) area for latest versions, and see the old <a href="https://github.com/mpaperno/spampd/downloads">Downloads</a> section for older releases. 
 
 Originally released in May of 2002, SpamPD is a program used within an e-mail delivery system to scan messages for possible Unsolicited Commercial E-mail (UCE, aka spam) content. 
 It uses an excellent program called SpamAssassin (SA) to do the actual message scanning. spampd acts as a transparent SMTP/LMTP proxy between 
