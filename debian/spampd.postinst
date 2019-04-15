@@ -2,13 +2,13 @@
 
 handle_init_errs ()
 {
-	RET=$?
-	if [ "$RET" = "6" ]; then
-		return 0
-	else
-		exit $RET
-	fi
-	set -e
+        RET=$?
+        if [ "$RET" = "6" ]; then
+                return 0
+        else
+                exit $RET
+        fi
+        set -e
 }
 
 case "$1" in 
@@ -16,38 +16,6 @@ case "$1" in
 		adduser --system --group \
 		        --no-create-home --home /nonexistent \
 			--quiet spampd 
-		INSTOVERR=0
-		dpkg --compare-versions "$2" lt 2.30-5 && INSTOVERR=1
-		if echo $2 | grep -q bpo; then
-			# special case backports.org versions
-			dpkg-compare-versions "$2" gt 2.30-4 || INSTOVERR=1
-		fi
-		if [ "$INSTOVERR" = 1 ]; then
-			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd \
-			|| echo "Warning: statoverride couldn't be created for /var/cache/spampd" >&2
-			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf \
-			|| echo "Warning: statoverride couldn't be created for /etc/spampd.conf" >&2
-		fi
-		;;
-	abort-upgrade)
-		# Aborting an upgrade, check wether it was actually a downgrade
-		# which removed the stat overrides
-		INSTOVERR=0
-		echo "spampd.postinst: Aborting upgrade"
-		dpkg --compare-versions "$2" lt 2.30-5 && INSTOVERR=1
-		if echo $2 | grep -q bpo; then
-			# special case backports.org versions
-			echo "spampd.postinst: Special casing bpo version: $2"
-			dpkg-compare-versions "$2" gt 2.30-4 || INSTOVERR=1
-		fi
-		if [ "$INSTOVERR" = 1 ]; then
-			dpkg-statoverride --update --add spampd spampd 775 /var/cache/spampd \
-			|| echo "Warning: statoverride couldn't be created for /var/cache/spampd" >&2
-			dpkg-statoverride --update --add root spampd 640 /etc/spampd.conf \
-			|| echo "Warning: statoverride couldn't be created for /etc/spampd.conf" >&2
-		else
-			echo "spampd.postinst: Not creating statoverrides on abort-upgrade. other version: $2"
-		fi
 		;;
 	*)
 		;;

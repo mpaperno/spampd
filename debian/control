@@ -26,6 +26,6 @@ Description: spamassassin based SMTP/LMTP proxy daemon
  .
  The advantage of spampd over amavisd-new is that it uses the
  original SpamAssassin header tags, which are more verbose than
- the tags which amavisd-new provides. This allows easier 
+ the tags which amavisd-new provides. This allows easier
  filtering in the mail client and easier tuning of SpamAssassin.
 

@@ -2,8 +2,9 @@ spampd (2.42-1) UNRELEASED; urgency=medium
 
   * Updated watch file for new github location.
   * New upstream version 2.42
+  * Removed special handling of updates from very old versions.
 
- -- Michael Meskes <meskes@debian.org>  Sun, 31 Dec 2017 14:40:21 +0100
+ -- Michael Meskes <meskes@debian.org>  Sun, 31 Dec 2017 15:32:54 +0100
 
 spampd (2.30-23) unstable; urgency=medium
 
