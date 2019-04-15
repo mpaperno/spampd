@@ -66,9 +66,8 @@ binary-indep: build install
 	dh_testdir
 	dh_install
 	dh_installdocs
-	dh_systemd_enable spampd.service
+	dh_installsystemd spampd.service
 	dh_installinit --error-handler handle_init_errs
-	dh_systemd_start
 	dh_installman
 	dh_installchangelogs changelog.txt
 	dh_compress

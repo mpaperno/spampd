@@ -1,3 +1,9 @@
+spampd (2.51-1) unstable; urgency=medium
+
+  * New upstream version 2.51
+
+ -- Michael Meskes <meskes@debian.org>  Sun, 20 May 2018 13:07:24 +0200
+
 spampd (2.42-1) unstable; urgency=medium
 
   * Updated watch file for new github location.
@@ -58,15 +64,15 @@ spampd (2.30-21) unstable; urgency=low
 
   * upgrade policy version
   * Add VCS and homepage information to debian/control
-  * fix patches to work with new 3.0 (quilt) source format (Closes: #485357) 
-  * Fix package description (Closes: #485585) 
+  * fix patches to work with new 3.0 (quilt) source format (Closes: #485357)
+  * Fix package description (Closes: #485585)
 
  -- Sven Mueller <sven@debian.org>  Tue, 22 Jul 2008 18:25:57 +0200
 
 spampd (2.30-20) unstable; urgency=low
 
   * Move from dpatch to quilt
-  * fix init script dependencies (Closes: #470108) 
+  * fix init script dependencies (Closes: #470108)
 
  -- Sven Mueller <sven@debian.org>  Sun, 16 Mar 2008 18:37:55 +0100
 
@@ -93,7 +99,7 @@ spampd (2.30-17) unstable; urgency=low
     Vladislav Kurz <vladki@brno-czfree.net>
   * Document problems with SpamAssassin's auto-whitelist plugin and
     the default filesystem storage. (Related to: bug #413753)
-  * Apply patch by Alexander Wirt to introduce a parameter which 
+  * Apply patch by Alexander Wirt to introduce a parameter which
     sets a proper home directory and also cleans up the environment
     before backgrounding. (Closes: #421100)
 
@@ -164,7 +170,7 @@ spampd (2.30-9) unstable; urgency=low
 
 spampd (2.30-8) UNRELEASED; urgency=low
 
-  * Fix removal of stat-overrides in postrm 
+  * Fix removal of stat-overrides in postrm
   * Try to handle downgrades (even when failed) correctly in postinst/postrm
 
  -- Sven Mueller <sven@debian.org>  Tue, 20 Jun 2006 15:05:40 +0200
@@ -193,7 +199,7 @@ spampd (2.30-5) unstable; urgency=low
     SpamAssassin Instance (closes: #344373)
   * Revert postinst to use dh_installinit built-in option to call an error
     handler if the init script fails.
-  * Move dependencies from build-depends-indep to build-depends 
+  * Move dependencies from build-depends-indep to build-depends
     (since they must also be fulfilled when calling the clean target)
 
  -- Sven Mueller <sven@debian.org>  Fri, 16 Jun 2006 15:26:49 +0200
@@ -262,13 +268,13 @@ spampd (2.20-17) unstable; urgency=high
   * add note to README.Debian to document initially disabled state of the
     daemon.
   * Fix a DoS vulnerability in MSGID-Handling
-  * Fix match/concatenation with uninitialized string 
+  * Fix match/concatenation with uninitialized string
 
  -- Sven Mueller <debian@incase.de>  Tue, 18 Oct 2005 21:33:35 +0200
 
 spampd (2.20-16) unstable; urgency=low
 
-  * Remove bashism from init script (closes #317746) 
+  * Remove bashism from init script (closes #317746)
 
  -- Sven Mueller <debian@incase.de>  Tue, 12 Jul 2005 21:24:59 +0200
 
@@ -384,7 +390,7 @@ spampd (2.20-2) unstable; urgency=low
 
   * Fixed a bug in preinst script which caused the spampd user not
     to be added
-  * Added check after adding the user wether or not the user now 
+  * Added check after adding the user wether or not the user now
     exists. Fail preinst script if it doesn't exist
   * Upstream changed version number without significant source
     changes, to fix upgrade problems because of 2.2 being smaller
@@ -403,7 +409,7 @@ spampd (2.12-8) unstable; urgency=low
 
   * Update control file to Standards version 3.6.1.1
   * Corrected problems in package description
-  * Modified init script to accept yes/true/enable/1 to 
+  * Modified init script to accept yes/true/enable/1 to
     enable an option in /etc/default/spampd
   * Sponsored by martin f. krafft <madduck@debian.org>
     (closes: Bug#220007).
