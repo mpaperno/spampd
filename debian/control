@@ -3,7 +3,7 @@ Section: mail
 Priority: optional
 Maintainer: Michael Meskes <meskes@debian.org>
 Build-Depends: debhelper (>= 11), quilt, dh-exec
-Standards-Version: 4.1.4
+Standards-Version: 4.2.1
 Homepage: https://github.com/mpaperno/spampd
 
 Package: spampd
