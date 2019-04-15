@@ -1,3 +1,9 @@
+spampd (2.52-1) unstable; urgency=medium
+
+  * New upstream version 2.52 (Closes: #849543)
+
+ -- Michael Meskes <meskes@debian.org>  Wed, 21 Nov 2018 10:31:13 +0100
+
 spampd (2.51-1) unstable; urgency=medium
 
   * New upstream version 2.51

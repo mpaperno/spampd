@@ -3,25 +3,25 @@ Description: Set homedir to Debian standard.
 
 --- spampd/spampd.pl	2018-01-01 09:37:42.387239787 +0100
 +++ spampd/spampd.pl	2018-01-01 09:44:55.141221666 +0100
-@@ -807,7 +807,7 @@
- 						 # passing it to spamassassin. Set to 1 to enable this.
- my $setenvelopefrom = 0; # Set X-Envelope-From header only
- my $saconfigfile = ""; # use this config file for SA settings (blank uses default local.cf)
--my $sa_home_dir = '/var/spool/spamassassin/spampd'; # home directory for SA files 
-+my $sa_home_dir = '/var/cache/spampd'; # home directory for SA files 
-                                                     # (auto-whitelist, plugin helpers)
+@@ -788,7 +788,7 @@
+                                                          #   passing it to spamassassin. Set to 1 to enable this.
+ my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only
+ my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
+-my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
++my $sa_home_dir     = '/var/cache/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
+ my $sa_local_only   = 0;                                 # disable SA network tests
+ my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
  
- my %options = (port => \$port,
-@@ -1058,7 +1058,7 @@
-   --local-only or -L       Turn off all SA network-based tests (RBL, Razor, etc).
+@@ -1035,7 +1035,7 @@
+   --local-only or -L       Turn off all SA network-based tests (RBL/Razor/etc).
    --homedir=path           Use the specified directory as home directory for 
-                               the SpamAssassin process. 
--                              Default is /var/spool/spamassassin/spampd
-+                              Default is /var/cache/spampd
+                              the SpamAssassin process. 
+-                             Default is /var/spool/spamassassin/spampd
++                             Default is /var/cache/spampd
    --saconfig=filename      Use the specified file for loading SA configuration
-                                options after the default local.cf file.
-   --debug or -d            Turn on SA debugging (sent to log file).
-@@ -1466,7 +1466,7 @@
+                              options after the default local.cf file.
+ 
+@@ -1477,7 +1477,7 @@
  Use the specified directory as home directory for the spamassassin process. 
  Things like the auto-whitelist and other plugin (razor/pyzor) files get
  written to here.
