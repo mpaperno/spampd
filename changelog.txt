@@ -1,6 +1,41 @@
 SpamPD Change Log
 -----------------
 
+  Legend (used since v2.60):
+    + : new feature/function
+    * : bug/deficiency fix
+    ~ : enhancement/non-breaking change
+    ! : important change, change of default behavior, etc.
+-----------------------------------------------------------
+
+2.60 (pending release) (experimental)
+
+This version brings quite a few changes, though the base functionality and compatibility is unchanged
+(minor exceptions noted below). Testing/close observation of this new version is recommended!
+
+~ Performance and diagnostic improvements, quicker startups, and a lot of documentation updates.
++ Add support for configuration files (examples included in /misc folder and in POD).
++ Add optional "scalable mode" using Net::Server::PreFork module (16-year TODO!). More info in POD.
++ Add --logfile option to control logging destination(s) (syslog, stderr, and/or file/device).
++ Add --logident, --logfacility options for syslog.
++ Add multiple levels of help, including full "man" output with optional HTML formatting.
++ Add --show <thing> argument for printing default option values and other debug.
+* Fix SpamAssassin debug logging with versions 3.1+ (output was going to stderr/wrong syslog/null).
+* Fix for IPv6 addresses being used on --host and --relayhost options (was not possible due to ":<port>" check).
+! SIGHUP will now reload SpamAssassin and SpamPD configuration files, still with graceful child process shutdown.
+! Use SpamAssassin::Logger module (with SA 3.1+) for all logging. This now inits logging much earlier.
+! Log to stderr by default if running non-daemonized (with --nodetach).
+! Child processes are now renamed to "spampd child" to distinguish them from the parent in task lists.
+! Now requires Net::Server v0.89+ (though latest 2.009 is recommended).
+! The --auto-whitelist option is no longer allowed with SpamAssassin v3+.
+~ Improve --debug option, adding ability to specify SpamAssassin (v3.1+) debug areas (aka channels/facilities).
+~ All boolean options can take 0/1 argument and be negated with "no-" prefix.
+~ The --children (-c) option is now more formally named --max-servers (-mxs), but still accepted.
+~ IO::Socket::UNIX and ::IP are only required if actually needed for --relaysocket / --relayhost options.
+~ SpamPD can now be loaded w/out executing eg. for unit tests or other uses. Much more modular code in general.
+
+########
+
 2.53 (25-Feb-19)
 
 - Fix LMTP delivery with multiple recipients (https://github.com/mpaperno/spampd/issues/23 & https://github.com/mail-in-a-box/mailinabox/issues/1523)
