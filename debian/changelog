@@ -1,3 +1,14 @@
+spampd (2.60-1) UNRELEASED; urgency=medium
+
+  [ Max Paperno ]
+  * New upstream version 2.60-1
+  * Update homedir patch for new upstream code.
+
+  [ Michael Meskes ]
+  * Get rid of default file.
+
+ -- Michael Meskes <meskes@debian.org>  Sat, 27 Apr 2019 14:26:58 +0200
+
 spampd (2.53-1) unstable; urgency=medium
 
   * New upstream version 2.53

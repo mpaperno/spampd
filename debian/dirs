@@ -1,6 +1,5 @@
 usr/sbin
 var/cache/spampd
-usr/share/spampd
 etc/logcheck/ignore.d.paranoid
 etc/logcheck/ignore.d.server
 etc/spamassassin/sa-update-hooks.d

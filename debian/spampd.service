@@ -3,9 +3,7 @@ Description=Spam Proxy Daemon
 After=network.target local-fs.service
 
 [Service]
-EnvironmentFile=-/var/run/spampd/spampd.arguments
-ExecStartPre=/usr/share/spampd/process_arguments.sh
-ExecStart=/usr/sbin/spampd --setsid $SPAMPD_ARGS
+ExecStart=/usr/sbin/spampd --setsid
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 PIDFile=/var/run/spampd/spampd.pid

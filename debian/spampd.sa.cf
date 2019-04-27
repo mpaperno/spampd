@@ -11,9 +11,8 @@
 
 #use_bayes 1
 #bayes_path /var/cache/spampd/bayes
-#auto_whitelist_path /var/cache/spampd/awl
 
 #
 # NOTE: This config isn't used by default!
-#       You need to enable its use in /etc/default/spampd
+#       You need to enable its use in /etc/spampd.cfg
 #

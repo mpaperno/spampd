@@ -1,0 +1,2 @@
+mv_conffile /etc/spampd.conf /etc/spampd.sa.cf 2.60-1~
+
