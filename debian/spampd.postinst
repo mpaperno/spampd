@@ -16,6 +16,51 @@ case "$1" in
 		adduser --system --group \
 		        --no-create-home --home /nonexistent \
 			--quiet spampd 
+		if dpkg --compare-versions "$2" lt 2.60-1~; then
+			DEFAULT=/etc/default/spampd.dpkg-backup
+			CONFIG=/etc/spampd.cfg
+
+			if [ -f ${DEFAULT} ]; then
+				. ${DEFAULT}
+
+				istrue () {
+				    ANS=$(echo $1 | tr A-Z a-z)
+				    [ "$ANS" = 'yes' -o "$ANS" = 'true' -o "$ANS" = 'enable' -o "$ANS" = '1' ]
+				}
+
+				# 
+				# Find differences to default config
+				#
+
+				SED_ARGS=
+
+				istrue "$TAGALL" || SED_ARGS="${SED_ARGS} -e 's/tagall            1/tagall            0/'"
+
+				istrue "$LOCALONLY" || SED_ARGS="${SED_ARGS} -e 's/local-only        1/local-only        0/'"
+
+				istrue "$LOGINET" && SED_ARGS="${SED_ARGS} -e 's/# logsock         inet/logsock         inet/'"
+
+				[ -n "${LISTENPORT}" -a "${LISTENPORT}" -ne 10025 ] && SED_ARGS="${SED_ARGS} -e 's/port              10025/port              ${LISTENPORT}/'"
+
+				[ -n "${LISTENHOST}" -a "${LISTENHOST}" != "127.0.0.1" ] && SED_ARGS="${SED_ARGS} -e 's/host              127.0.0.1/host              ${LISTENHOST}/'"
+
+				[ -n "${DESTPORT}" -a "${DESTPORT}" -ne 10026 ] && SED_ARGS="${SED_ARGS} -e 's/relayport         10026/relayport         ${DESTPORT}/'"
+
+				[ -n "${DESTHOST}" -a "${DESTHOST}" != "127.0.0.1" ] && SED_ARGS="${SED_ARGS} -e 's/relayhost         127.0.0.1/relayhost         ${DESTHOST}/'"
+
+				[ -n "${CHILDREN}" -a "${CHILDREN}" -ne 3 ] && SED_ARGS="${SED_ARGS} -e 's/max-servers       3/max-servers       ${CHILDREN}/'"
+
+				[ -n "${USERID}" -a "${USERID}" != "spampd" ] && SED_ARGS="${SED_ARGS} -e 's/user              spampd/user              ${USERID}/'"
+
+				[ -n "${GRPID}" -a "${GRPID}" != "spampd" ] && SED_ARGS="${SED_ARGS} -e 's/group             spampd/group             ${GRPID}/'"
+
+				if [ -n "${SED_ARGS}" ]; then
+					eval "sed ${SED_ARGS} ${CONFIG} > ${CONFIG}.dpkg-new && mv ${CONFIG}.dpkg-new ${CONFIG}"
+				fi
+			fi
+
+exit 0
+		fi
 		;;
 	*)
 		;;

@@ -1,2 +1,2 @@
 mv_conffile /etc/spampd.conf /etc/spampd.sa.cf 2.60-1~
-
+rm_conffile /etc/default/spampd 2.60-1~
