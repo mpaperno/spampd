@@ -14,7 +14,7 @@ Description: spamassassin based SMTP/LMTP proxy daemon
  MTA processing chain (e.g. as a content filter). It is
  written in Perl and uses the Net::Server framework. It is
  intended to provide spam filtering at the system level (i.e.
- ususally for all users). If you rely on per-user configuration
+ usually for all users). If you rely on per-user configuration
  or per-user Bayes databases, spampd is not for you.
  .
  The major advantage of spampd over plain SpamAssassin (both

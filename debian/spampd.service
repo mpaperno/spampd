@@ -3,10 +3,10 @@ Description=Spam Proxy Daemon
 After=network.target local-fs.service
 
 [Service]
-ExecStart=/usr/sbin/spampd --setsid
+ExecStart=/usr/sbin/spampd --setsid --config /etc/spampd.cfg
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-PIDFile=/var/run/spampd/spampd.pid
+PIDFile=/var/run/spampd.pid
 
 [Install]
 WantedBy=multi-user.target

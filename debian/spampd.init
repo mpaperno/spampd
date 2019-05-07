@@ -24,7 +24,7 @@ DESC='spam checking proxy daemon'
 NAME='spampd'
 PROGRAM=/usr/sbin/spampd
 EXECUTABLE=/usr/bin/perl
-PIDFILE=/var/run/spampd/spampd.pid
+PIDFILE=/var/run/spampd.pid
 
 . /lib/lsb/init-functions
 
@@ -86,7 +86,7 @@ case "$1" in
 		# start daemon
 		start-stop-daemon --start --exec $EXECUTABLE \
 			--startas $PROGRAM --pidfile $PIDFILE \
-			--user $USERID --group $GRPID -- --setsid
+			--user $USERID --group $GRPID -- --setsid  --config /etc/spampd.cfg
 		if [ "$?" = '0' ]; then
 			log_end_msg 0
 			exit 0

@@ -6,8 +6,9 @@ spampd (2.60-1) UNRELEASED; urgency=medium
 
   [ Michael Meskes ]
   * Get rid of default file.
+  * Convert old default file to new config file.
 
- -- Michael Meskes <meskes@debian.org>  Sat, 27 Apr 2019 14:26:58 +0200
+ -- Michael Meskes <meskes@debian.org>  Tue, 07 May 2019 11:20:37 +0200
 
 spampd (2.53-1) unstable; urgency=medium
 
