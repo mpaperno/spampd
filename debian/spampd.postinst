@@ -54,6 +54,13 @@ case "$1" in
 
 				[ -n "${GRPID}" -a "${GRPID}" != "spampd" ] && SED_ARGS="${SED_ARGS} -e 's/group             spampd/group             ${GRPID}/'"
 
+				if [ -n "${ADDOPTS}" ]; then
+					shopt -s extglob
+					ADD=${ADDOPTS/#?(-|--)/\\n}  # first option
+					ADD=${ADD//+( )?(-|--)/\\n}  # subsequent option(s)
+					SED_ARGS="${SED_ARGS} -e 's%# Inserted from ADDOPTS in spampd.default file:%# Inserted from ADDOPTS in spampd.default file:${ADD}%'"
+				fi
+
 				if [ -n "${SED_ARGS}" ]; then
 					eval "sed ${SED_ARGS} ${CONFIG} > ${CONFIG}.dpkg-new && mv ${CONFIG}.dpkg-new ${CONFIG}"
 				fi

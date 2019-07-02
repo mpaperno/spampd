@@ -1,9 +1,11 @@
 Author: Maxim Paperno <MPaperno@WorldDesign.com>
 Description: Set homedir to Debian standard.
 
---- a/spampd.pl
-+++ b/spampd.pl
-@@ -461,8 +461,9 @@
+Index: spampd/spampd.pl
+===================================================================
+--- spampd.orig/spampd.pl
++++ spampd/spampd.pl
+@@ -461,8 +461,9 @@ sub new {
      assassin => {
        debug                => 0,                  # debug flag, can be boolean or a list to pass to SA (--debug option)
        local_tests_only     => 0,                  # disable SA network tests (--local-only flag)
