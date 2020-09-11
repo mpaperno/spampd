@@ -441,7 +441,7 @@ sub process_message {
     return 1;
   }
 
-  my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
+  my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp, $user, $user_dir);
   my $inhdr      = 1;
   my $envfrom    = 0;
   my $envto      = 0;
@@ -496,6 +496,23 @@ sub process_message {
 
     # save previous timer and start new
     my $previous_alarm = alarm($self->{spampd}->{satimeout});
+    
+    # Set SA user (if we can find one)
+    $user_dir = $self->{spampd}->{user_dir};
+    if ($user_dir && $recips =~ /^<([\w\d\/!#$%&'*+=?^_`{|}~-][\w\d\/!#$%&'*+=?^_`{|}~.-]*)@/) {
+      $user = lc $1;
+      $self->dbg("Telling SA to use '$user'");
+      if (!$self->{spampd}->{sa_prefs}) {
+        $assassin->read_scoreonly_config("$user_dir/$user/sa.conf");
+      }
+      $assassin->signal_user_changed({
+	username => $user,
+	user_dir => "$user_dir/$user",
+	userstate_dir => "$user_dir/$user",
+      })
+    } else {
+	$self->dbg("Userdir: $user_dir, Recipts: $recips");
+    }
 
     # Audit the message
     if ($sa_version >= 3) {
@@ -791,6 +808,7 @@ my $envelopeheaders = 0;                                 # Set X-Envelope-To and
 my $setenvelopefrom = 0;                                 # Set X-Envelope-From header only
 my $sa_config       = '';                                # use this config file for SA settings (blank uses default local.cf)
 my $sa_home_dir     = '/var/spool/spamassassin/spampd';  # home directory for SA files (auto-whitelist, plugin helpers)
+my $user_dir        = '';                                # Root directory for per-user settings
 my $sa_local_only   = 0;                                 # disable SA network tests
 my $sa_awl          = 0;                                 # enable SA auto-whitelist (deprecated as of SA 3.0)
 
@@ -827,6 +845,7 @@ GetOptions(
   'set-envelope-from|sef'    => \$setenvelopefrom,
   'saconfig=s'               => \$sa_config,
   'homedir=s'                => \$sa_home_dir,
+  'user-dir=s'               => \$user_dir,
   'local-only|l'             => \$sa_local_only,
   'auto-whitelist|aw'        => \$sa_awl,
   'help|h|?'                 => sub { usage(0) },
@@ -947,6 +966,7 @@ my $server = bless {
     instance         => 0,
     envelopeheaders  => $envelopeheaders,
     setenvelopefrom  => $setenvelopefrom,
+    user_dir         => $user_dir,
   },
 }, 'SpamPD';
 
@@ -1039,7 +1059,8 @@ Options:
                              the SpamAssassin process. 
                              Default is /var/spool/spamassassin/spampd
   --saconfig=filename      Use the specified file for loading SA configuration
-                             options after the default local.cf file.
+                             options after the default local.cf file
+  --user-dir=directory     Store per-user data in directories under this root.
 
   --debug or -d            Turn on extra debugging details (sent to log file).
   --version                Print version information and exit.
@@ -1114,6 +1135,7 @@ B<spampd>
 [B<--log-rules-hit|rh>]
 [B<--set-envelope-headers|seh>]
 [B<--set-envelope-from|sef>]
+[B<--user-dir=path>]
 [B<--auto-whitelist|aw>]
 [B<--local-only|L>]
 [B<--saconfig=filename>]
@@ -1497,6 +1519,13 @@ Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
 place your bayes_path SA config setting points to (if any).  Make sure this
 directory is accessible to the user that spampd is running as (default: mail).
 New in v2.40. Thanks to Alexander Wirt for this fix.
+
+=item B<--user-dir=path>
+
+Use the specified directory as the root of per-user data directories. Make
+sure this directory is accessible to the user that spampd is running as.
+Per-user data is stored using the mailbox name extracted from the mail
+recipient (RCPT TO).
 
 =item B<--saconfig=filename>
 
