@@ -1,41 +1,15 @@
-=pod
+=encoding UTF-8
 
 =head1 NAME
 
-SpamPD - Spam Proxy Daemon (version 2.5x)
+SpamPD - Spam Proxy Daemon
 
-=head1 Synopsis
+=head1 VERSION
 
-B<spampd>
-[B<--host=host[:port]>]
-[B<--relayhost=hostname[:port]>]
-[B<--socket>]
-[B<--socket-perms>]
-[B<--relaysocket>]
-[B<--user|u=username>]
-[B<--group|g=groupname>]
-[B<--children|c=n>]
-[B<--maxrequests=n>]
-[B<--childtimeout=n>]
-[B<--satimeout=n>]
-[B<--pid|p=filename>]
-[B<--nodetach>]
-[B<--setsid>]
-[B<--logsock=inet|unix>]
-[B<--maxsize=n>]
-[B<--dose>]
-[B<--tagall|a>]
-[B<--log-rules-hit|rh>]
-[B<--set-envelope-headers|seh>]
-[B<--set-envelope-from|sef>]
-[B<--auto-whitelist|aw>]
-[B<--local-only|L>]
-[B<--saconfig=filename>]
-[B<--debug|d>]
+Documentation for SpamPD version 2.60.
 
-B<spampd> B<--help>
 
-=head1 Description
+=head1 DESCRIPTION
 
 I<spampd> is an SMTP/LMTP proxy that marks (or tags) spam using
 SpamAssassin (L<http://www.SpamAssassin.org/>). The proxy is designed
@@ -45,11 +19,11 @@ I<spampd> (or SpamAssassin) then the mail servers will disconnect and the
 sending server is still responsible for retrying the message for as long
 as it is configured to do so.
 
-I<spampd> uses SpamAssassin to modify (tag) relayed messages based on 
-their spam score, so all SA settings apply. This is described in the SA 
-documentation.  I<spampd> will by default only tell SA to tag a 
-message if it exceeds the spam threshold score, however you can have 
-it rewrite all messages passing through by adding the --tagall option 
+I<spampd> uses SpamAssassin to modify (tag) relayed messages based on
+their spam score, so all SA settings apply. This is described in the SA
+documentation.  I<spampd> will by default only tell SA to tag a
+message if it exceeds the spam threshold score, however you can have
+it rewrite all messages passing through by adding the --tagall option
 (see SA for how non-spam messages are tagged).
 
 I<spampd> logs all aspects of its operation to syslog(8), using the
@@ -57,7 +31,72 @@ mail syslog facility.
 
 The latest version can be found at L<https://github.com/mpaperno/spampd>.
 
-=head1 Requires
+
+=head1 SYNOPSIS
+
+B<spampd> I<[ options ]>
+
+Options:
+
+  --config <filename>        Load options from file(s).
+
+  --host <host>[:<port>]     Hostname/IP and optional port to listen on.
+  --port <n>                 Port to listen on (alternate syntax to above).
+  --socket <socketpath>      UNIX socket to listen on.
+  --socket-perms <mode>      The octal mode to set on the UNIX socket.
+  --relayhost <hst>[:<prt>]  Host and optional port to relay mail to.
+  --relayport <n>            Port to relay to (alternate syntax to above).
+  --relaysocket <sockpath>   UNIX socket to relay to.
+
+  --min-servers | -mns  <n>  The minimum number of servers to keep running.
+  --min-spare   | -mnsp <n>  The minimum number of servers to have waiting.
+  --max-spare   | -mxsp <n>  The maximum number of servers to have waiting.
+  --max-servers | -mxs  <n>  The maximum number of child servers to start.
+  --maxrequests or -r <n>    Maximum requests that each child can process.
+  --childtimeout <n>         Time out children after this many seconds.
+  --satimeout <n>            Time out SpamAssassin after this many seconds.
+
+  --pid   or -p <filename>   Store the daemon's process ID in this file.
+  --user  or -u <user>       Specifies the user that the daemon runs as.
+  --group or -g <group>      Specifies the group that the daemon runs as.
+
+  --[no]detach               Detach from the console daemonize (default).
+  --[no]setsid               Completely detach from stderr with setsid().
+
+  --maxsize n                Maximum size of mail to scan (in KB).
+  --dose                     (D)ie (o)n (s)pamAssassin (e)rrors.
+  --tagall                   Tag all messages with SA headers, not just spam.
+  --set-envelope-headers     Set X-Envelope-From and X-Envelope-To headers.
+  --set-envelope-from        Set X-Envelope-From header only.
+
+  --local-only or -L         Turn off all SA network-based tests.
+  --homedir path             Use the specified directory as SA home.
+  --saconfig <filename>      Use the file for SA "user_prefs" configuration.
+
+  --logfile or -o <dest>     Destination for logs (syslog|stderr|<filename>).
+  --logsock or -ls <sock>    Allows specifying the syslog socket type.
+  --logident or -li <name>   Specify syslog identity name.
+  --logfacility or -lf <nm>  Specify syslog facility (log name).
+  --log-rules-hit or -rh     Log the names of each matched SA test per mail.
+  --debug or -d [<areas>]    Controls extra debug logging.
+
+  --help | -h | -?   [txt]   Show basic command-line usage.
+          -hh | -??  [txt]   Show short option descriptions (this text).
+         -hhh | -??? [txt]   Show usage summary and full option descriptions.
+  --man [html|txt]           Show full docs a man page or HTML/plain text.
+  --show defaults|<thing>    Print default option values or <thing> and exit.
+  --version                  Print version information and exit.
+
+Compatibility with previous SpamPD versions:
+
+  --children or -c <n>       Same as --max-servers | -mxs (since v2.60).
+
+Deprecated since SpamAssassin v3:
+
+  --auto-whitelist or -aw    Use the SA global auto-whitelist feature.
+
+
+=head1 REQUIRES
 
 Perl modules:
 
@@ -65,19 +104,19 @@ Perl modules:
 
 =item B<Mail::SpamAssassin>
 
-=item B<Net::Server::PreForkSimple>
+=item B<Net::Server> (>= v0.89, v2.009+ recommended) with B<PreForkSimple> and/or B<PreFork> submodules.
 
 =item B<IO::File>
 
-=item B<IO::Socket::IP>
+=item B<Time::HiRes>
 
-=item B<IO::Socket::UNIX>
+=item B<IO::Socket::IP> (if using TCP/IP sockets)
 
-=item B<Time::HiRes> (not actually required but recommended)
+=item B<IO::Socket::UNIX> (if using UNIX sockets)
 
 =back
 
-=head1 Operation
+=head1 OPERATION
 
 I<spampd> is meant to operate as an S/LMTP mail proxy which passes
 each message through SpamAssassin for analysis.  Note that I<spampd>
@@ -85,8 +124,8 @@ does not do anything other than check for spam, so it is not suitable as
 an anti-relay system.  It is meant to work in conjunction with your
 regular mail system.  Typically one would pipe any messages they wanted
 scanned through I<spampd> after initial acceptance by your MX host.
-This is especially useful for using Postfix's (http://www.postfix.org) 
-advanced content filtering mechanism, although certainly not limited to 
+This is especially useful for using Postfix's (http://www.postfix.org)
+advanced content filtering mechanism, although certainly not limited to
 that application.
 
 Please re-read the second sentence in the above paragraph.  You should NOT
@@ -97,65 +136,87 @@ way.
 Here are some simple examples (square brackets in the "diagrams" indicate
 physical machines):
 
+=over 2
 
-B<Running between firewall/gateway and internal mail server>
+=item B<Running between firewall/gateway and internal mail server>
 
-=over 3
-
-The firewall/gateway MTA would be configured to forward all of its mail 
-to the port that I<spampd> listens on, and I<spampd> would relay its 
-messages to port 25 of your internal server. I<spampd> could either 
-run on its own host (and listen on any port) or it could run on either 
+The firewall/gateway MTA would be configured to forward all of its mail
+to the port that I<spampd> listens on, and I<spampd> would relay its
+messages to port 25 of your internal server. I<spampd> could either
+run on its own host (and listen on any port) or it could run on either
 mail server (and listen on any port except port 25).
 
- Internet -> [ MX gateway (@inter.net.host:25) -> 
-	spampd (@localhost:2025) ] ->
-	Internal mail (@private.host.ip:25)
+  Internet ->
+  [ MX gateway (@inter.net.host:25) -> spampd (@localhost:2025) ] ->
+  [ Internal mail (@private.host.ip:25) ]
 
-=back
-
-B<Using Postfix advanced content filtering>
-
-=over 3
+=item B<Using Postfix advanced content filtering>
 
 Please see the F<FILTER_README> that came with the Postfix distribution.  You
 need to have a version of Postfix which supports this (ideally v.2 and up).
 
- Internet -> [ Postfix (@inter.net.host:25) -> 
-	spampd (@localhost:10025) -> 
-	Postfix (@localhost:10026) ] -> final delivery
+  Internet -> [ Postfix (@inter.net.host:25)  ->
+                spampd (@localhost:10025)     ->
+                Postfix (@localhost:10026)  ] -> final delivery
 
 =back
 
-Note that these examples only show incoming mail delivery.  Since it is 
-often unnecessary to scan mail coming from your network, it may be desirable 
+Note that these examples only show incoming mail delivery.  Since it is
+often unnecessary to scan mail coming from your network, it may be desirable
 to set up a separate outbound route which bypasses I<spampd>.
 
-=head1 Installation / Configuration
+=head2 Scalable Mode
+
+Since v2.60 I<spampd> can optionally run in "scalable mode" which dynamically adjusts the number
+of child servers which can process requests simultaneously. This is activated automatically if the
+C<--min-servers> option is specifically set to be lower than C<--max-servers>.
+
+Historically I<SpamPD> inherited from the module I<Net::Server::PreForkSimple> which only allows for
+a static number of child servers to be running at once. This new option essentially allows for inheriting from
+I<Net::Server::PreFork> which features dynamic allocation of child servers, with some tunable parameters.
+(The reason I<PreFork> wasn't used to begin with is because older versions of it didn't seem to work...
+it was an old TODO to try again later.)
+
+Here is what the I<Net::Server::PreFork> documentation has to say (option names changed to match I<spampd>):
+
+I<"This personality binds to one or more ports and then forks C<--min-servers> child process.  The server
+will make sure that at any given time there are C<--min-spare> servers available to receive a client
+request, up to C<--max-servers>. Each of these children will process up to C<--maxrequests> client
+connections. This type is good for a heavily hit site, and should scale well for most applications.">
+
+Some experimentation and tuning will likely be needed to get the best performance vs. efficiency. Keep in mind
+that a SIGHUP sent to the parent process will reload configuration files and restart child servers gracefully
+(handy for tuning a busy site).
+
+See the documentation for C<--min-servers>, C<--max-servers>, C<--min-spare>, and C<--max-spare> options,
+and also the section about L</"Other Net::Server Options"> for tuning parameters and links to further documentation.
+
+
+=head1 INSTALLATION AND CONFIGURATION
 
 I<spampd> can be run directly from the command prompt if desired.  This is
 useful for testing purposes, but for long term use you probably want to put
 it somewhere like /usr/bin or /usr/local/bin and execute it at system startup.
-For example on Red Hat-style Linux system one can use a script in 
-/etc/rc.d/init.d to start I<spampd> (a L<sample script|https://github.com/mpaperno/spampd/tree/master/misc> 
+For example on Red Hat-style Linux system one can use a script in
+/etc/rc.d/init.d to start I<spampd> (a L<sample script|https://github.com/mpaperno/spampd/tree/master/misc>
 is available in the I<spampd> code repository).
 
 I<spampd> is available as a B<package> for a significant number of Linux distributions,
 including Debian and derivatives (Ubuntu, etc). This is typically the easiest/best way
-to install and configure I<spampd> since it should already take into account any system 
-specifics for setting up and running as a daemon, etc.  Note however that packages 
+to install and configure I<spampd> since it should already take into account any system
+specifics for setting up and running as a daemon, etc.  Note however that packages
 might not offer the latest version of I<spampd>. A good reference for available
 packages and their versions can be found at L<https://repology.org/project/spampd/versions>.
 
 I<spampd> is also used in the turnkey L<Mail-in-a-Box|https://mailinabox.email/>
-project, which includes Postfix as the main MTA and Dovecot as the local delivery agent 
-with LMTP protocol. Even if you don't need the turnkey solution, it may be imformative 
+project, which includes Postfix as the main MTA and Dovecot as the local delivery agent
+with LMTP protocol. Even if you don't need the turnkey solution, it may be informative
 to peruse the MIAB L<setup|https://github.com/mail-in-a-box/mailinabox/tree/master/setup> /
 L<configuration|https://github.com/mail-in-a-box/mailinabox/tree/master/conf> files for reference.
 
 All I<spampd> options have reasonable defaults, especially for a Postfix-centric
 installation.  You may want to specify the --children option if you have an
-especially beefy or weak server box because I<spampd> is a memory-hungry 
+especially beefy or weak server box because I<spampd> is a memory-hungry
 program.  Check the L<"Options"> for details on this and all other parameters.
 
 Note that B<I<spampd> replaces I<spamd>> from the I<SpamAssassin> distribution
@@ -165,21 +226,21 @@ This has apparently been the source of some confusion, so now you know.
 =head2 Postfix-specific Notes
 
 Here is a typical setup for Postfix "advanced" content filtering as described
-in the F<FILTER_README> that came with the Postfix distribution (which you 
+in the F<FILTER_README> that came with the Postfix distribution (which you
 really need to read):
 
 F</etc/postfix/master.cf>:
- 
- smtp	inet	n	-	y	-	-	smtpd
- 	-o content_filter=smtp:localhost:10025
-	-o myhostname=mx.example.com
 
- localhost:10026	inet	n	-	n	-	10	smtpd
- 	-o content_filter=
- 	-o myhostname=mx-int.example.com
+  smtp             inet  n  -  y  -  -   smtpd
+    -o content_filter=smtp:localhost:10025
+    -o myhostname=mx.example.com
+
+  localhost:10026  inet  n  -  n  -  10  smtpd
+    -o content_filter=
+    -o myhostname=mx-int.example.com
 
 The first entry is the main public-facing MTA which uses localhost:10025
-as the content filter for all mail.	The second entry receives mail from
+as the content filter for all mail. The second entry receives mail from
 the content filter and does final delivery.  Both smtpd instances use
 the same Postfix F<main.cf> file.  I<spampd> is the process that listens on
 localhost:10025 and then connects to the Postfix listener on localhost:10026.
@@ -198,90 +259,213 @@ Another tip for Postfix when considering what timeout values to use for
 
 C<# postconf | grep timeout>
 
-This will return a list of useful timeout settings and their values.  For 
+This will return a list of useful timeout settings and their values.  For
 explanations see the relevant C<man> page (smtp, smtpd, lmtp).  By default
 I<spampd> is set up for the default Postfix timeout values.
 
 The following guide has some more specific setup instructions:
 B<L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>>
 
-=head1 Upgrading
 
-If upgrading from a version prior to 2.2, please note that the --add-sc-header
+=head1 UPGRADING
+
+Always consult the F<changelog.txt> file which should be included in the I<spampd> repository/distribution.
+
+If upgrading from a version B<prior to 2.2>, please note that the --add-sc-header
 option is no longer supported.  Use SA's built-in header manipulation features
 instead (as of SA v2.6).
 
-Upgrading from version 1 simply involves replacing the F<spampd> program file
+Upgrading from B<version 1> simply involves replacing the F<spampd> program file
 with the latest one.  Note that the I<dead-letters> folder is no longer being
 used and the --dead-letters option is no longer needed (though no errors are
-thrown if it's present).  Check the L<"Options"> list below for a full list of new
+thrown if it's present).  Check the L</OPTIONS> list below for a full list of new
 and deprecated options.  Also be sure to check out the change log.
 
-=head1 Options
+B<Since v2.60> I<spampd> has a new L</"Scalable Mode"> feature which varies the number of running
+child servers based on demand. This is disabled by default. The option previosly known as
+C<--children> (or C<-c>) is now called C<--max-servers> (or C<-mxs>), but the old style is still accepted.
+See descriptions of the C<max-servers> and C<min-servers> options for details.
+
+Also note that v2.60 added the ability to use a L</"CONFIGURATION FILE"> for specifying all options.
+
+
+=head1 USAGE
+
+  spampd [
+    [ --config | --cfg | --config-file | --cfg-file [<filename>] ][...]
+
+    [ --host <host>[:<port>]      | --socket <path> --socket-perms <mode> ]
+    [ --relayhost <host>[:<port>] | --relaysocket <path>                  ]
+
+    [--min-servers | -mns  <n>] [--saconfig  <file>] [--user  | -u <user>  ]
+    [--min-spare   | -mnsp <n>] [--satimeout <n>   ] [--group | -g <group> ]
+    [--max-spare   | -mxsp <n>] [--dose            ] [--pid   | -p <file>  ]
+    [--max-servers | -mxs  <n>] [--maxsize   <n>   ] [--[no]detach         ]
+    [--maxrequests | -r    <n>] [--local-only | -L ] [--[no]setsid         ]
+    [--childtimeout        <n>] [--tagall     | -a ] [--log-rules-hit | -rh]
+    [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
+
+    [ --logfile | -o (syslog|stderr|<filename>) ][...]
+    [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
+    [ --debug   | -d [<area,...>|1|0] ]  [ --logfacility | -lf <name> ]
+    [ --show ( all | (defaults, config, version, argv, start, self) ) ][...]
+  ]
+  spampd --version
+  spampd [--help | -?] | -?? [txt] | -??? [txt] | [-???? | --man [html|txt]]
+
+Options are case-insensitive. "=" can be used as name/value separator
+instead of space (--name=value). "-" or "--" prefix can be used
+for all options. Shortest unique option name can be used. All options must
+be listed individually (no "bundling"). All boolean options can take an
+optional argument of 1 or 0, or can be negated by adding a "no-" prefix
+in front of the name. An option specified on the command line overrides the
+same option loaded from config file(s).
+
+=head1 OPTIONS
+
+Please be sure to also read the general information about specifying option
+arguments in the above L</"USAGE"> section.
+
+To show default values for all options, run C<spampd --show defaults>.
 
 =over 5
 
-=item B<--host=(ip|hostname)[:port]>
+=item B<--config> or B<-cfg> or B<--config-file> or B<--cfg-file> I<<filename>> C<new in v2.60>
+
+Load options from one or more configuration file(s). This option can be specified
+multiple times. The C<filename> can also be a list of files separated by a C<:>
+(colon). If multiple files specify the same option, the last one loaded
+will take precedence. Also any options specified on the actual command line will
+take precedence (regardless of where they appear relative to the C<--config> option).
+B<--config can only be specified on the command line>, one cannot use it within
+another configuration file.
+
+See L</"CONFIGURATION FILE"> section for more details.
+
+
+=item B<--host> I<< (<ip>|<hostname>)[:<port>] >>
 
 Specifies what hostname/IP and port I<spampd> listens on. By default, it listens
-on 127.0.0.1 (localhost) on port 10025. 
+on 127.0.0.1 (localhost) on port 10025.
+
+As of v2.60 this option can also handle IPv6 addresses in the form of
+C<--host n:n:n> or, with port, C<--host [n:n:n]:port> (the square brackets are optional
+in both forms but recommended in the latter case).
+
+Note that the I<port> specified this way implicitly overrides the C<--port> option.
 
 B<Important!> You should NOT enable I<spampd> to listen on a
 public interface (IP address) unless you know exactly what you're doing!
 
-=item B<--port=n>
+
+=item B<--port> I<<n>>
 
 Specifies what port I<spampd> listens on. By default, it listens on
 port 10025. This is an alternate to using the above --host=ip:port notation.
+Note that a I<port> specified in the C<--host> option will override this one.
 
-=item B<--socket=socketpath>
+
+=item B<--socket> I<<socketpath>>
 
 Specifies what UNIX socket I<spampd> listens on. If this is specified,
 --host and --port are ignored.
 
-=item B<--socket-perms=mode>
 
-The file mode fo the created UNIX socket (see --socket) in octal
-format, e.g. 700 to specify acces only for the user spampd is run as.
+=item B<--socket-perms> I<<mode>>
 
-=item B<--relayhost=(ip|hostname)[:port]>
+The file mode for the created UNIX socket (see --socket) in octal
+format, e.g. 700 to specify acces only for the user I<spampd> is run as.
+
+
+=item B<--relayhost> I<< (<ip>|<hostname>)[:<port>] >>
 
 Specifies the hostname/IP to which I<spampd> will relay all
 messages. Defaults to 127.0.0.1 (localhost). If the port is not provided, that
 defaults to 25.
 
-=item B<--relayport=n>
+As of v2.60 this option can also handle IPv6 addresses in the form of
+C<--relayhost n:n:n> or, with port, C<--relayhost [n:n:n]:port> (the square brackets
+are optional in both forms but recommended in the latter case).
 
-Specifies what port I<spampd> will relay to. Default is 25. This is an 
-alternate to using the above --relayhost=ip:port notation.
+Note that the I<port> specified this way implicitly overrides the C<--relayport> option.
 
-=item B<--relaysocket=socketpath>
+
+=item B<--relayport> I<<n>>
+
+Specifies what port I<spampd> will relay to. Default is 25. This is an
+alternate to using the above --relayhost=ip:port notation. Note that a I<port>
+specified in the C<--relayhost> option will override this one.
+
+
+=item B<--relaysocket> I<<socketpath>>
 
 Specifies what UNIX socket spampd will relay to. If this is specified
 --relayhost and --relayport will be ignored.
 
-=item B<--user=username> or B<-u=username>
 
-=item B<--group=groupname> or  B<-g=groupname>
+=item B<--user> or B<-u> I<<username>>
+
+=item B<--group> or B<-g> I<<groupname>>
 
 Specifies the user and/or group that the proxy will run as. Default is
 I<mail>/I<mail>.
 
-=item B<--children=n> or B<-c=n>
 
-Number of child servers to start and maintain (where n > 0). Each child will 
-process up to --maxrequests (below) before exiting and being replaced by 
-another child.  Keep this number low on systems w/out a lot of memory. 
-Default is 5 (which seems OK on a 512MB lightly loaded system).  Note that 
-there is always a parent process running, so if you specify 5 children you
+=item B<--children> or B<-c> I<<n>>
+
+=item B<--max-servers> or B<-mxs> I<<n>> C<new in v2.60>
+
+Number of child servers to start and maintain (where n > 0). Each child will
+process up to C<--maxrequests> (below) before exiting and being replaced by
+another child.  Keep this number low on systems w/out a lot of memory.
+Note that there is always a parent process running, so if you specify 5 children you
 will actually have 6 I<spampd> processes running.
 
-You may want to set your origination mail server to limit the 
-number of concurrent connections to I<spampd> to match this setting (for 
-Postfix this is the C<xxxx_destination_concurrency_limit> setting where 
+B<Note:> If C<--min-servers> option is also set, and is less than C<--max-servers>,
+then the server runs in L</"Scalable Mode"> and the meaning of this option changes.
+In scalable mode, the number of actual running servers will fluctuate between C<--min-servers>
+and C<--max-servers>, based on demand.
+
+You may want to set your origination mail server to limit the
+number of concurrent connections to I<spampd> to match this setting (for
+Postfix this is the C<xxxx_destination_concurrency_limit> setting where
 'xxxx' is the transport being used, usually 'smtp', and the default is 100).
 
-=item B<--maxrequests=n>
+See also C<--min-servers>, C<--min-spare>, and C<--max-spare> options.
+
+
+=item B<--min-servers> or B<-mns> I<<n>> C<new in v2.60>
+
+Minimum number of child servers to start and maintain (where n > 0).
+
+B<Note:> If this option is set, and it is less than C<--max-servers> option,
+then the server runs in L</"Scalable Mode">. By default this option is undefined,
+meaning I<spampd> runs only a set number of servers specified in C<--max-servers>.
+In scalable mode, the number of actual running servers will fluctuate between C<--min-servers>
+and C<--max-servers>, based on demand.
+
+See also C<--max-servers>, C<--min-spare>, and C<--max-spare> options.
+
+
+=item B<--min-spare> or B<-mnsp> I<<n>> C<new in v2.60>
+
+The minimum number of servers to have waiting for requests.  Minimum
+and maximum numbers should not be set to close to each other or the
+server will fork and kill children too often. (I<- Copied from C<Net::Server::PreFork>>)
+
+B<Note:> This option is only used when running in L</"Scalable Mode">. See C<--min-servers>
+and C<--max-servers> options.
+
+
+=item B<--max-spare> or B<-mxsp> I<<n>> C<new in v2.60>
+
+The maximum number of servers to have waiting for requests. (I<- Copied from C<Net::Server::PreFork>>)
+
+B<Note:> This option is only used when running in L</"Scalable Mode">. See C<--min-servers>
+and C<--max-servers> options.
+
+
+=item B<--maxrequests> or B<-mr> or B<-r> I<<n>>
 
 I<spampd> works by forking child servers to handle each message. The
 B<maxrequests> parameter specifies how many requests will be handled
@@ -289,21 +473,23 @@ before the child exits. Since a child never gives back memory, a large
 message can cause it to become quite bloated; the only way to reclaim
 the memory is for the child to exit. The default is 20.
 
-=item B<--childtimeout=n>
+
+=item B<--childtimeout> I<<n>>
 
 This is the number of seconds to allow each child server before it times out
-a transaction. In an S/LMTP transaction the timer is reset for every command. 
-This timeout includes time it would take to send the message data, so it should 
+a transaction. In an S/LMTP transaction the timer is reset for every command.
+This timeout includes time it would take to send the message data, so it should
 not be too short.  Note that it's more likely the origination or destination
 mail servers will timeout first, which is fine.  This is just a "sane" failsafe.
 Default is 360 seconds (6 minutes).
 
-=item B<--satimeout=n>
+
+=item B<--satimeout> I<<n>>
 
 This is the number of seconds to allow for processing a message with
-SpamAssassin (including feeding it the message, analyzing it, and adding 
-the headers/report if necessary).  
-This should be less than your origination and destination servers' timeout 
+SpamAssassin (including feeding it the message, analyzing it, and adding
+the headers/report if necessary).
+This should be less than your origination and destination servers' timeout
 settings for the DATA command. For Postfix the default is 300 seconds in both
 cases (smtp_data_done_timeout and smtpd_timeout). In the event of timeout
 while processing the message, the problem is logged and the message is passed
@@ -311,129 +497,325 @@ on anyway (w/out spam tagging, obviously).  To fail the message with a temp
 450 error, see the --dose (die-on-sa-errors) option, below.
 Default is 285 seconds.
 
-=item B<--pid=filename> or B<-p=filename>
+
+=item B<--pid> or B<-p> I<<filename>>
 
 Specifies a filename where I<spampd> will write its process ID so
 that it is easy to kill it later. The directory that will contain this
 file must be writable by the I<spampd> user. The default is
 F</var/run/spampd.pid>.
 
-=item B<--logsock=(unix|inet)> C<(new in v2.20)>
 
-Syslog socket to use.  May be either "unix" of "inet".  Default is "unix"
-except on HP-UX and SunOS (Solaris) systems which seem to prefer "inet".
+=item B<--logfile> or B<-o> I<< (syslog|stderr|<filename>) >> C<new in v2.60>
 
-=item B<--nodetach> C<(new in v2.20)>
+Logging method to use. May be one or more of:
 
-If this option is given spampd won't detach from the console and fork into the
-background. This can be useful for running under control of some daemon
-management tools or when configured as a win32 service under cygrunsrv's
-control.
+=over 5
 
-=item B<--setsid> C<(new in v2.51)>
+=item *
 
-If this option is given spampd will fork after the bind method to release
+C<syslog>: Use the system's syslogd (via Sys::Syslog). B<Default> when running as daemon.
+
+=item *
+
+C<stderr>: Direct all logging to stderr (if running in background mode
+these may still end up in the default system log).  B<Default> when not running as daemon (C<--nodetach>).
+
+=item *
+
+C<filename>: Use the specified file (the location must be accessible to the
+user I<spampd> is running as). This can also be a device handle, eg: C</dev/tty0>
+or even C</dev/null> to disable logging entirely.
+
+=back
+
+B<This option may be specified multiple times.> You may also specify multiple
+destination by separating them with a C<:> (colon): C<--logfile stderr:/var/log/spampd.log>
+
+Simultaneous logging to C<syslog>, C<stderr>, and one C<filename> is possible.
+At this time only one log file can be used at a time (if several are specified
+then the last one takes precedence).
+
+
+=item B<--logsock> or B<-ls> I<<type>> C<new in v2.20>  C<updated in v2.60>
+
+Syslog socket to use if C<--logfile> is set to I<syslog>.
+
+C<Since v2.60:>
+
+The I<type> can be any of the socket types or logging mechanisms as accepted by
+the subroutine Sys::Syslog::setlogsock(). Depending on the version of Sys::Syslog and
+the underlying operating system, one of the following values (or their subset) can
+be used:
+
+  native, tcp, udp, inet, unix, stream, pipe, console, eventlog (Win32 only)
+
+The default behavior since I<spampd> v2.60 is to let I<Sys::Syslog> pick the default
+syslog socket. This is the recommended usage for I<Sys::Syslog> (since v0.15), which chooses thusly:
+
+  The default is to try native, tcp, udp, unix, pipe, stream, console. Under systems with the
+  Win32 API, eventlog will be added as the first mechanism to try if Win32::EventLog is available.
+
+For more information please consult the L<Sys::Syslog|https://metacpan.org/pod/Sys::Syslog> documentation.
+
+To preserve backwards-compatibility, the default on HP-UX and SunOS (Solaris) systems is C<inet>.
+
+C<Prior to v2.60:>
+
+The default was C<unix> except on HP-UX and SunOS (Solaris) systems it is C<inet>.
+
+
+=item B<--logident> or B<-li> I<<name>> C<new in v2.60>
+
+Syslog identity name to use. This may also be used in log files written directly (w/out syslog). Default is C<spampd>.
+
+
+=item B<--logfacility> or B<-lf> I<<name>> C<new in v2.60>
+
+Syslog facility name to use. This is typically the name of the system-wide log file to be written to. Default is C<mail>.
+
+
+=item B<--[no]detach> I<[0|1]> C<new in v2.20>
+
+By default I<spampd> will detach from the console and fork into the
+background ("daemonize"). Use C<--nodetach> to override this.
+This can be useful for running under control of some daemon
+management tools or testing from a command line.
+
+
+=item B<--[no]setsid> I<[0|1]> C<new in v2.51>
+
+If C<--setsid> is specified then I<spampd> will fork after the bind method to release
 itself from the command line and then run the POSIX::setsid() command to truly
-daemonize. Only used if --nodetach isn't specified.
+daemonize. Only used if C<--nodetach> isn't specified.
 
-=item B<--maxsize=n>
+
+=item B<--maxsize> I<<n>>
 
 The maximum message size to send to SpamAssassin, in KBytes. By default messages
 over 64KB are not scanned at all, and an appropriate message is logged
 indicating this.  The size includes headers and attachments (if any).
 
-=item B<--dose>
+
+=item B<--dose> I<[0|1]>
 
 Acronym for (d)ie (o)n (s)pamAssassin (e)rrors.  By default if I<spampd>
-encounters a problem with processing the message through Spam Assassin (timeout 
-or other error), it will still pass the mail on to the destination server.  If 
-you specify this option however, the mail is instead rejected with a temporary 
-error (code 450, which means the origination server should keep retrying to send 
+encounters a problem with processing the message through Spam Assassin (timeout
+or other error), it will still pass the mail on to the destination server.  If
+you specify this option however, the mail is instead rejected with a temporary
+error (code 450, which means the origination server should keep retrying to send
 it).  See the related --satimeout option, above.
 
-=item B<--tagall> or B<-a>
+
+=item B<--tagall> or B<-a> I<[0|1]>
 
 Tells I<spampd> to have SpamAssassin add headers to all scanned mail,
-not just spam.  By default I<spampd> will only rewrite messages which 
+not just spam.  By default I<spampd> will only rewrite messages which
 exceed the spam threshold score (as defined in the SA settings).  Note that
-for this option to work as of SA-2.50, the I<always_add_report> and/or 
-I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be 
+for this option to work as of SA-2.50, the I<always_add_report> and/or
+I<always_add_headers> settings in your SpamAssassin F<local.cf> need to be
 set to 1/true.
 
-=item B<--log-rules-hit> or B<--rh>
 
-Logs the names of each SpamAssassin rule which matched the message being 
+=item B<--log-rules-hit> or B<-rh> I<[0|1]>
+
+Logs the names of each SpamAssassin rule which matched the message being
 processed.  This list is returned by SA.
 
-=item B<--set-envelope-headers> or B<--seh> C<(new in v2.30)>
+
+=item B<--set-envelope-headers> or B<-seh> I<[0|1]> C<new in v2.30>
 
 Turns on addition of X-Envelope-To and X-Envelope-From headers to the mail
-being scanned before it is passed to SpamAssassin. The idea is to help SA 
-process any blacklist/whitelist to/from directives on the actual 
-sender/recipients instead of the possibly bogus envelope headers. This 
-potentially exposes the list of all recipients of that mail (even BCC'd ones). 
-Therefore usage of this option is discouraged. 
+being scanned before it is passed to SpamAssassin. The idea is to help SA
+process any blacklist/whitelist to/from directives on the actual
+sender/recipients instead of the possibly bogus envelope headers. This
+potentially exposes the list of all recipients of that mail (even BCC'd ones).
+Therefore usage of this option is discouraged.
 
 I<NOTE>: Even though I<spampd> tries to prevent this leakage by removing the
 X-Envelope-To header after scanning, SpamAssassin itself might add headers
 that report recipient(s) listed in X-Envelope-To.
 
-=item B<--set-envelope-from> or B<--sef> C<(new in v2.30)>
+
+=item B<--set-envelope-from> or B<-sef> I<[0|1]> C<new in v2.30>
 
 Same as above option but only enables the addition of X-Envelope-From header.
 For those that don't feel comfortable with the possible information exposure
 of X-Envelope-To.  The above option overrides this one.
 
-=item B<--auto-whitelist> or B<--aw> C<(deprecated with SpamAssassin v3+)>
 
-This option is no longer relevant with SA version 3.0 and above, which
-controls auto whitelist use via config file settings. This option is likely to
-be removed in the future.  Do not use it unless you must use an older SA
-version.
-
-For SA version < 3.0, turns on the SpamAssassin global whitelist feature.  
-See the SA docs. Note that per-user whitelists are not available.
-
-B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
-a different mechanism (such as SQLBasedAddrList), the I<spampd> code will 
-need to be modified in 2 instances (search the source for DBBasedAddrList).
-
-=item B<--local-only> or B<-L>
+=item B<--local-only> or B<-L> I<[0|1]>
 
 Turn off all SA network-based tests (DNS, Razor, etc).
 
-=item B<--homedir=directory>
 
-Use the specified directory as home directory for the spamassassin process. 
+=item B<--homedir> I<<directory>> C<new in v2.40>
+
+Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
 written to here.
 Default is /var/spool/spamassassin/spampd.  A good place for this is in the same
 place your bayes_path SA config setting points to (if any).  Make sure this
 directory is accessible to the user that spampd is running as (default: mail).
-New in v2.40. Thanks to Alexander Wirt for this fix.
+Thanks to Alexander Wirt for this fix.
 
-=item B<--saconfig=filename>
+
+=item B<--saconfig> I<<filename>>
 
 Use the specified file for SpamAssassin configuration options in addition to the
 default local.cf file.  Any options specified here will override the same
 option from local.cf.  Default is to not use any additional configuration file.
 
-=item B<--debug> or B<-d>
+
+=item B<--debug> or B<-d> I<< [<area,...>|1|0] >> C<(updated in v2.60)>
 
 Turns on SpamAssassin debug messages which print to the system mail log
-(same log as spampd will log to).  Also turns on more verbose logging of 
+(same log as spampd will log to).  Also turns on more verbose logging of
 what spampd is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 
-=item B<--version>
+C<New in v2.60:>
+
+Setting the value to 1 (one) is the same as using no parameter (eg. simply I<-d>).
+The value of 0 (zero) disables debug logging (this is the default).
+
+The I<area> list is passed on directly to SpamAssassin and controls logging
+facilities. If no I<area>s are listed (and debug logging is enabled), all
+debugging information is printed (this equivalent to passing C<all> as the I<area>).
+Diagnostic output can also be enabled for each area individually;
+I<area> is the area of the code to instrument. For example, to produce
+diagnostic output on bayes, learn, and dns, use:
+
+    -d bayes,learn,dns
+
+You can also disable specific areas with the "no" prefix:
+
+    -d all,norules,nobayes
+
+To show only I<spampd> debug messages (none from SpamAssassin), use:
+
+    -d spampd
+
+For more information about which I<areas> (aka I<channels> or I<facilities>) are available,
+please see the documentation at:
+
+L<SpamAssassin Wiki::DebugChannels|http://wiki.apache.org/spamassassin/DebugChannels>
+
+L<Mail::SpamAssassin::Logger::add_facilities()|https://spamassassin.apache.org/doc/Mail_SpamAssassin_Logger.html#METHODS>
+
+
+=item B<--show> I<<thing>>[,I<<thing>>[,...]] C<new in v2.60>
+
+Meant primarily for debugging configuration settings (or code), this will print some information
+to the console and then exit.
+
+I<<thing>> may be one or more of:
+
+=over 4
+
+=item *
+
+C<defaults>: Show default values for all options, in a format suitable for a config file.
+
+=item *
+
+C<config>: Shows option values after processing all given command-line arguments, including
+anything loaded from config file(s).
+
+=item *
+
+C<start>: Shows the final configuration arguments after processing any config file(s).
+
+=item *
+
+C<version>: Same as C<--version> switch but runs after parsing all options and shows actual I<Net::Server> type
+which would be used (I<PreFork> or I<PreForkSimple>).
+
+=item *
+
+C<argv>: Shows anything remaining on command line (@ARGV) after processing all known arguments
+(this will be passed onto Net::Server).
+
+=item *
+
+C<self>: Dumps the whole SpamPD object, including all settings. Trés geek.
+
+=item *
+
+C<all>: Prints all of the above.
+
+=back
+
+Multiple C<thing>s may be specified by using the I<--show> option multiple times, or
+separating the items with a comma: C<--show config,start,argv>.
+
+Note that all I<thing> options besides C<defaults> and C<config> require the Perl module I<Data::Dumper> installed.
+
+
+=item B<--version> C<new in v2.52>
 
 Prints version information about SpamPD, Net::Server, SpamAssassin, and Perl.
 
-=item B<--help> or B<-h> or B<-?>
 
-Prints usage information.
+=item B<--help> or B<-h> or B<-?> I<[txt]>
+
+=item B<--hh> or B<-??> I<[txt]>
+
+=item B<--hhh> or B<-???> I<[txt]>
+
+=item B<--man> or B<-hhhh> or B<-????> I<[html|txt]>
+
+Prints increasingly verbose usage information. By default help is displayed in
+"terminal" (groff) format with some text styling applied. If you want to use
+C<less> as a pager, provide it with the C<-R> switch, eg.:
+
+  spampd --??? | less -R
+
+Alternatively you can request plain-text format with the optional C<txt> value.
+
+C<--man> displays the full documentation, optionally in C<html> or plain text
+C<txt> formats (default is to use actual "man" format/display). HTML version is
+saved to a temp file and an attempt is made to open it in the default system browser
+(it is better if the browser is already opened). If available, the optional Perl
+module I<HTML::Display> is used to (try to) open a browser.
 
 =back
+
+=head2 Other Net::Server Options
+
+I<Net::Server> supports some other options which I<spampd> doesn't accept directly.
+For example there are access control options, child process tuning, and a few more (see below).
+Such options can be passed through to I<Net::Server> (and subtypes) by specifying them at the end
+of the I<spampd> command line (or in a configuration file) following two dashes
+C< -- > by themselves (this is a failry typicaly convention for passing options onto
+another program). As an example, it may look something like this:
+
+  spampd --host 10.0.0.1 -port 10025 -- --cidr_allow 10.0.0.0/24
+
+The C<--cidr_allow> after the C< -- > is passed onto I<Net::Server>. If the C< -- > were
+not there, you would get an error from I<spampd> about an unknown option.
+
+To specify I<Net::Server> options in a configuration file, place them after two
+dashes (C<-->) on a line by themselves. See L</"CONFIGURATION FILE"> for an example.
+
+This only makes sense with the few options not directly controlled by/through I<spampd>.
+As of I<Net::Server> v2.009 the list is:
+
+  reverse_lookups, allow, deny, cidr_allow, cidr_deny, chroot, ipv, conf_file,
+  serialize, lock_file, check_for_dead, max_dequeue, check_for_dequeue
+
+If running in L</"Scalable Mode"> then these settings from I<Net::Server::PreFork> can also be very relevant to performance tuning:
+
+  check_for_waiting, check_for_spawn, min_child_ttl
+
+Keep in mind that the I<Net::Server> types inherit from each other: C<PreFork> inherits from C<PreForkSimple>
+which inherits from C<Net::Server> itself. Which means all the options are also inherited.
+
+See the L<Net::Server(3)|https://https://metacpan.org/pod/Net::Server#DEFAULT-ARGUMENTS-FOR-Net::Server>,
+L<Net::Server::PreForkSimple(3)|https://metacpan.org/pod/Net::Server::PreForkSimple#COMMAND-LINE-ARGUMENTS>,
+and L<Net::Server::PreFork(3)|https://metacpan.org/pod/Net::Server::PreFork#COMMAND-LINE-ARGUMENTS>
+documentation for details.
+
 
 =head2 Deprecated Options
 
@@ -452,17 +834,97 @@ compatibility with prevoius I<spampd> versions:
 
 =item  B<--hostname>
 
+=item B<--auto-whitelist> or B<-aw> C<deprecated with SpamAssassin v3+>
+
+This option is no longer relevant with SA version 3.0 and above, which
+controls auto whitelist use via config file settings. Do not use it unless
+you must use an older SA version. An error will be generated if attempting
+to use this option with SA 3.0 or above.
+
+For SA version < 3.0, turns on the SpamAssassin global whitelist feature.
+See the SA docs. Note that per-user whitelists are not available.
+
+B<NOTE>: B<DBBasedAddrList> is used as the storage mechanism. If you wish to use
+a different mechanism (such as SQLBasedAddrList), the I<spampd> code will
+need to be modified in 2 instances (search the source for DBBasedAddrList).
+
 =back
 
-=head1 Signals
+
+=head1 CONFIGURATION FILE
+
+Since v2.60 I<spampd> allows for the use of a configuration file to load server parameters.
+One or more files can be specified on the command line (see C<--config> option for more details on syntax).
+The format of a configuration file is simple key/value pairs. Comments (starting with # or ;)
+and blank lines are ignored. The option names are exactly as they appear above in the L</"OPTIONS"> section.
+They can be listed with or w/out the "-"/"--" prefixes.
+Key/value separator can be one or more of space, tab, or "=" (equal) sign.
+
+Multiple configuration files can be loaded, with the latter ones being able to override options
+loaded earlier. Any options specified on the command line will take precedence over options from
+file(s). Configuration file(s) are reloaded during a HUP-induced restart (see L</"SIGNALS">),
+making it possible to adjust settings dynamically on a running server.
+
+You may also provide "B<passthrough>" options directly to I<Net::Server> by putting them after a "--" on a
+line by itself (this is just like using the lonesome "--" on a command line; see L</"Other Net::Server Options">).
+
+Note that one cannot use the C<--config> option to load a file from within
+another file. B<A config file can only be specified on the command line.>
+
+Use the C<< spampd --show defaults > spampd.config >> command to generate a sample
+configuration file showing all default values. The example below demonstrates various
+valid syntax for the file.
+
+  # Sample configuration file for SpamPD.
+
+  # Double dashes
+  --user    spampd
+
+  # Single dash and = separator with spaces
+  -pid = /var/run/spampd/spampd.pid
+
+  # No dashes required, equals separator no spaces
+  homedir=/var/cache/spampd
+
+  # No dashes, space separator
+  host  127.0.0.1
+
+  # Disabled option (after comment character)
+  #port  10025
+
+  # Boolean values can be set/unset a number of ways:
+  tagall      1
+  local-only  0
+  set-envelope-from
+  no-log-rules-hit
+
+  # Passthrough arguments for Net::Server[::PreFork[Simple]] could go here.
+  # Be sure to also uncomment the "--" if using any.
+  # --
+  # cidr_allow      127.0.0.1/32
+
+
+=head1 SIGNALS
 
 =over 5
 
-=item HUP
+=item HUP  C<updated in v2.60>
 
-Sending HUP signal to the master process will restart all the children
-gracefully (meaning the currently running requests will shut down once
-the request is complete).  SpamAssassin configuration is NOT reloaded.
+Sending HUP signal to the master process will restart all the children gracefully (meaning the currently
+running requests will shut down once the request is complete).
+
+C<Since v2.60>:
+
+SpamAssassin configuration IS reloaded on HUP. Any children currently in the middle of a transaction will
+finish with the previous SA config and then exit. A new set of children, using the new config, is spawned
+immediately upon HUP and will serve any new requests.
+
+In a similar manner, I<spampd> will also reload its own settings from any configuration file(s)
+specified on the original command line with C<--config> option (see L</"OPTIONS"> and L</"CONFIGURATION FILE">).
+
+C<Since v2.52>: Children were restarted but SpamAssassin configuration was not reloaded.
+
+C<Prior to v2.52>: HUP would try to restart the server with all default settings (usually failing).
 
 =item TTIN, TTOU
 
@@ -474,9 +936,16 @@ the number of children by one, and TTOU signal will decrease it by one.
 Sending INT or TERM signal to the master process will kill all the
 children immediately and shut down the daemon.
 
+=item QUIT
+
+Sending QUIT signal to the master process will perform a graceful shutdown,
+waiting for all children to finish processing any current transactions and
+then shutting down the parent process.
+
 =back
 
-=head1 Examples
+
+=head1 EXAMPLES
 
 =over 5
 
@@ -486,8 +955,8 @@ I<spampd> listens on port 10025 on the same host as the internal mail server.
 
   spampd --host=192.168.1.10
 
-Same as above but I<spampd> runs on port 10025 of the same host as 
-the firewall/gateway and passes messages on to the internal mail server 
+Same as above but I<spampd> runs on port 10025 of the same host as
+the firewall/gateway and passes messages on to the internal mail server
 on another host.
 
   spampd --relayhost=192.168.1.10
@@ -499,38 +968,39 @@ and disable SA network checks:
 
 =item Using UNIX sockets instead if INET ports:
 
-Spampd listens on the UNIX socket /var/run/spampd.socket with
+I<spampd> listens on the UNIX socket C</var/run/spampd.socket> with
 persmissions 700 instead of a TCP port:
 
   spampd --socket /var/run/spampd.socket --socket-perms 700
 
-Spampd will relay mail to /var/run/dovecot/lmtp instead of a TCP port:
+I<spampd> will relay mail to C</var/run/dovecot/lmtp> instead of a TCP port:
 
   spampd --relaysocket /var/run/dovecot/lmtp
 
-Remember that the user spampd runs as needs to have read AND write
+Remember that the user I<spampd> runs as needs to have read AND write
 permissions on the relaysocket!
 
 =back
 
-=head1 Credits
+
+=head1 CREDITS
 
 I<spampd> is written and maintained by Maxim Paperno <MPaperno@WorldDesign.com>.
 See L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm> for latest info.
 
-I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan 
+I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan
 Stanley Dean Witter. These are distributed under the GNU GPL (see
-module code for more details). Both modules have been slightly modified 
+module code for more details). Both modules have been slightly modified
 from the originals and are included in this file under new names.
 
 Also thanks to Bennett Todd for the example smtpproxy script which helped create
 this version of I<spampd>.  See http://bent.latency.net/smtpprox/ .
 
-I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace 
+I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace
 amounts of his code or documentation may still remain. Thanks to him for the
 original inspiration and code. L<https://openshut.net/>.
 
-Also thanks to I<spamd> (included with SpamAssassin) and 
+Also thanks to I<spamd> (included with SpamAssassin) and
 I<amavisd-new> (L<http://www.ijs.si/software/amavisd/>) for some tricks.
 
 Various people have contributed patches, bug reports, and ideas, all of whom
@@ -546,9 +1016,10 @@ in the change log, as appropriate.
 
 See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
 
-=head1 Copyright, License, and Disclaimer
 
-I<spampd> is Copyright (c) 2002-2006, 2009, 2010, 2013, 2018-2019 Maxim Paperno; 
+=head1 COPYRIGHT, LICENSE, AND DISCLAIMER
+
+I<spampd> is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno;
 All Rights Reserved.
 
 Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above
@@ -569,29 +1040,83 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see L<https://www.gnu.org/licenses/>.
 
 
-=head1 Bugs
+=head1 BUGS
 
 Use GitHub issue tracking: L<https://github.com/mpaperno/spampd/issues>
 
-=head1 To Do
 
-Figure out how to use Net::Server::PreFork because it has cool potential for
-load management.  I tried but either I'm missing something or PreFork is
-somewhat broken in how it works.  If anyone has experience here, please let 
-me know.
+=head1 SEE ALSO
 
-Add configurable option for rejecting mail outright based on spam score.
-It would be nice to make this program safe enough to sit in front of a mail 
-server such as Postfix and be able to reject mail before it enters our systems.
-The only real problem is that Postfix will see localhost as the connecting
-client, so that disables any client-based checks Postfix can do and creates a 
-possible relay hole if localhost is trusted.
+L<spamassassin(1)>
 
-=head1 See Also
+L<Mail::SpamAssassin(3)|https://spamassassin.apache.org/doc/Mail_SpamAssassin.html>
 
-L<perl(1)>, L<spamassassin(1)>, 
-L<Mail::SpamAssassin(3)|https://spamassassin.apache.org/doc/Mail_SpamAssassin.html>,
-L<SpamAssassin Site|http://www.spamassassin.org/>, 
-L<SpamPD Code Repository|https://github.com/mpaperno/spampd>, 
-L<SpamPD product page|http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>,
+L<Net::Server(3)|https://metacpan.org/pod/Net::Server>
+
+L<SpamAssassin Site|http://www.spamassassin.org/>
+
+L<SpamPD Code Repository|https://github.com/mpaperno/spampd>
+
+L<SpamPD product page|http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm>
+
 L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spamassassin/IntegratePostfixViaSpampd>
+
+
+=begin html
+
+<!-- HTML formatter customizations -->
+
+<style>
+  /* change color of internal links */
+  a[href^="#"] {
+    color: green;
+    text-decoration: none;
+  }
+  /* In the styles below, the first selector is for Pod::HTML (pod2html), other(s) for Pod::Simple::HTML (perldoc -o html) */
+  /* remove ugly underlines and color on headings with backlinks */
+  a[href*="podtop"],
+  a.u {
+    color: unset !important;
+    text-decoration: none;
+  }
+  /* set up to display "back to top" links on headings with backlinks */
+  a[href*="podtop"] h1,
+  a.u {
+    position: relative;
+    display: block;
+  }
+  /* place "back to top" links in pseudo ::after elements (except the first n heading(s) */
+  a[href*="podtop"]:not(:nth-of-type(-n+3)) h1::after,
+  h1:not(:nth-of-type(-n+3)) a.u::after,
+  h2 a.u::after {
+    content: "[back to top]";
+    font-size: small;
+    text-decoration: underline;
+    color: green;
+    display: inline-block;
+    position: absolute;
+    bottom: 0px;
+    right: 20px;
+  }
+</style>
+<script>
+  // Transform each level 1 heading and index entry to Title Case on document load.
+  window.onload = function() {
+    var prepsRx = RegExp("^(?:the|and?|or|of|by|in)$", "i");
+    var titleCase = function(str) {
+      return str.toLowerCase().split(' ').map(function(word, idx) {
+        if (idx && prepsRx.test(word)) return word;
+        return word.replace(word[0], word[0].toUpperCase());
+      }).join(' ');
+    };
+    var list = document.querySelectorAll("a[href*=podtop] h1, ul#index > li > a, h1 a.u, li.indexItem1 > a");
+    for (let item of list)
+      item.innerText = titleCase(item.innerText);
+  }
+</script>
+
+=end html
+
+
+=cut
+
