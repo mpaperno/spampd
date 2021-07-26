@@ -8,7 +8,7 @@ SpamPD Change Log
     ! : important change, change of default behavior, etc.
 -----------------------------------------------------------
 
-2.60 (pending release) (experimental)
+2.60 (26-Jul-21)
 
 This version brings quite a few changes, though the base functionality and compatibility is unchanged
 (minor exceptions noted below). Testing/close observation of this new version is recommended!
