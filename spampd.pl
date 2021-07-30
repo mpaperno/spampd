@@ -3,6 +3,7 @@
 ######################
 # SpamPD - Spam Proxy Daemon
 #
+# v2.61  - 30-Jul-21
 # v2.60  - 26-Jul-21
 # v2.53  - 25-Feb-19
 # v2.52  - 10-Nov-18
@@ -24,7 +25,7 @@
 # v1.0.1 - 03-Feb-03
 # v1.0.0 - May 2002
 #
-# spampd is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno; All Rights Reserved.
+# spampd is Copyright (c) Maxim Paperno; All Rights Reserved.
 #
 # Written and maintained by Maxim Paperno (MPaperno@WorldDesign.com)
 #
@@ -392,7 +393,7 @@ use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
 
-our $VERSION = '2.60';
+our $VERSION = '2.61';
 
 # ISA will change to a Net::Server "flavor" at runtime based on options.
 our @ISA = qw(Net::Server);
@@ -570,14 +571,17 @@ sub initial_options_map {
   # Also a good place to check for help/version/show option(s), but not if we're HUPping.
   # These all cause an exit(0) (--show is processed later but still exits).
   if (!$self->is_reloading()) {
+    my ($q2, $q3, $q4) = ("|??", "|???", "|????");
+    # https://github.com/mpaperno/spampd/issues/30#issuecomment-889110122
+    $q2 = $q3 = $q4 = "" if ($Getopt::Long::VERSION < 2.39);
     %options = (
       %options,
-      'show=s@'         => \$spd_p->{show_dbg},
-      'help|h|?:s'      => sub { $self->usage(0, 1, $_[1]); },
-      'hh|??:s'         => sub { $self->usage(0, 2, $_[1]); },
-      'hhh|???:s'       => sub { $self->usage(0, 3, $_[1]); },
-      'hhhh|????|man:s' => sub { $self->usage(0, 4, $_[1]); },
-      'version|vers'    => sub { $self->version(); },
+      'show=s@'           => \$spd_p->{show_dbg},
+      'help|h|?:s'        => sub { $self->usage(0, 1, $_[1]); },
+      'hh'.$q2.':s'       => sub { $self->usage(0, 2, $_[1]); },
+      'hhh'.$q3.':s'      => sub { $self->usage(0, 3, $_[1]); },
+      'hhhh'.$q4.'|man:s' => sub { $self->usage(0, 4, $_[1]); },
+      'version|vers'      => sub { $self->version(); },
     );
   }
   return %options;
@@ -699,10 +703,10 @@ sub handle_main_opts {
     $spd_p->{logtype} &= ~LOG_TYPE_MASK;  # reset the low byte containing LOG_<type> constant
     ($spd_p->{logtype}, $srv_p->{log_file}) = logfile2logtype($spd_p->{logspec}, $spd_p->{logtype});
   }
-  elsif (!$srv_p->{background}) {
-    # set default logging to stderr if not daemonizing and user didn't specify.
-    $spd_p->{logtype} = $spd_p->{logtype} & (~LOG_TYPE_MASK) | LOG_STDERR;
-  }
+  # elsif (!$srv_p->{background}) {
+  #   # set default logging to stderr if not daemonizing and user didn't specify.
+  #   $spd_p->{logtype} = $spd_p->{logtype} & (~LOG_TYPE_MASK) | LOG_SYSLOG;
+  # }
 
   # fixup listening socket/host/port if needed
   if ($spd_p->{socket}) {
@@ -1383,7 +1387,7 @@ sub print_options {
   print "# This format is suitable as a configuration file. Just remove\n".
         "# the '#' marks (comment characters) and change values as needed.\n\n" if $exit > -1;
   for my $k (sort keys %{$opts}) {
-    my $v = %{$opts}{$k};
+    my $v = $opts->{$k};
     next if ref($v) !~ /SCALAR|REF/;
     $k = $1 if $k =~ /([\w-]+).*/;
     $v = defined(${$v}) ? ${$v} : "(undefined)";
@@ -1425,8 +1429,11 @@ sub show_debug {
     if (@dumps) {
       eval {
         require Data::Dumper;
-        $Data::Dumper::Quotekeys = 0; $Data::Dumper::Bless = '';
-        $Data::Dumper::Sortkeys = $Data::Dumper::Sparseseen = 1;
+        no warnings 'once';  # https://github.com/mpaperno/spampd/issues/30#issuecomment-889117210
+        $Data::Dumper::Quotekeys = 0;
+        $Data::Dumper::Bless = '';
+        $Data::Dumper::Sortkeys = 1;
+        $Data::Dumper::Sparseseen = 1;
         print("\n". Data::Dumper->Dump(\@dumps, \@dnames) ."\n");
       };
       warn "Data::Dumper error:\n\t$@\n\n" if $@;
