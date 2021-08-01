@@ -77,7 +77,7 @@ package SpamPD::Server;
 # This server simply gathers the SMTP acquired information (envelope
 # sender and recipient, and data) into unparsed memory buffers (or a
 # file for the data), and returns control to the caller to explicitly
-# acknowlege each command or request. Since acknowlegement or failure
+# acknowledge each command or request. Since acknowledgement or failure
 # are driven explicitly from the caller, this module can be used to
 # create a robust SMTP content scanning proxy, transparent or not as
 # desired.
@@ -116,7 +116,7 @@ sub new {
 # =item chat;
 #
 # The chat method carries the SMTP dialogue up to the point where any
-# acknowlegement must be made. If chat returns true, then its return
+# acknowledgement must be made. If chat returns true, then its return
 # value is the previous SMTP command. If the return value begins with
 # 'mail' (case insensitive), then the attribute 'from' has been filled
 # in, and may be checked; if the return value begins with 'rcpt' then
@@ -254,7 +254,7 @@ package SpamPD::Client;
 # =head1 DESCRIPTION
 #
 # MSDW::SMTP::Client provides a very lean SMTP client implementation;
-# the only protocol-specific knowlege it has is the structure of SMTP
+# the only protocol-specific knowledge it has is the structure of SMTP
 # multiline responses. All specifics lie in the hands of the calling
 # program; this makes it appropriate for a semi-transparent SMTP
 # proxy, passing commands between a talker and a listener.
@@ -266,7 +266,7 @@ use warnings;
 
 # =item new([interface => $interface, port => $port] | [unix_socket => $unix_socket] [, timeout = 300]);
 #
-# The interface and port, OR a unix socket to talk to must be specified. If
+# The interface and port, OR a UNIX socket to talk to must be specified. If
 # this call succeeds, it returns a client structure with an open
 # IO::Socket::IP or IO::Socket::UNIX in it, ready to talk to.
 # If it fails it dies, so if you want anything other than an exit with an
@@ -553,6 +553,9 @@ sub init {
 
   $sa_p->compile_now(!!$sa_p->{userprefs_filename});
 
+  # Redirect all errors to logger (must do this after SA is compiled, otherwise for some reason we get strange SA errors if anything actually dies).
+  # $SIG{__DIE__}  = sub { return if $^S; chomp(my $m = $_[0]); $self->fatal($m); };
+
   # clean up a bit
   delete $spd_p->{config_files};
   delete $spd_p->{logspec};
@@ -705,7 +708,7 @@ sub handle_main_opts {
   }
   # elsif (!$srv_p->{background}) {
   #   # set default logging to stderr if not daemonizing and user didn't specify.
-  #   $spd_p->{logtype} = $spd_p->{logtype} & (~LOG_TYPE_MASK) | LOG_SYSLOG;
+  #   $spd_p->{logtype} = $spd_p->{logtype} & (~LOG_TYPE_MASK) | LOG_STDERR;
   # }
 
   # fixup listening socket/host/port if needed
@@ -876,7 +879,7 @@ sub process_message {
 
   # Only process message under --maxsize KB
   if ($size >= ($prop->{maxsize} * 1024)) {
-    $self->log(2, "skipped large message (" . $size / 1024 . "KB)");
+    $self->inf("skipped large message (" . $size / 1024 . "KB)");
     return 1;
   }
 
@@ -927,7 +930,7 @@ sub process_message {
 
   $msgid ||= "(unknown)";
 
-  $self->log(2, "processing message $msgid for " . $recips);
+  $self->inf("processing message $msgid for " . $recips);
 
   eval {
 
@@ -1008,11 +1011,11 @@ sub process_message {
     my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
     my $proc_time     = sprintf("%.2f", time - $start);
 
-    $self->log(2, "$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
+    $self->inf("$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
                     "$recips in " . $proc_time . "s, $size bytes.");
 
     # thanks to Kurt Andersen for this idea
-    $self->log(2, "rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
+    $self->inf("rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
 
     $status->finish();
     $mail->finish();
@@ -1023,7 +1026,7 @@ sub process_message {
   };  # end eval block
 
   if ($@ ne '') {
-    $self->log(1, "WARNING!! SpamAssassin error on message $msgid: $@");
+    $self->wrn("WARNING!! SpamAssassin error on message $msgid: $@");
     return 0;
   }
 
@@ -1094,7 +1097,7 @@ sub process_request {
 
         #close the temp file
         $smtp_server->{data}->close
-          or $self->log(1, "WARNING!! Couldn't close smtp_server->{data} temp file: $!");
+          or $self->wrn("WARNING!! Couldn't close smtp_server->{data} temp file: $!");
 
         $self->dbg("Finished sending DATA");
       }
@@ -1147,7 +1150,7 @@ sub process_request {
   # check for error in eval block
   if ($@) {
     chomp($@);
-    $self->log(0, "WARNING!! Error in process_request eval block: $@");
+    $self->err("WARNING!! Error in process_request eval block: $@");
     $self->{server}->{done} = 1;  # exit this child gracefully
   }
 
