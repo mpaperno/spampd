@@ -458,6 +458,7 @@ sub new {
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
       instance          => 0,                     # child instance count
       sa_version        => $Mail::SpamAssassin::VERSION,  # may be used while processing messages
+      sa_rules_ver      => undef,                 # SA RULESVERSION tag, may be set during startup on SA >= v3.4.0
     },
     # this hash is eventually passed to SpamAssassin->new() so it must use valid SA option names. This also becomes the SA object afterwards.
     assassin => {
@@ -539,8 +540,6 @@ sub init {
   # If debug output requested, do it now and exit.
   $self->show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args) && exit(0) if $spd_p->{show_dbg};
 
-  $self->dbg(ref($self)." v".$self->VERSION." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
-
   # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
   $sa_p = Mail::SpamAssassin->new($sa_p);
 
@@ -552,6 +551,16 @@ sub init {
   };
 
   $sa_p->compile_now(!!$sa_p->{userprefs_filename});
+
+  # Get the SA "rules update version" for logging and child process name (since v3.4.0).
+  # https://github.com/apache/spamassassin/blob/3.4/build/announcements/3.4.0.txt#L334
+  # https://github.com/apache/spamassassin/blob/3.4/lib/Mail/SpamAssassin/PerMsgStatus.pm#L1597
+  ($spd_p->{sa_version} >= 3.0040) and eval {
+    my $status = Mail::SpamAssassin::PerMsgStatus->new($sa_p);
+    $spd_p->{sa_rules_ver} = $status->get_tag("RULESVERSION");
+  };
+
+  $self->inf(ref($self)." v".$self->runtime_version()." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
 
   # Redirect all errors to logger (must do this after SA is compiled, otherwise for some reason we get strange SA errors if anything actually dies).
   # $SIG{__DIE__}  = sub { return if $^S; chomp(my $m = $_[0]); $self->fatal($m); };
@@ -1005,14 +1014,14 @@ sub process_message {
     }  # end rewrite mail
 
     # Log what we did
-    my $was_it_spam = 'clean message';
-    if ($status->is_spam) { $was_it_spam = 'identified spam'; }
+    my $was_it_spam = ($status->is_spam) ? 'identified spam' : 'clean message';
     my $msg_score     = sprintf("%.2f", $status->get_hits);
     my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
     my $proc_time     = sprintf("%.2f", time - $start);
+    my $rules_ver     = defined($prop->{sa_rules_ver}) ? ", rules v".$prop->{sa_rules_ver} : "";
 
     $self->inf("$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
-                    "$recips in " . $proc_time . "s, $size bytes.");
+                    "$recips in " . $proc_time . "s, $size bytes$rules_ver.");
 
     # thanks to Kurt Andersen for this idea
     $self->inf("rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
@@ -1456,6 +1465,14 @@ sub version {
   print "  using SpamAssassin ".Mail::SpamAssassin::Version()."\n";
   print "  using Perl ".(split(/v/, $^V))[-1]."\n\n";
   exit $exit if $exit > -1;
+}
+
+sub runtime_version {
+  my $self = $_[0];
+  my $rules_ver = defined($self->{spampd}->{sa_rules_ver}) ? ", rules v".$self->{spampd}->{sa_rules_ver} : "";
+  return $VERSION . ' [Perl '.(split(/v/, $^V))[-1] . ', ' .
+    $self->net_server_type() . ' ' . Net::Server->VERSION() .
+    ', SA ' . Mail::SpamAssassin::Version() . $rules_ver . ']';
 }
 
 # =item usage([exit_value=2, [help_level=1, [help_format=man]]])
