@@ -3,7 +3,7 @@
 ######################
 # SpamPD - Spam Proxy Daemon
 #
-# v2.61  - 30-Jul-21
+# v2.61  - 01-Aug-21
 # v2.60  - 26-Jul-21
 # v2.53  - 25-Feb-19
 # v2.52  - 10-Nov-18
@@ -1253,9 +1253,9 @@ sub read_conf_file {
     ($dest = \@ptargs) && next if $1 eq '--';
     my $k = $1;
     $k = join('', $prfx, $k) if $prfx && substr($k, 0, 1) ne '-';
-    $k = join($sep, $k, $2) if $sep && $2 ne '';
+    $k = join($sep, $k, $2) if $sep && defined($2) && $2 ne '';
     push (@{$dest}, $k);
-    push (@{$dest}, $2) if !$sep && $2 ne '';
+    push (@{$dest}, $2) if !$sep && defined($2) && $2 ne '';
   }
   close $fh;
   return (\@args, \@ptargs);
