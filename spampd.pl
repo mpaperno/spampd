@@ -987,35 +987,20 @@ sub process_message {
         $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
       }
 
-      # Build the new message to relay.
+      # remove the envelope-to header if we added it
+      if ($addedenvto) {
+        $self->dbg("Removing X-Envelope-To");
+        $msg_resp =~ s/^X-Envelope-To: .+\r?\n//m;
+      }
+
+      # Write the modified mail back to the original file.
       # Pause the timeout alarm while we do this (no point in timing
       # out here and leaving a half-written file).
-      my @resplines   = split(/\r?\n/, $msg_resp);
-      my $arraycont   = @resplines;
       my $pause_alarm = alarm(0);
-      my $skipline    = 0;
-      $inhdr = 1;
       $fh->seek(0, 0) or die "Can't rewind message file: $!";
       $fh->truncate(0) or die "Can't truncate message file: $!";
-
-      for (0 .. ($arraycont - 1)) {
-        $inhdr = 0 if ($resplines[$_] =~ m/^\r?\n$/);
-
-        # if we are still in the header, skip over any
-        # "X-Envelope-To: " line if we have previously added it.
-        if ($inhdr && $addedenvto && $resplines[$_] =~ m/^X-Envelope-To: .*$/) {
-          $skipline = 1;
-          $self->dbg("Removing X-Envelope-To");
-        }
-
-        if (!$skipline) {
-          $fh->print($resplines[$_] . "\r\n")
-            or die "Can't print to message file: $!";
-        }
-        else {
-          $skipline = 0;
-        }
-      }
+      $fh->print($msg_resp)
+        or die "Can't print to message file: $!";
       #restart the alarm
       alarm($pause_alarm);
     }  # end rewrite mail
