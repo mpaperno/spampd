@@ -1135,10 +1135,13 @@ sub process_request {
       # patch for LMTP - multiple responses after . after DATA, done by Vladislav Kurz
       # we have to count sucessful RCPT commands and then read the same amount of responses
       if ($smtp_server->{proto} eq 'lmtp') {
-        if ($smtp_server->{state} =~ /^rset/i) { $rcpt_ok = 0; }
-        if ($smtp_server->{state} =~ /^mail/i) { $rcpt_ok = 0; }
-        if ($smtp_server->{state} =~ /^rcpt/i and $destresp =~ /^25/) { $rcpt_ok++; }
-        if ($smtp_server->{state} eq '.') {
+        if ($smtp_server->{state} =~ /^(?:rset|mail)/i) {
+          $rcpt_ok = 0;
+        }
+        elsif ($smtp_server->{state} =~ /^rcpt/i and $destresp =~ /^25/) {
+          $rcpt_ok++;
+        }
+        elsif ($smtp_server->{state} eq '.') {
           while (--$rcpt_ok) {
             $destresp = $client->hear;
             $smtp_server->reply($destresp);
