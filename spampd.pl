@@ -979,6 +979,8 @@ sub process_message {
 
       # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
       if ($prop->{sa_version} >= 3) {
+        # inject _SPAMPDVERSION_ as a "template tag" (macro) for SA add_header
+        $status->set_tag("SPAMPDVERSION", $self->VERSION) if ($prop->{sa_version} >= 3.0020);
         $msg_resp = $status->rewrite_mail;
       }
       else {
@@ -1758,6 +1760,12 @@ especially beefy or weak server box because I<spampd> is a memory-hungry
 program.  Check the L<"Options"> for details on this and all other parameters.
 
 To show default values for all options, run C<spampd --show defaults>.
+
+B<Since v2.61> I<spampd> injects a C<_SPAMPDVERSION_>
+L<"template tag"|https://spamassassin.apache.org/doc/Mail_SpamAssassin_Conf.html#TEMPLATE-TAGS>
+macro at message processing time. This can be used in an C<add_header> SA config file directive, for example.
+
+  add_header all Filter-Version SpamAssassin _VERSION_ (_SUBVERSION_, Rules: _RULESVERSION_) / SpamPD _SPAMPDVERSION_
 
 Note that B< I<spampd> replaces I<spamd> > from the I<SpamAssassin> distribution
 in function. You do not need to run I<spamd> in order for I<spampd> to work.
