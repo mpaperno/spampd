@@ -894,9 +894,9 @@ sub process_message {
 
   my (@msglines, $msgid, $sender, $recips, $tmp, $mail, $msg_resp);
   my $inhdr      = 1;
-  my $envfrom    = 0;
-  my $envto      = 0;
   my $addedenvto = 0;
+  my $envfrom    = !($prop->{envelopeheaders} || $prop->{setenvelopefrom});
+  my $envto      = !$prop->{envelopeheaders};
 
   $recips = "@{$self->{smtp_server}->{to}}";
   if ("$self->{smtp_server}->{from}" =~ /(\<.*?\>)/) { $sender = $1; }
@@ -908,33 +908,40 @@ sub process_message {
   # loop over message file content
   $fh->seek(0, 0) or die "Can't rewind message file: $!";
   while (<$fh>) {
-    $envto   = 1 if (/^(?:X-)?Envelope-To: /);
-    $envfrom = 1 if (/^(?:X-)?Envelope-From: /);
-    if (/^\r?\n$/ && $inhdr) {
-      $inhdr = 0;  # outside of msg header after first blank line
-      if (($prop->{envelopeheaders} || $prop->{setenvelopefrom}) && !$envfrom) {
-        unshift(@msglines, "X-Envelope-From: $sender\r\n");
-        $self->dbg("Added X-Envelope-From") ;
+    if ($inhdr) {
+      # we look for and possibly set some headers before handing to SA
+      if (/^\r?\n$/) {
+        # outside of msg header after first blank line
+        $inhdr = 0;
+        if (!$envfrom) {
+          unshift(@msglines, "X-Envelope-From: $sender\r\n");
+          $self->dbg("Added X-Envelope-From") ;
+        }
+        if (!$envto) {
+          unshift(@msglines, "X-Envelope-To: $recips\r\n");
+          $addedenvto = 1;  # we remove this header later
+          $self->dbg("Added X-Envelope-To");
+        }
       }
-      if ($prop->{envelopeheaders} && !$envto) {
-        unshift(@msglines, "X-Envelope-To: $recips\r\n");
-        $addedenvto = 1;
-        $self->dbg("Added X-Envelope-To");
+      else {
+        # still inside headers, check for some we're interested in
+        $envto   = $envto || (/^(?:X-)?Envelope-To: /);
+        $envfrom = $envfrom || (/^(?:X-)?Envelope-From: /);
+        # find the Message-ID for logging (code is mostly from spamd)
+        if (/^Message-Id:\s+(.*?)\s*$/i) {
+          $msgid = $1;
+          while ($msgid =~ s/\([^\(\)]*\)//) { }  # remove comments and
+          $msgid =~ s/^\s+|\s+$//g;               # leading and trailing spaces
+          $msgid =~ s/\s+/ /g;                    # collapse whitespaces
+          $msgid =~ s/^.*?<(.*?)>.*$/$1/;         # keep only the id itself
+          $msgid =~ s/[^\x21-\x7e]/?/g;           # replace all weird chars
+          $msgid =~ s/[<>]/?/g;                   # plus all dangling angle brackets
+          $msgid =~ s/^(.+)$/<$1>/;               # re-bracket the id (if not empty)
+        }
       }
     }
+    # add the line to our result array
     push(@msglines, $_);
-
-    # find the Message-ID for logging (code is mostly from spamd)
-    if ($inhdr && /^Message-Id:\s+(.*?)\s*$/i) {
-      $msgid = $1;
-      while ($msgid =~ s/\([^\(\)]*\)//) { }  # remove comments and
-      $msgid =~ s/^\s+|\s+$//g;               # leading and trailing spaces
-      $msgid =~ s/\s+/ /g;                    # collapse whitespaces
-      $msgid =~ s/^.*?<(.*?)>.*$/$1/;         # keep only the id itself
-      $msgid =~ s/[^\x21-\x7e]/?/g;           # replace all weird chars
-      $msgid =~ s/[<>]/?/g;                   # plus all dangling angle brackets
-      $msgid =~ s/^(.+)$/<$1>/;               # re-bracket the id (if not empty)
-    }
   }
 
   $msgid ||= "(unknown)";
