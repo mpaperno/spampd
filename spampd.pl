@@ -1180,7 +1180,8 @@ sub child_init_hook {
   # set process name to help clarify via process listing which is child/parent
   my $me = $0;
   eval { $me = $1 if ($me =~ m/^.*?([\w-]+)(?:\.[\w-]+)*$/); };
-  $0 = $me.' child';
+  $me .= ': child v' . $_[0]->runtime_version();
+  eval { $0 = $me; };
 }
 
 # Net::Server hook: about to exit child process
