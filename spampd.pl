@@ -461,7 +461,7 @@ sub new {
       # default child name template
       child_name_templ  => '%base_name: child #%child_count(%child_status) ' .
                            '[req %req_count/%req_max, time lst/avg/ttl %(req_time_last).3f/%(req_time_avg).3f/%(req_time_ttl).3f, ham/spm %req_ham/%req_spam] ' .
-                           '[SA rules v%sa_rls_ver)]',
+                           '[SA %sa_ver/%sa_rls_ver]',
     },
     # this hash is eventually passed to SpamAssassin->new() so it must use valid SA option names. This also becomes the SA object afterwards.
     assassin => {
@@ -1734,7 +1734,7 @@ Options:
   --set-envelope-from        Set X-Envelope-From header only.
 
   --local-only or -L         Turn off all SA network-based tests.
-  --homedir path             Use the specified directory as SA home.
+  --homedir <path>           Use the specified directory as SA home.
   --saconfig <filename>      Use the file for SA "user_prefs" configuration.
 
   --logfile or -o <dest>     Destination for logs (syslog|stderr|<filename>).
@@ -1975,8 +1975,8 @@ Also note that v2.60 added the ability to use a L</"CONFIGURATION FILE"> for spe
     [--max-servers | -mxs  <n>] [--maxsize   <n>   ] [--[no]detach         ]
     [--maxrequests | -r    <n>] [--local-only | -L ] [--[no]setsid         ]
     [--childtimeout        <n>] [--tagall     | -a ] [--log-rules-hit | -rh]
+    [ --child-name-template | -cnt [<template>] ]    [--homedir <path>     ]
     [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
-    [ --child-name-template | -cnt [<string>] ]
 
     [ --logfile | -o (syslog|stderr|<filename>) ][...]
     [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
@@ -2695,15 +2695,18 @@ permissions on the relaysocket!
 =head1 CREDITS
 
 I<spampd> is written and maintained by Maxim Paperno <MPaperno@WorldDesign.com>.
-See L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm> for latest info.
+The open source code repository is located at L<https://github.com/mpaperno/spampd/>.
+See L<http://www.WorldDesign.com/index.cfm/rd/mta/spampd.htm> for historical info.
 
-I<spampd> v2 uses two Perl modules by Bennett Todd and Copyright (C) 2001 Morgan
-Stanley Dean Witter. These are distributed under the GNU GPL (see
-module code for more details). Both modules have been slightly modified
-from the originals and are included in this file under new names.
+I<spampd> v2 uses two Perl modules (I<MSDW::SMTP::Client> and I<MSDW::SMTP::Server>)
+by Bennett Todd and Copyright (C) 2001 Morgan Stanley Dean Witter.
+These are distributed under the GNU GPL (see module code for more details).
+Both modules have been slightly modified from the originals and are included in
+this file under new names (I<SpamPD::Client> and I<SpamPD::Server>, respectively).
 
-Also thanks to Bennett Todd for the example smtpproxy script which helped create
-this version of I<spampd>.  See http://bent.latency.net/smtpprox/ .
+Also thanks to Bennett Todd for the example I<smtpproxy> script which helped create
+this version of I<spampd>.  See L<http://bent.latency.net/smtpprox/> (seems to be down)
+or L<https://github.com/jnorell/smtpprox>.
 
 I<spampd> v1 was based on code by Dave Carrigan named I<assassind>. Trace
 amounts of his code or documentation may still remain. Thanks to him for the
@@ -2728,8 +2731,7 @@ See also: L<https://github.com/mpaperno/spampd/graphs/contributors/>
 
 =head1 COPYRIGHT, LICENSE, AND DISCLAIMER
 
-I<spampd> is Copyright (c) 2002-2006, 2009-2010, 2013, 2018-2019 Maxim Paperno;
-All Rights Reserved.
+I<spampd> is Copyright (c) Maxim Paperno;  All Rights Reserved.
 
 Portions are Copyright (c) 2001 Morgan Stanley Dean Witter as mentioned above
 in the Credits section.
@@ -2818,7 +2820,7 @@ L<Integrating SpamAssassin into Postfix using spampd|https://wiki.apache.org/spa
         return word.replace(word[0], word[0].toUpperCase());
       }).join(' ');
     };
-    var list = document.querySelectorAll("a[href*=podtop] h1, ul#index > li > a, h1 a.u, li.indexItem1 > a");
+    var list = document.querySelectorAll("a[href*=podtop] h1, ul#index > li > a, h1 a.u, body > h1[id], li.indexItem1 > a");
     for (let item of list)
       item.innerText = titleCase(item.innerText);
   }
