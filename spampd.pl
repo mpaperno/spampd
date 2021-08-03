@@ -571,7 +571,7 @@ sub init {
     perl_ver      => sprintf("%vd", $^V), # (split(/v/, $^V))[-1];
     ns_ver        => Net::Server->VERSION(),
     ns_typ        => $ns_type,
-    ns_typ_acr    => $ns_type=~s/[a-z]//rg,
+    ns_typ_acr    => do { (my $tmp = $ns_type) =~ s/[a-z]//g; $tmp },
     sa_ver        => Mail::SpamAssassin::Version(),
     sa_rls_ver    => $sa_rules_ver || "(unknown)",
     child_count   => 0,   # total # of children launched
@@ -1475,7 +1475,7 @@ sub sprintf_named {
   )}xs;
 
   my @args;
-  my sub replace {
+  my $replace = sub {
     my ($all, $fmt, $npi, $flags, $vflag, $width, $dot, $prec, $conv) = @_;
     if ($fmt && defined($npi) && defined(my $val = $hash->{$npi})) {
       push(@args, $val);
@@ -1484,8 +1484,8 @@ sub sprintf_named {
       );
     }
     return $all;
-  }
-  $format =~ s/$regex/replace($1, $2, $3, $4, $5, $6, $7, $8, $9)/ge;
+  };
+  $format =~ s/$regex/$replace->($1, $2, $3, $4, $5, $6, $7, $8, $9)/ge;
   # use Data::Dump; dd [$format, @args];
   return sprintf($format, @args);
 }
