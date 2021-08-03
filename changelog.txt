@@ -8,12 +8,20 @@ SpamPD Change Log
     ! : important change, change of default behavior, etc.
 -----------------------------------------------------------
 
-2.61 (30-Jul-21)
+2.61 (3-Aug-21)
 
-Minor bug fixes. Thanks to Simon Matter for reporting and testing.
+Bug fixes, new features, and some optimization. Thanks to Simon Matter for reporting, suggestions, and testing!
 
 * Restore syslog as default logging destination (https://github.com/mpaperno/spampd/issues/31)
 * Fix issues with older Perl versions (https://github.com/mpaperno/spampd/issues/30)
+~ Optimize initial header processing when building message line array in process_message().
+~ Slight optimization to LMTP multi-recipient handling in process_request().
+~ Optimize how rewritten (tagged) message is saved back to temp file.
++ Add detection and logging of "RULESVERSION" tag with SA >= v3.4.0.
++ Add tracking of some per-child runtime statistics which by default are now shown in the child process names.
++ Add ability to provide a custom child process name template string (or not modify the child name at all).
+    Template format documented in POD. (https://github.com/mpaperno/spampd/issues/32)
++ Add _SPAMPDVERSION_ as a "template tag" (macro), eg. for use in SA add_header directives.
 
 
 2.60 (26-Jul-21)
@@ -30,7 +38,7 @@ This version brings quite a few changes, though the base functionality and compa
 + Add --show <thing> argument for printing default option values and other debug.
 * Fix SpamAssassin debug logging with versions 3.1+ (output was going to stderr/wrong syslog/null).
 * Fix for IPv6 addresses being used on --host and --relayhost options (was not possible due to ":<port>" check).
-! SIGHUP will now reload SpamAssassin and SpamPD configuration files, still with graceful child process shutdown.
+! SIGHUP will now reload SpamAssassin and SpamPD configuration files (and all module code), still with graceful child process shutdown.
 ! Use SpamAssassin::Logger module (with SA 3.1+) for all logging. This now inits logging much earlier.
 ! Log to stderr by default if running non-daemonized (with --nodetach).
 ! Child processes are now renamed to "spampd child" to distinguish them from the parent in task lists.
