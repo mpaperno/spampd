@@ -3,7 +3,7 @@
 ######################
 # SpamPD - Spam Proxy Daemon
 #
-# v2.61  - 01-Aug-21
+# v2.61  - 03-Aug-21
 # v2.60  - 26-Jul-21
 # v2.53  - 25-Feb-19
 # v2.52  - 10-Nov-18
@@ -456,9 +456,12 @@ sub new {
       setenvelopefrom   => 0,                     # Set X-Envelope-From header only (--sef option)
       sa_awl            => 0,                     # SA auto-whitelist (deprecated)
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
-      instance          => 0,                     # child instance count
       sa_version        => $Mail::SpamAssassin::VERSION,  # may be used while processing messages
-      sa_rules_ver      => undef,                 # SA RULESVERSION tag, may be set during startup on SA >= v3.4.0
+      runtime_stats     => undef,                 # variables hash for status tracking, can be used as values in user-provided template strings (defined in init())
+      # default child name template
+      child_name_templ  => '%base_name: child #%child_count(%child_status) ' .
+                           '[req %req_count/%req_max, time lst/avg/ttl %(req_time_last).3f/%(req_time_avg).3f/%(req_time_ttl).3f, ham/spm %req_ham/%req_spam] ' .
+                           '[SA rules v%sa_rls_ver)]',
     },
     # this hash is eventually passed to SpamAssassin->new() so it must use valid SA option names. This also becomes the SA object afterwards.
     assassin => {
@@ -555,12 +558,35 @@ sub init {
   # Get the SA "rules update version" for logging and child process name (since v3.4.0).
   # https://github.com/apache/spamassassin/blob/3.4/build/announcements/3.4.0.txt#L334
   # https://github.com/apache/spamassassin/blob/3.4/lib/Mail/SpamAssassin/PerMsgStatus.pm#L1597
+  my $sa_rules_ver = "(unknown)";
   ($spd_p->{sa_version} >= 3.0040) and eval {
-    my $status = Mail::SpamAssassin::PerMsgStatus->new($sa_p);
-    $spd_p->{sa_rules_ver} = $status->get_tag("RULESVERSION");
+    $sa_rules_ver = Mail::SpamAssassin::PerMsgStatus->new($sa_p)->get_tag("RULESVERSION");
   };
 
-  $self->inf(ref($self)." v".$self->runtime_version()." ". ($self->is_reloading() ? "reloading": "starting") ." with: @startup_args \n");
+  # Set up statistics hash. This is currently used for report formatting, eg. in child process name.
+  my $ns_type = (split(':', $self->net_server_type()))[-1];
+  $spd_p->{runtime_stats} = {
+    base_name     => eval { ($0 =~ m/^.*?([\w-]+)(?:\.[\w-]+)*$/) ? $1 : "spampd"; },
+    spampd_ver    => $self->VERSION(),
+    perl_ver      => sprintf("%vd", $^V), # (split(/v/, $^V))[-1];
+    ns_ver        => Net::Server->VERSION(),
+    ns_typ        => $ns_type,
+    ns_typ_acr    => $ns_type=~s/[a-z]//rg,
+    sa_ver        => Mail::SpamAssassin::Version(),
+    sa_rls_ver    => $sa_rules_ver,
+    child_count   => 0,   # total # of children launched
+    child_status  => "D", # (C)onnected, or (D)isconnected
+    req_count     => 0,   # num of requests child has processed so far
+    req_max       => $self->{server}->{max_requests},  # maximum child requests
+    req_time_last => 0,   # [s] time to process the last message
+    req_time_ttl  => 0,   # [s] total processing time for this child
+    req_time_avg  => 0,   # [s] average processing time for this child (req_time_ttl / req_count)
+    req_ham       => 0,   # count of ham messages scored by child
+    req_spam      => 0,   # count of spam messages scored by child
+  };
+
+  my $template = ' v%spampd_ver [Perl %perl_ver, Net::Server::%ns_typ %ns_ver, SA %sa_ver, rules v%sa_rls_ver] ';
+  $self->inf(ref($self) . $self->format_stats_string($template) . ($self->is_reloading() ? "reloading": "starting") . " with: @startup_args \n");
 
   # Redirect all errors to logger (must do this after SA is compiled, otherwise for some reason we get strange SA errors if anything actually dies).
   # $SIG{__DIE__}  = sub { return if $^S; chomp(my $m = $_[0]); $self->fatal($m); };
@@ -680,6 +706,7 @@ sub options_map {
     'no-set-envelope-headers|no-seh' => sub { $spd_p->{envelopeheaders} = 0; },
     'set-envelope-from|sef:1'        => \$spd_p->{setenvelopefrom},
     'no-set-envelope-from|no-sef'    => sub { $spd_p->{setenvelopefrom} = 0; },
+    'child-name-template|cnt:s'      => \$spd_p->{child_name_templ},
     # SA
     'debug|d:s'                => \$sa_p->{debug},
     'saconfig=s'               => \$sa_p->{userprefs_filename},
@@ -1007,15 +1034,28 @@ sub process_message {
       alarm($pause_alarm);
     }  # end rewrite mail
 
+    # Track some statistics
+    my $stats = $prop->{runtime_stats};
+    my $was_it_spam;
+    my $time_d = time - $start;
+    $stats->{req_time_last} = $time_d;
+    $stats->{req_time_ttl} += $time_d;
+    $stats->{req_time_avg} = $stats->{req_time_ttl} / $self->{server}->{requests};
+    if ($status->is_spam) {
+      ++$stats->{req_spam};
+      $was_it_spam = 'identified spam';
+    }
+    else {
+      ++$stats->{req_ham};
+      $was_it_spam = 'clean message';
+    }
+
     # Log what we did
-    my $was_it_spam = ($status->is_spam) ? 'identified spam' : 'clean message';
     my $msg_score     = sprintf("%.2f", $status->get_hits);
     my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
-    my $proc_time     = sprintf("%.2f", time - $start);
-    my $rules_ver     = defined($prop->{sa_rules_ver}) ? ", rules v".$prop->{sa_rules_ver} : "";
-
+    my $proc_time     = sprintf("%.2f", $time_d);
     $self->inf("$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
-                    "$recips in " . $proc_time . "s, $size bytes$rules_ver.");
+                    "$recips in ${proc_time}s, $size bytes, with rules v$prop->{runtime_stats}->{sa_rls_ver}");
 
     # thanks to Kurt Andersen for this idea
     $self->inf("rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
@@ -1159,8 +1199,6 @@ sub process_request {
     $self->err("WARNING!! Error in process_request eval block: $@");
     $self->{server}->{done} = 1;  # exit this child gracefully
   }
-
-  $prop->{instance}++;
 }
 
 # Net::Server hook: After binding listening sockets
@@ -1172,18 +1210,37 @@ sub post_bind_hook {
   }
 }
 
+# Net::Server hook: about to fork a new child
+sub pre_fork_hook {
+  return if $_[1];  # && $_[1] eq 'dequeue';
+  ++$_[0]->{spampd}->{runtime_stats}->{child_count};
+}
+
 # Net::Server hook: new child starting
 sub child_init_hook {
+  return if $_[1];  # && $_[1] eq 'dequeue';
   # set process name to help clarify via process listing which is child/parent
-  my $me = $0;
-  eval { $me = $1 if ($me =~ m/^.*?([\w-]+)(?:\.[\w-]+)*$/); };
-  $me .= ': child v' . $_[0]->runtime_version();
-  eval { $0 = $me; };
+  $_[0]->update_child_name();
 }
 
 # Net::Server hook: about to exit child process
 sub child_finish_hook {
-  $_[0]->dbg("Exiting child process after handling " . $_[0]->{spampd}->{instance} . " requests");
+  return if $_[1];  # && $_[1] eq 'dequeue';
+  $_[0]->dbg("Exiting child process after handling " . $_[0]->{server}->{requests} . " requests");
+}
+
+# Net::Server hook: new connection established
+sub post_accept_hook {
+  my $self = $_[0];
+  $self->{spampd}->{runtime_stats}->{req_count} = $self->{server}->{requests};
+  $self->{spampd}->{runtime_stats}->{child_status} = "C";
+  $self->update_child_name();
+}
+
+# Net::Server hook: connection ended
+sub post_client_connection_hook {
+  $_[0]->{spampd}->{runtime_stats}->{child_status} = "D";
+  $_[0]->update_child_name();
 }
 
 # Net::Server hook: called when we're using SA Logger or falling back to Net::Server logging.
@@ -1256,13 +1313,15 @@ sub read_conf_file {
   $prfx //= '--';
   open(my $fh, '<', $file) or die "Couldn't open config file '$file' [$!]";
   while (defined(my $line = <$fh>)) {
-    next if ($line !~ m/^\s* ((?:--?)?[\w\@-]+) (?:[=:\t ]+ (\S+) \s*)?$/xo);
+    next if ($line !~ m/^\s* ((?:--?)?[\w\@-]+) (?:[=:\t ]+ (.+) \s*)?$/xo);
     ($dest = \@ptargs) && next if $1 eq '--';
     my $k = $1;
+    my $v = $2 || "";
+    $v =~ s/^"(.*)"$/$1/;
     $k = join('', $prfx, $k) if $prfx && substr($k, 0, 1) ne '-';
-    $k = join($sep, $k, $2) if $sep && defined($2) && $2 ne '';
+    $k = join($sep, $k, $v) if $sep && $v ne '';
     push (@{$dest}, $k);
-    push (@{$dest}, $2) if !$sep && defined($2) && $2 ne '';
+    push (@{$dest}, $v) if !$sep && $v ne '';
   }
   close $fh;
   return (\@args, \@ptargs);
@@ -1377,11 +1436,83 @@ sub show_html_file {
   }
 }
 
+# =item sprintf_named(<format_string>, <value_hash_ref>)
+# Like C<sprintf()> but with named parameter support. Converts named placeholders to printf-style
+# positional arguments based on a passed hash of values. Supports all typical printf formatting options.
+# Parameters are specified like: "Value of %(my_name)s is %(my_float_value).4f", with names in parenthesis,
+# or simply "Value of %my_name is %my_value" with the default format being a string.
+# Original code from https://metacpan.org/dist/Text-sprintfn/source/lib/Text/sprintfn.pm
+# simplified and optimized for our humble needs.
+sub sprintf_named {
+  my ($format, $hash) = @_;
+  my $regex = qr{( #all=1
+    ( #fmt=2
+      %
+      (?| #npi=3
+        \((\w+)\) | (\w+)
+      )?
+      # any format specifiers must follow a ")"
+      (?:(?<=\))
+        (#flags=4
+          [ +0#-]+
+        )?
+        (#vflag=5
+          \*?[v]
+        )?
+        (#width=6
+          -?\d+ | \*\d+\$?
+        )?
+        (#dot=7
+          \.?)
+        (#prec=8
+          (?: \d+ | \*)
+        )?
+        (#conv=9
+          [%csduoxefgXEGbBpniDUOF]
+        )?
+      )?
+    ) | % | [^%]+
+  )}xs;
+
+  my @args;
+  my sub replace {
+    my ($all, $fmt, $npi, $flags, $vflag, $width, $dot, $prec, $conv) = @_;
+    if ($fmt && defined($npi) && defined(my $val = $hash->{$npi})) {
+      push(@args, $val);
+      return join("",
+        grep {defined} ("%", $flags, $vflag, $width, $dot, $prec, $conv || "s")
+      );
+    }
+    return $all;
+  }
+  $format =~ s/$regex/replace($1, $2, $3, $4, $5, $6, $7, $8, $9)/ge;
+  # use Data::Dump; dd [$format, @args];
+  return sprintf($format, @args);
+}
+
 
 ##################   UTILITY METHODS   ######################
 
 # returns true if server is being restarted with a SIGHUP.
 sub is_reloading { return !!$ENV{'BOUND_SOCKETS'}; };
+
+# set process name to a string formatted from user-specified template
+sub update_child_name {
+  my $self = $_[0];
+  return if !$self->{spampd}->{child_name_templ};
+  eval { $0 = $self->format_stats_string($self->{spampd}->{child_name_templ}); };
+  $self->dbg("Error in update_child_name(): $@") if $@ ne '';
+}
+
+# Calls sprintf_named() on passed string with {$self->{spampd}->{runtime_stats} data hash.
+# Returns results or blank string if error. Errors are logged to debug stream.
+sub format_stats_string {
+  my ($self, $string) = @_;
+  my $ret = eval { sprintf_named($string, \%{$self->{spampd}->{runtime_stats}}); };
+  $self->dbg("Error calling sprintf_named(): $@") if $@ ne '';
+  # $self->dbg($ret);
+  return $ret || "";
+}
 
 # =item print_options(\%options [, type = "default"] [, exit = -1])
 # Prints out names and values from a hash of option {name => \$value} pairs, such as might
@@ -1463,14 +1594,6 @@ sub version {
   print "  using SpamAssassin ".Mail::SpamAssassin::Version()."\n";
   print "  using Perl ".(split(/v/, $^V))[-1]."\n\n";
   exit $exit if $exit > -1;
-}
-
-sub runtime_version {
-  my $self = $_[0];
-  my $rules_ver = defined($self->{spampd}->{sa_rules_ver}) ? ", rules v".$self->{spampd}->{sa_rules_ver} : "";
-  return $VERSION . ' [Perl '.(split(/v/, $^V))[-1] . ', ' .
-    $self->net_server_type() . ' ' . Net::Server->VERSION() .
-    ', SA ' . Mail::SpamAssassin::Version() . $rules_ver . ']';
 }
 
 # =item usage([exit_value=2, [help_level=1, [help_format=man]]])
@@ -1595,6 +1718,7 @@ Options:
   --maxrequests or -r <n>    Maximum requests that each child can process.
   --childtimeout <n>         Time out children after this many seconds.
   --satimeout <n>            Time out SpamAssassin after this many seconds.
+  --child-name-template [s]  Template for formatting child process name.
 
   --pid   or -p <filename>   Store the daemon's process ID in this file.
   --user  or -u <user>       Specifies the user that the daemon runs as.
@@ -1852,6 +1976,7 @@ Also note that v2.60 added the ability to use a L</"CONFIGURATION FILE"> for spe
     [--maxrequests | -r    <n>] [--local-only | -L ] [--[no]setsid         ]
     [--childtimeout        <n>] [--tagall     | -a ] [--log-rules-hit | -rh]
     [ [--set-envelope-headers | -seh] | [--set-envelope-from | -sef] ]
+    [ --child-name-template | -cnt [<string>] ]
 
     [ --logfile | -o (syslog|stderr|<filename>) ][...]
     [ --logsock | -ls <socketpath>    ]  [ --logident    | -li <name> ]
@@ -2041,6 +2166,48 @@ settings for the DATA command. (For Postfix this is set in C<(smtp|lmtp)_data_do
 and C<smtpd_timeout>). In the event of timeout while processing the message, the problem is
 logged and the message is passed on anyway (w/out spam tagging, obviously).  To fail the
 message with a temp 450 error, see the C<--dose> (die-on-sa-errors) option, below.
+
+
+=item B<--child-name-template> or B<-cnt> I<[<template>]> C<new in v2.61>
+
+Template for formatting child process name. Use a blank string (just the argument name
+without a value) to leave the child process name unchanged (will be same as parent command line).
+
+The template uses C<printf()> style formatting, but with named parameter placeholders.
+For example (wrapped for clarity):
+
+  %base_name: child #%child_count(%child_status)
+  [req %req_count/%req_max, time lst/avg/ttl %(req_time_last).4f/%(req_time_avg).4f/%(req_time_ttl).4f,
+  ham/spm %req_ham/%req_spam, rules v%sa_rls_ver)]'
+
+Would produce something like:
+
+  spampd: child #4(D) [req 8/30, time lst/avg/ttl 0.0222/0.0256/0.2045, ham/spm 3/5, rules v1891891]
+
+Parameters are specified like: "Value of %(my_name)s is %(my_float_value).4f", with names
+in parenthesis followed by standard a C<printf()> style formatting specifier (C<s> is default),
+or simply as "Value of %my_name is %my_value" with the default format being a string
+(works for numerics also).
+
+The following variables are available:
+
+    base_name     # Base script name, eg. "spampd"
+    spampd_ver    # SpamPD version, eg. "2.61"
+    perl_ver      # Perl version, eg. "5.28.1"
+    ns_ver        # Net::Server version, eg. "2.009"
+    ns_typ        # Net::Server type, "PreFork" or "PreForkSimple"
+    ns_typ_acr    # Net::Server type acronym, "PF" or "PFS"
+    sa_ver        # SpamAassassin version, eg. "3.4.2"
+    sa_rls_ver    # SpamAassassin rules update version, eg. "1891891" or "(unknown)"
+    child_count   # total number of children launched so far (current child number)
+    child_status  # child status, "C" for connected, or "D" for disconnected
+    req_count     # number of requests child has processed so far
+    req_max       # maximum child requests before exit
+    req_time_last # [s] time to process the last message
+    req_time_ttl  # [s] total processing time for this child
+    req_time_avg  # [s] average processing time for this child (req_time_ttl / req_count)
+    req_ham       # count of ham messages scored by child
+    req_spam      # count of spam messages scored by child
 
 
 =item B<--pid> or B<-p> I<<filename>>
