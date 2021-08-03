@@ -558,7 +558,7 @@ sub init {
   # Get the SA "rules update version" for logging and child process name (since v3.4.0).
   # https://github.com/apache/spamassassin/blob/3.4/build/announcements/3.4.0.txt#L334
   # https://github.com/apache/spamassassin/blob/3.4/lib/Mail/SpamAssassin/PerMsgStatus.pm#L1597
-  my $sa_rules_ver = "(unknown)";
+  my $sa_rules_ver;
   ($spd_p->{sa_version} >= 3.0040) and eval {
     $sa_rules_ver = Mail::SpamAssassin::PerMsgStatus->new($sa_p)->get_tag("RULESVERSION");
   };
@@ -573,7 +573,7 @@ sub init {
     ns_typ        => $ns_type,
     ns_typ_acr    => $ns_type=~s/[a-z]//rg,
     sa_ver        => Mail::SpamAssassin::Version(),
-    sa_rls_ver    => $sa_rules_ver,
+    sa_rls_ver    => $sa_rules_ver || "(unknown)",
     child_count   => 0,   # total # of children launched
     child_status  => "D", # (C)onnected, or (D)isconnected
     req_count     => 0,   # num of requests child has processed so far
