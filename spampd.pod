@@ -6,7 +6,7 @@ SpamPD - Spam Proxy Daemon
 
 =head1 VERSION
 
-Documentation for SpamPD version 2.60.
+Documentation for SpamPD version 2.61.
 
 
 =head1 DESCRIPTION
@@ -522,9 +522,10 @@ Would produce something like:
   spampd: child #4(D) [req 8/30, time lst/avg/ttl 0.0222/0.0256/0.2045, ham/spm 3/5, rules v1891891]
 
 Parameters are specified like: "Value of %(my_name)s is %(my_float_value).4f", with names
-in parenthesis followed by standard a C<printf()> style formatting specifier (C<s> is default),
+in parenthesis followed by a standard C<printf()> style formatting specifier (C<s> is default),
 or simply as "Value of %my_name is %my_value" with the default format being a string
-(works for numerics also).
+(works for numerics also). Keep in mind that any actual C<%> characters need to be escaped as C<%%>.
+Formatting warnings will be logged as C<sprintf> errors (most likely a parameter was misspelled).
 
 The following variables are available:
 
@@ -562,12 +563,12 @@ Logging method to use. May be one or more of:
 
 =item *
 
-C<syslog>: Use the system's syslogd (via Sys::Syslog). B<Default> when running as daemon.
+C<syslog>: Use the system's syslogd (via Sys::Syslog). B<Default> setting.
 
 =item *
 
 C<stderr>: Direct all logging to stderr (if running in background mode
-these may still end up in the default system log).  B<Default> when not running as daemon (C<--nodetach>).
+these may still end up in the default system log).
 
 =item *
 
