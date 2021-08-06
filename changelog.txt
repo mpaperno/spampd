@@ -8,7 +8,7 @@ SpamPD Change Log
     ! : important change, change of default behavior, etc.
 -----------------------------------------------------------
 
-2.61 (3-Aug-21)
+2.61 (6-Aug-21)
 
 Bug fixes, new features, and some optimization. Thanks to Simon Matter for reporting, suggestions, and testing!
 
