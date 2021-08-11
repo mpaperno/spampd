@@ -528,8 +528,8 @@ sub init {
   # Options on the actual command line will override anything loaded from the file(s).
   $self->handle_main_opts();
 
-  # Configure logging ASAP.
-  $self->setup_logging();
+  # Configure logging ASAP, unless just showing debug info.
+  $self->setup_logging() if !$spd_p->{show_dbg};
 
   # Validate options.
   my (@errs, @warns) = $self->validate_main_opts();
@@ -639,9 +639,9 @@ sub handle_initial_opts {
   if ($spd_p->{show_dbg}) {
     my $shw = \@{$spd_p->{show_dbg}};
     trimmed(@$shw = split(/,/, join(',', @$shw)));  # could be a CSV list
-    if (@$shw && grep(/^(defaults?|all)$/i, @$shw)) {
+    if (@$shw && grep(/^(def(aults?)?|all)$/i, @$shw)) {
       # Handle "--show defaults" debugging request here (while we still know them).
-      @$shw = grep {$_ !~ /^defaults?$/i} @$shw;   # remove "defaults" from list
+      @$shw = grep {$_ !~ /^def(aults?)?$/i} @$shw;   # remove "defaults" from list
       # show defaults and exit here if that's all the user wanted to see
       $self->print_options({$self->options_map()}, 'default', (@$shw ? -1 : 0));
     }
