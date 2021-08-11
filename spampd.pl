@@ -393,7 +393,7 @@ use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
 
-our $VERSION = '2.61';
+our $VERSION = '2.611';
 
 # ISA will change to a Net::Server "flavor" at runtime based on options.
 our @ISA = qw(Net::Server);
@@ -799,7 +799,7 @@ sub validate_preforksimple_opts {
   my ($self, @errs, @warns) = @_;
 
   if ($self->{server}->{max_servers} < 1)
-    { push (@errs, "Option '--children' (or '--max-children') ($self->{server}->{max_servers}) must be greater than zero!"); }
+    { push (@errs, "Option '--max-servers' (or '--children') ($self->{server}->{max_servers}) must be greater than zero!"); }
   return (@errs, @warns);
 }
 
@@ -810,21 +810,21 @@ sub validate_prefork_opts {
   # Even though Net::Server::PreFork validates all these options also,
   #   their error messages can be confusing and in some cases just wrong.
   if ($prop->{min_servers} < 1) {
-    push (@errs, "Option '--min-children' ($prop->{min_servers}) must be greater than zero!");
+    push (@errs, "Option '--min-servers' ($prop->{min_servers}) must be greater than zero!");
   }
   elsif ($prop->{max_servers} < 1) {
-    push (@errs, "Option '--max-children' (or '--children') ($prop->{max_servers}) must be greater than zero!");
+    push (@errs, "Option '--max-servers' (or '--children') ($prop->{max_servers}) must be greater than zero!");
   }
   elsif ($prop->{max_servers} < $prop->{min_servers}) {
-    push (@errs, "Option '--max-children' (or --children) ($prop->{max_servers}) must be >= '--min-children' ($prop->{min_servers})!");
+    push (@errs, "Option '--max-servers' (or --children) ($prop->{max_servers}) must be >= '--min-servers' ($prop->{min_servers})!");
   }
   else {
     if ($prop->{max_spare_servers} >= $prop->{max_servers})
-      { push (@errs, "Option '--max-spare' ($prop->{max_spare_servers}) must be < '--max-children' ($prop->{max_servers})."); }
+      { push (@errs, "Option '--max-spare' ($prop->{max_spare_servers}) must be < '--max-servers' ($prop->{max_servers})."); }
 
     if (my $ms = $prop->{min_spare_servers}) {
       if ($ms > $prop->{min_servers})
-        { push (@errs, "Option '--min-spare' ($ms) must be <= '--min-children' ($prop->{min_servers})"); }
+        { push (@errs, "Option '--min-spare' ($ms) must be <= '--min-servers' ($prop->{min_servers})"); }
       if ($ms > $prop->{max_spare_servers})
         { push (@errs, "Option '--min-spare' ($ms) must be <= '--max-spare' ($prop->{max_spare_servers})"); }
     }
