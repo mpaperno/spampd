@@ -392,8 +392,9 @@ BEGIN {
 use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
+use Net::Server::SIG qw(register_sig);
 
-our $VERSION = '2.611';
+our $VERSION = '2.612';
 
 # ISA will change to a Net::Server "flavor" at runtime based on options.
 our @ISA = qw(Net::Server);
@@ -587,6 +588,10 @@ sub init {
 
   my $template = ' v%spampd_ver [Perl %perl_ver, Net::Server::%ns_typ %ns_ver, SA %sa_ver, rules v%sa_rls_ver] ';
   $self->inf(ref($self) . $self->format_stats_string($template) . ($self->is_reloading() ? "reloading": "starting") . " with: @startup_args \n");
+
+  register_sig(
+    USR2 => sub { $self->log_runtime_config() },
+  );
 
   # Redirect all errors to logger (must do this after SA is compiled, otherwise for some reason we get strange SA errors if anything actually dies).
   # $SIG{__DIE__}  = sub { return if $^S; chomp(my $m = $_[0]); $self->fatal($m); };
@@ -1490,6 +1495,25 @@ sub sprintf_named {
   return sprintf($format, @args);
 }
 
+# =item resolve_options(\%options)
+# Returns a hash of normalized names and resolved values from a hash of option {name => \$value}
+# pairs, such as might be passed to Getopt::Long::GetOptions(). Fairly limited, eg. it cannot handle
+# hash values. Any value that is not a ref to a scalar or to an array ref is ignored. The first
+# version of the option name, before the first "|", is used as the option name.
+sub resolve_options {
+  my $opts = shift;
+  my $ret = {};
+  for my $k (keys %{$opts}) {
+    my $v = $opts->{$k};
+    next if ref($v) !~ /SCALAR|REF/;
+    $k = $1 if $k =~ /([\w-]+).*/;
+    $v = defined(${$v}) ? ${$v} : "(undefined)";
+    $v = join(":", @{$v}) if ref($v) eq 'ARRAY';
+    $ret->{$k} = $v;
+  }
+  return $ret;
+}
+
 
 ##################   UTILITY METHODS   ######################
 
@@ -1514,26 +1538,35 @@ sub format_stats_string {
   return $ret || "";
 }
 
+# Writes runtime configuration options to log file.  See also resolve_options().
+sub log_runtime_config {
+  my $self = $_[0];
+  my $template = ' v%spampd_ver [Perl %perl_ver, Net::Server::%ns_typ %ns_ver, SA %sa_ver, rules v%sa_rls_ver] ';
+  $self->inf(ref($self) . $self->format_stats_string($template) . "\n");
+  $self->inf("[running config start]\n");
+  my $result = resolve_options({$self->options_map()});
+  for my $k (sort keys %$result) {
+    $self->inf(sprintf("%s = %s\n", $k, $result->{$k}));
+  }
+  $self->inf("[running config end]\n");
+}
+
 # =item print_options(\%options [, type = "default"] [, exit = -1])
 # Prints out names and values from a hash of option {name => \$value} pairs, such as might
-#   be passed to Getopt::Long::GetOptions(). Fairly limited, eg. it cannot handle hash values.
-# Any value that is not a ref to a scalar or to an array ref is ignored. The first version of the
-#   option name, before the first "|", is used as the option name. Any option spec is also excluded.
+#   be passed to Getopt::Long::GetOptions(). See also resolve_options().
 sub print_options {
   my ($self, $opts) = (shift, shift);
   my $type = ($_[0] && $_[0] !~ /^\d+$/ ? shift : 'default');
   my $exit = @_ ? $_[0] : -1;
   print "\n";
   print "# Configuration options for ".ref($self)." v".$self->VERSION." with ".$type." values.\n";
-  print "# This format is suitable as a configuration file. Just remove\n".
-        "# the '#' marks (comment characters) and change values as needed.\n\n" if $exit > -1;
-  for my $k (sort keys %{$opts}) {
-    my $v = $opts->{$k};
-    next if ref($v) !~ /SCALAR|REF/;
-    $k = $1 if $k =~ /([\w-]+).*/;
-    $v = defined(${$v}) ? ${$v} : "(undefined)";
-    $v = join(":", @{$v}) if ref($v) eq 'ARRAY';
-    printf("# %-24s %s\n", $k, $v);
+  if ($exit > -1) {
+    print "# This format is suitable as a configuration file. Just remove\n".
+          "# the '#' marks (comment characters) and change values as needed.\n\n";
+  }
+  my $result = resolve_options($opts);
+  for my $k (sort keys %$result) {
+    printf("# %-24s %s\n", $k, $result->{$k});
   }
   print "\n";
   exit $exit if $exit > -1;
@@ -2651,6 +2684,13 @@ children immediately and shut down the daemon.
 Sending QUIT signal to the master process will perform a graceful shutdown,
 waiting for all children to finish processing any current transactions and
 then shutting down the parent process.
+
+=item USR2 C<Since v2.62>
+
+Sending C<USR2> signal to the master process will write a summary of the current
+configuration option values to the log file(s). This is similar to the
+C<--show config> debug output, but always reflects the option values of the
+currently running process.
 
 =back
 
