@@ -1546,7 +1546,7 @@ sub log_runtime_config {
   $self->inf("[running config start]\n");
   my $result = resolve_options({$self->options_map()});
   for my $k (sort keys %$result) {
-    $self->inf(sprintf("%s=%s\n", $k, $result->{$k}));
+    $self->inf(sprintf("%s = %s\n", $k, $result->{$k}));
   }
   $self->inf("[running config end]\n");
 }
