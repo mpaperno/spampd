@@ -2,6 +2,12 @@
 #
 # This script starts and stops the spampd daemon
 #
+####   NOTE   #####
+#  This is a very old and outdated example!!!
+#  Recommend checking the Debian version of spampd.init script,
+#  in the /debian branch of the source repository
+#  (https://github.com/mpaperno/spampd/tree/debian).
+#
 # chkconfig: 2345 80 30
 #
 # description: spampd is a daemon process which uses SpamAssassin to check
