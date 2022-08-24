@@ -1,9 +1,18 @@
 [Unit]
-Description=Spamassassin Proxy Daemon
-After=network.target
+Description=Spam Proxy Daemon
+After=syslog.target network.target
 
 [Service]
-ExecStart=/usr/bin/spampd --port=10025 --relayhost=127.0.0.1:10026 --tagall --log-rules-hit --user spampd --group spampd --pid=/home/spampd/spampd.pid --nodetach
+ExecStart=/usr/sbin/spampd --config /etc/spampd.cfg --pid /run/spampd.pid --nodetach
+ExecReload=/usr/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+Restart=on-failure
+# To run as a forking server, uncomment below and remove the "--nodetach" option
+# from the command line above. You may need/want to add "--setsid" option instead.
+#Type=forking
+#PIDFile=/run/spampd.pid
 
 [Install]
 WantedBy=multi-user.target
