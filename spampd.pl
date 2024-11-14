@@ -457,6 +457,7 @@ sub new {
       sa_awl            => 0,                     # SA auto-whitelist (deprecated)
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
       sa_version        => $Mail::SpamAssassin::VERSION,  # may be used while processing messages
+      sa_client         => 0                      # specifies wether to use SA client instead of embedded SA instance
       runtime_stats     => undef,                 # variables hash for status tracking, can be used as values in user-provided template strings (defined in init())
       # default child name template
       child_name_templ  => '%base_name: child #%child_count(%child_status) ' .
@@ -473,6 +474,13 @@ sub new {
       username             => '',                 # this will be set to the same user as we're running as once options are parsed
       userprefs_filename   => undef,              # add this config file for SA "user_prefs" settings (--saconfig option)
       dont_copy_prefs      => 1,                  # tell SA not to copy user pref file into its working dir
+    },
+    assassinc => {
+      socketpath  => undef,
+      port        => 783,
+      host        => '127.0.0.1',
+      username    => undef,
+      timeout     => 30
     }
   }, $class;
 }
@@ -495,7 +503,7 @@ sub set_server_type {
 
 sub init {
   my $self = shift;
-  my ($spd_p, $sa_p) = ($self->{spampd}, $self->{assassin});
+  my ($spd_p, $sa_p, $sa_c) = ($self->{spampd}, $self->{assassin}, $self->{assassinc});
 
   # Clean up environment.
   delete @ENV{qw(IFS CDPATH ENV BASH_ENV HOME)};
@@ -543,25 +551,30 @@ sub init {
   # If debug output requested, do it now and exit.
   $self->show_debug($spd_p->{show_dbg}, {$self->options_map()}, \@startup_args) && exit(0) if $spd_p->{show_dbg};
 
-  # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
-  $sa_p = Mail::SpamAssassin->new($sa_p);
-
-  $spd_p->{sa_awl} and eval {
-    require Mail::SpamAssassin::DBBasedAddrList;
-    # create a factory for the persistent address list
-    my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
-    $sa_p->set_persistent_address_list_factory($addrlistfactory);
-  };
-
-  $sa_p->compile_now(!!$sa_p->{userprefs_filename});
-
-  # Get the SA "rules update version" for logging and child process name (since v3.4.0).
-  # https://github.com/apache/spamassassin/blob/3.4/build/announcements/3.4.0.txt#L334
-  # https://github.com/apache/spamassassin/blob/3.4/lib/Mail/SpamAssassin/PerMsgStatus.pm#L1597
   my $sa_rules_ver;
-  ($spd_p->{sa_version} >= 3.0040) and eval {
-    $sa_rules_ver = Mail::SpamAssassin::PerMsgStatus->new($sa_p)->get_tag("RULESVERSION");
-  };
+  if ($spd_p->{sa_client}) {
+    $sa_c = Mail::SpamAassassin::Client->new($sa_c);
+  } else {
+    # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
+    $sa_p = Mail::SpamAssassin->new($sa_p);
+
+    $spd_p->{sa_awl} and eval {
+      require Mail::SpamAssassin::DBBasedAddrList;
+      # create a factory for the persistent address list
+      my $addrlistfactory = Mail::SpamAssassin::DBBasedAddrList->new();
+      $sa_p->set_persistent_address_list_factory($addrlistfactory);
+    };
+
+    $sa_p->compile_now(!!$sa_p->{userprefs_filename});
+    # Get the SA "rules update version" for logging and child process name (since v3.4.0).
+    # https://github.com/apache/spamassassin/blob/3.4/build/announcements/3.4.0.txt#L334
+    # https://github.com/apache/spamassassin/blob/3.4/lib/Mail/SpamAssassin/PerMsgStatus.pm#L1597
+    
+    ($spd_p->{sa_version} >= 3.0040) and eval {
+      $sa_rules_ver = Mail::SpamAssassin::PerMsgStatus->new($sa_p)->get_tag("RULESVERSION");
+    };
+  }
+
 
   # Set up statistics hash. This is currently used for report formatting, eg. in child process name.
   my $ns_type = (split(':', $self->net_server_type()))[-1];
@@ -659,7 +672,7 @@ sub handle_initial_opts {
 # Main command-line options mapping; this is for Getopt::Long::GetOptions and also to generate config dumps.
 sub options_map {
   my $self = $_[0];
-  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
+  my ($srv_p, $spd_p, $sa_p, @sa_c) = ($self->{server}, $self->{spampd}, $self->{assassin}, $self->{assassinc});
   $spd_p->{logspec} = logtype2logfile($spd_p->{logtype}, $srv_p->{log_file}); # set a valid default for print_options()
 
   # To support setting boolean options with "--opt", "--opt=1|0", as well as the "no-" prefix,
@@ -707,12 +720,19 @@ sub options_map {
     'set-envelope-from|sef:1'        => \$spd_p->{setenvelopefrom},
     'no-set-envelope-from|no-sef'    => sub { $spd_p->{setenvelopefrom} = 0; },
     'child-name-template|cnt:s'      => \$spd_p->{child_name_templ},
+    'saclient:1'              => \$spd_p->{sa_client},
+    'no-saclient|nosaclient'  => sub { $spd->{sa_client} = 0; },
     # SA
     'debug|d:s'                => \$sa_p->{debug},
     'saconfig=s'               => \$sa_p->{userprefs_filename},
     'homedir=s'                => \$sa_p->{userstate_dir},
     'local-only|l:1'           => \$sa_p->{local_tests_only},
     'no-local-only|no-l'       => sub { $sa_p->{local_tests_only} = 0; },
+    # SA Client
+    'sa-host=s'                => \$sa_c->{host},
+    'sa-port=i'                => \$sa_c->{port},
+    'sa-socketpath=s'          => \$sa_c->{socketpath}
+    'sa-username=s'            => \$sa_c->{username}
     # others
     'dead-letters=s'           => \&deprecated_opt,
     'heloname=s'               => \&deprecated_opt,
@@ -725,7 +745,7 @@ sub options_map {
 sub handle_main_opts {
   my $self = shift;
   my %options = $_[0] || $self->options_map();
-  my ($srv_p, $spd_p, $sa_p) = ($self->{server}, $self->{spampd}, $self->{assassin});
+  my ($srv_p, $spd_p, $sa_p, $sa_c) = ($self->{server}, $self->{spampd}, $self->{assassin}, $self->{assassinc});
 
   # Reconfigure GoL for stricter parsing and check for all other options on ARGV, including anything parsed from config file(s).
   Getopt::Long::Configure(qw(ignore_case no_permute no_bundling auto_abbrev require_order no_pass_through));
@@ -763,6 +783,9 @@ sub handle_main_opts {
   $srv_p->{setsid}= 0 if !$srv_p->{background};
   $sa_p->{home_dir_for_helpers} = $sa_p->{userstate_dir};
   $sa_p->{username} = $srv_p->{user};
+
+  # Set SA Client timeout
+  $sa_c->{timeout} = $spd_p->timeout
 }
 
 sub validate_main_opts {
@@ -898,6 +921,51 @@ sub setup_logging {
 
 ##################   SERVER METHODS   ######################
 
+sub audit {
+  my ($self, $msglines) = @_;
+  my $prop = $self->{spampd};
+  my $status
+  # Audit the message
+  if ($prop->{sa_client}) {
+    my $assassinc = $self->{assassinc};
+    $status = $self->{assassinc}->process(\$msglines);
+    return $status;
+  }
+  my $assassin = $self->{assassin}
+  my $mail
+  if ($prop->{sa_version} >= 3) {
+    $mail = $assassin->parse(\$msglines, 0);
+  }
+  elsif ($prop->{sa_version} >= 2.70) {
+    $mail = Mail::SpamAssassin::MsgParser->parse(\$msglines);
+  }
+  else {
+    $mail = Mail::SpamAssassin::NoMailAudit->new(data => \$msglines);
+  }
+
+  # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
+  my $result = $assassin->check($mail);
+  # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
+  if ($prop->{sa_version} >= 3) {
+    # inject _SPAMPDVERSION_ as a "template tag" (macro) for SA add_header
+    $result->set_tag("SPAMPDVERSION", $self->VERSION) if ($prop->{sa_version} >= 3.0020);
+    $msg_resp = $result->rewrite_mail;
+  }
+  else {
+    # SA versions prior to 3 need to get the response in a different manner
+    $result->rewrite_mail;
+    $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
+  }
+  $mail->finish();
+  return {
+    'isspam'    => $result->is_spam,
+    'score'     => $result->get_hits,
+    'threshold' => $result->get_required_hits,
+    'message'   => $msg_resp,
+    'report'    => $result->get_names_of_tests_hit
+  };
+}
+
 sub process_message {
   my ($self, $fh) = @_;
   my $prop = $self->{spampd};
@@ -983,39 +1051,13 @@ sub process_message {
     my $previous_alarm = alarm($prop->{satimeout});
 
     # Audit the message
-    if ($prop->{sa_version} >= 3) {
-      $mail = $assassin->parse(\@msglines, 0);
-      undef @msglines;  #clear some memory-- this screws up SA < v3
-    }
-    elsif ($prop->{sa_version} >= 2.70) {
-      $mail = Mail::SpamAssassin::MsgParser->parse(\@msglines);
-    }
-    else {
-      $mail = Mail::SpamAssassin::NoMailAudit->new(data => \@msglines);
-    }
-
-    # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
-    my $status = $assassin->check($mail);
-
+    $status = $self->audit(\@msglines);
+    undef @msglines;
     $self->dbg("Returned from checking by SpamAssassin");
 
     #  Rewrite mail if high spam factor or options --tagall
-    if ($status->is_spam || $prop->{tagall}) {
-
-      $self->dbg("Rewriting mail using SpamAssassin");
-
-      # use Mail::SpamAssassin:PerMsgStatus object to rewrite message
-      if ($prop->{sa_version} >= 3) {
-        # inject _SPAMPDVERSION_ as a "template tag" (macro) for SA add_header
-        $status->set_tag("SPAMPDVERSION", $self->VERSION) if ($prop->{sa_version} >= 3.0020);
-        $msg_resp = $status->rewrite_mail;
-      }
-      else {
-        # SA versions prior to 3 need to get the response in a different manner
-        $status->rewrite_mail;
-        $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
-      }
-
+    if ($status->{isspam} || $prop->{tagall}) {
+      my $msg_resp = $status->{message};
       # remove the envelope-to header if we added it
       if ($addedenvto) {
         $self->dbg("Removing X-Envelope-To");
@@ -1041,7 +1083,7 @@ sub process_message {
     $stats->{req_time_last} = $time_d;
     $stats->{req_time_ttl} += $time_d;
     $stats->{req_time_avg} = $stats->{req_time_ttl} / $self->{server}->{requests};
-    if ($status->is_spam) {
+    if ($status->{isspam}) {
       ++$stats->{req_spam};
       $was_it_spam = 'identified spam';
     }
@@ -1051,17 +1093,14 @@ sub process_message {
     }
 
     # Log what we did
-    my $msg_score     = sprintf("%.2f", $status->get_hits);
-    my $msg_threshold = sprintf("%.2f", $status->get_required_hits);
+    my $msg_score     = sprintf("%.2f", $status->{score});
+    my $msg_threshold = sprintf("%.2f", $status->{threshold});
     my $proc_time     = sprintf("%.2f", $time_d);
     $self->inf("$was_it_spam $msgid ($msg_score/$msg_threshold) from $sender for " .
                     "$recips in ${proc_time}s, $size bytes, with rules v$prop->{runtime_stats}->{sa_rls_ver}");
 
     # thanks to Kurt Andersen for this idea
-    $self->inf("rules hit for $msgid: " . $status->get_names_of_tests_hit) if ($prop->{rh});
-
-    $status->finish();
-    $mail->finish();
+    $self->inf("rules hit for $msgid: " . $status->{report}) if ($prop->{rh});
 
     # set the timeout alarm back to wherever it was at
     alarm($previous_alarm);
