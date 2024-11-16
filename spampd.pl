@@ -457,7 +457,7 @@ sub new {
       sa_awl            => 0,                     # SA auto-whitelist (deprecated)
       logtype           => LOG_SYSLOG,            # logging destination and logger type (--logfile option)
       sa_version        => $Mail::SpamAssassin::VERSION,  # may be used while processing messages
-      sa_client         => 0                      # specifies wether to use SA client instead of embedded SA instance
+      sa_client         => 0,                     # specifies wether to use SA client instead of embedded SA instance
       runtime_stats     => undef,                 # variables hash for status tracking, can be used as values in user-provided template strings (defined in init())
       # default child name template
       child_name_templ  => '%base_name: child #%child_count(%child_status) ' .
@@ -480,7 +480,7 @@ sub new {
       port        => 783,
       host        => '127.0.0.1',
       username    => undef,
-      timeout     => 30
+      timeout     => 30,
     }
   }, $class;
 }
@@ -672,7 +672,7 @@ sub handle_initial_opts {
 # Main command-line options mapping; this is for Getopt::Long::GetOptions and also to generate config dumps.
 sub options_map {
   my $self = $_[0];
-  my ($srv_p, $spd_p, $sa_p, @sa_c) = ($self->{server}, $self->{spampd}, $self->{assassin}, $self->{assassinc});
+  my ($srv_p, $spd_p, $sa_p, $sa_c) = ($self->{server}, $self->{spampd}, $self->{assassin}, $self->{assassinc});
   $spd_p->{logspec} = logtype2logfile($spd_p->{logtype}, $srv_p->{log_file}); # set a valid default for print_options()
 
   # To support setting boolean options with "--opt", "--opt=1|0", as well as the "no-" prefix,
@@ -721,7 +721,7 @@ sub options_map {
     'no-set-envelope-from|no-sef'    => sub { $spd_p->{setenvelopefrom} = 0; },
     'child-name-template|cnt:s'      => \$spd_p->{child_name_templ},
     'saclient:1'              => \$spd_p->{sa_client},
-    'no-saclient|nosaclient'  => sub { $spd->{sa_client} = 0; },
+    'no-saclient|nosaclient'  => sub { $spd_p->{sa_client} = 0; },
     # SA
     'debug|d:s'                => \$sa_p->{debug},
     'saconfig=s'               => \$sa_p->{userprefs_filename},
@@ -731,8 +731,8 @@ sub options_map {
     # SA Client
     'sa-host=s'                => \$sa_c->{host},
     'sa-port=i'                => \$sa_c->{port},
-    'sa-socketpath=s'          => \$sa_c->{socketpath}
-    'sa-username=s'            => \$sa_c->{username}
+    'sa-socketpath=s'          => \$sa_c->{socketpath},
+    'sa-username=s'            => \$sa_c->{username},
     # others
     'dead-letters=s'           => \&deprecated_opt,
     'heloname=s'               => \&deprecated_opt,
@@ -785,7 +785,7 @@ sub handle_main_opts {
   $sa_p->{username} = $srv_p->{user};
 
   # Set SA Client timeout
-  $sa_c->{timeout} = $spd_p->timeout
+  $sa_c->{timeout} = $spd_p->{timeout}
 }
 
 sub validate_main_opts {
@@ -924,15 +924,16 @@ sub setup_logging {
 sub audit {
   my ($self, $msglines) = @_;
   my $prop = $self->{spampd};
-  my $status
+  my $status;
   # Audit the message
   if ($prop->{sa_client}) {
     my $assassinc = $self->{assassinc};
     $status = $self->{assassinc}->process(\$msglines);
     return $status;
   }
-  my $assassin = $self->{assassin}
-  my $mail
+  my $assassin = $self->{assassin};
+  my $mail;
+  my $msg_resp;
   if ($prop->{sa_version} >= 3) {
     $mail = $assassin->parse(\$msglines, 0);
   }
@@ -1051,7 +1052,7 @@ sub process_message {
     my $previous_alarm = alarm($prop->{satimeout});
 
     # Audit the message
-    $status = $self->audit(\@msglines);
+    my $status = $self->audit(\@msglines);
     undef @msglines;
     $self->dbg("Returned from checking by SpamAssassin");
 
