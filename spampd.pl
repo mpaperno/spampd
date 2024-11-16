@@ -392,6 +392,7 @@ BEGIN {
 use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
+use Mail::SpamAssassin::Client ();
 
 our $VERSION = '2.611';
 
@@ -553,7 +554,12 @@ sub init {
 
   my $sa_rules_ver;
   if ($spd_p->{sa_client}) {
-    $sa_c = Mail::SpamAassassin::Client->new($sa_c);
+    $sa_c = Mail::SpamAssassin::Client->new($sa_c);
+    $self->{assassinc} = $sa_c;
+    $self->inf("Pinging sa daemon");
+    if ($sa_c->ping()){
+      $self->inf("Connected successfully with sa daemon");
+    }
   } else {
     # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
     $sa_p = Mail::SpamAssassin->new($sa_p);
@@ -785,7 +791,7 @@ sub handle_main_opts {
   $sa_p->{username} = $srv_p->{user};
 
   # Set SA Client timeout
-  $sa_c->{timeout} = $spd_p->{timeout}
+  $sa_c->{timeout} = $spd_p->{satimeout}
 }
 
 sub validate_main_opts {
@@ -928,7 +934,7 @@ sub audit {
   # Audit the message
   if ($prop->{sa_client}) {
     my $assassinc = $self->{assassinc};
-    $status = $self->{assassinc}->process(\$msglines);
+    $status = $assassinc->process(\$msglines);
     return $status;
   }
   my $assassin = $self->{assassin};
