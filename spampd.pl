@@ -933,9 +933,14 @@ sub audit {
   my $status;
   # Audit the message
   if ($prop->{sa_client}) {
-    my $assassinc = $self->{assassinc};
-    $status = $assassinc->process(\$msglines);
-    return $status;
+    $status = $self->{assassinc}->process(\$msglines);
+    return {
+      'isspam'    => $status->{isspam} eq "True",
+      'score'     => $status->{score},
+      'threshold' => $status->{threshold},
+      'message'   => $status->{message},
+      'report'    => $status->{report}
+    };
   }
   my $assassin = $self->{assassin};
   my $mail;
