@@ -943,8 +943,7 @@ sub audit {
     };
   }
   my $assassin = $self->{assassin};
-  my $mail;
-  my $msg_resp;
+  my ($mail, $msg_resp);
   if ($prop->{sa_version} >= 3) {
     $mail = $assassin->parse(\$msglines, 0);
   }
@@ -1063,7 +1062,7 @@ sub process_message {
     my $previous_alarm = alarm($prop->{satimeout});
 
     # Audit the message
-    my $status = $self->audit(\@msglines);
+    my $status = $self->audit(@msglines);
     undef @msglines;
     $self->dbg("Returned from checking by SpamAssassin");
 
