@@ -935,7 +935,7 @@ sub audit {
   if ($prop->{sa_client}) {
     $status = $self->{assassinc}->process(\$msglines);
     return {
-      'isspam'    => $status->{isspam} eq "True",
+      'is_spam'    => $status->{isspam} eq "True",
       'score'     => $status->{score},
       'threshold' => $status->{threshold},
       'message'   => $status->{message},
@@ -967,14 +967,16 @@ sub audit {
     $result->rewrite_mail;
     $msg_resp = join '', $mail->header, "\r\n", @{$mail->body};
   }
-  $mail->finish();
-  return {
-    'isspam'    => $result->is_spam,
+  $status = {
+    'is_spam'    => $result->is_spam,
     'score'     => $result->get_hits,
     'threshold' => $result->get_required_hits,
     'message'   => $msg_resp,
     'report'    => $result->get_names_of_tests_hit
   };
+  $mail->finish();
+  $result->finish();
+  return $status;
 }
 
 sub process_message {
@@ -1067,7 +1069,7 @@ sub process_message {
     $self->dbg("Returned from checking by SpamAssassin");
 
     #  Rewrite mail if high spam factor or options --tagall
-    if ($status->{isspam} || $prop->{tagall}) {
+    if ($status->{is_spam} || $prop->{tagall}) {
       my $msg_resp = $status->{message};
       # remove the envelope-to header if we added it
       if ($addedenvto) {
@@ -1094,7 +1096,7 @@ sub process_message {
     $stats->{req_time_last} = $time_d;
     $stats->{req_time_ttl} += $time_d;
     $stats->{req_time_avg} = $stats->{req_time_ttl} / $self->{server}->{requests};
-    if ($status->{isspam}) {
+    if ($status->{is_spam}) {
       ++$stats->{req_spam};
       $was_it_spam = 'identified spam';
     }
