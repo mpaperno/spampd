@@ -1214,6 +1214,9 @@ sub post_bind_hook {
 sub pre_fork_hook {
   return if $_[1];  # && $_[1] eq 'dequeue';
   ++$_[0]->{spampd}->{runtime_stats}->{child_count};
+  ($_[0]->{spampd}->{sa_version} >= 3) and eval {
+    $_[0]->{assassin}->call_plugins("prefork_init");
+  }
 }
 
 # Net::Server hook: new child starting
@@ -1221,6 +1224,9 @@ sub child_init_hook {
   return if $_[1];  # && $_[1] eq 'dequeue';
   # set process name to help clarify via process listing which is child/parent
   $_[0]->update_child_name();
+  ($_[0]->{spampd}->{sa_version} >= 3) and eval {
+    $_[0]->{assassin}->call_plugins("spamd_child_init");
+  }
 }
 
 # Net::Server hook: about to exit child process
