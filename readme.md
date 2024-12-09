@@ -73,7 +73,7 @@ is a very helpful users discussion list for SA (see their site). For <a href="ht
  documentation). Postfix also has a helpful users discussion list. Make
 sure you do your homework before you ask other people to help you!</p>
 
-<p>Be sure to check out the <a href="https://github.com/mpaperno/spampd/blob/master/spampd.pod"><i>SpamPD</i> documentation</a>, the <a href="https://github.com/mpaperno/spampd/blob/master/changelog.txt">change log</a>, as well as comments in the <a href="https://github.com/mpaperno/spampd/blob/master/spampd.pl">ac</a></p>
+<p>Be sure to check out the <a href="https://github.com/mpaperno/spampd/blob/master/spampd.pod"><i>SpamPD</i> documentation</a>, the <a href="https://github.com/mpaperno/spampd/blob/master/changelog.txt">change log</a>, as well as comments in the <a href="https://github.com/mpaperno/spampd/blob/master/spampd.pl">actual code.</a></p>
 
 <h2>Credits</h2>
 <p><i>SpamPD</i> is written and maintained by Maxim Paperno (<a href="https://github.com/mpaperno">https://github.com/mpaperno</a>).</p>
