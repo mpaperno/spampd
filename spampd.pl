@@ -3,6 +3,7 @@
 ######################
 # SpamPD - Spam Proxy Daemon
 #
+# v2.62  - 09-Dec-24
 # v2.61  - 06-Aug-21
 # v2.60  - 26-Jul-21
 # v2.53  - 25-Feb-19
@@ -393,7 +394,7 @@ use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
 
-our $VERSION = '2.611';
+our $VERSION = '2.62';
 
 # ISA will change to a Net::Server "flavor" at runtime based on options.
 our @ISA = qw(Net::Server);
@@ -1675,7 +1676,7 @@ SpamPD - Spam Proxy Daemon
 
 =head1 VERSION
 
-Documentation for SpamPD version 2.61.
+Documentation for SpamPD version 2.62.
 
 
 =head1 DESCRIPTION

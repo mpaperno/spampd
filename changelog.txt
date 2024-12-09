@@ -8,6 +8,14 @@ SpamPD Change Log
     ! : important change, change of default behavior, etc.
 -----------------------------------------------------------
 
+2.62 (9-Dec-24)
+
+* Fixed that SpamPD shares the same socket to `redist` between children.
+  Report: https://github.com/mpaperno/spampd/issues/44  Fix: https://github.com/mpaperno/spampd/pull/45 (thanks @catap !)
+* Fix option names in configuration parameter validation methods (https://github.com/mpaperno/spampd/commit/29752f8)
+~ Do not set up logging if only showing debug info (https://github.com/mpaperno/spampd/commit/641e6571).
+
+---
 2.61 (6-Aug-21)
 
 Bug fixes, new features, and some optimization. Thanks to Simon Matter for reporting, suggestions, and testing!
@@ -23,7 +31,7 @@ Bug fixes, new features, and some optimization. Thanks to Simon Matter for repor
     Template format documented in POD. (https://github.com/mpaperno/spampd/issues/32)
 + Add _SPAMPDVERSION_ as a "template tag" (macro), eg. for use in SA add_header directives.
 
-
+---
 2.60 (26-Jul-21)
 
 This version brings quite a few changes, though the base functionality and compatibility is unchanged

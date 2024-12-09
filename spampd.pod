@@ -6,7 +6,7 @@ SpamPD - Spam Proxy Daemon
 
 =head1 VERSION
 
-Documentation for SpamPD version 2.61.
+Documentation for SpamPD version 2.62.
 
 
 =head1 DESCRIPTION
