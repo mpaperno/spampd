@@ -1,3 +1,7 @@
+[![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/mpaperno/spampd?include_prereleases)](https://github.com/mpaperno/spampd/releases)
+[![Documentation](https://img.shields.io/badge/POD-Documentation-39457E?logo=perl)](https://github.com/mpaperno/spampd/blob/master/spampd.pod)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE.txt)
+
 # SpamPD - Spam Proxy Daemon
 
 Originally released in May of 2002, _SpamPD_ is a program used within an e-mail delivery system to scan messages for possible Unsolicited Commercial E-mail (UCE, aka spam) content.
@@ -22,13 +26,14 @@ See the [changelog](https://github.com/mpaperno/spampd/blob/master/changelog.txt
 
 ## Package status
 
+<a href="https://repology.org/metapackage/spampd/versions" target="_new">
+    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?exclude_unsupported=1&minversion=2.61&header=Latest+release+v2.62" alt="Packaging status" align="right">
+</a>
+
 **HELP!** Debian package maintainer needed. Please see [GitHub Issue 46](https://github.com/mpaperno/spampd/issues/46).
 
-Linux packages data courtesy of Repology:
+Linux packages data at right courtesy of Repology:
 
-<a href="https://repology.org/metapackage/spampd/versions" target="_new">
-    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?minversion=2.61&header=Latest+release+v2.62" alt="Packaging status">
-</a>
 
 <h2>Usage</h2>
 <p><i>SpamPD</i> was initially designed as a content filter mechanism for use with the <a href="http://www.postfix.org/"><i>Postfix</i></a> MTA.
