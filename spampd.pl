@@ -1248,6 +1248,9 @@ sub post_accept_hook {
 sub post_client_connection_hook {
   $_[0]->{spampd}->{runtime_stats}->{child_status} = "D";
   $_[0]->update_child_name();
+  ($_[0]->{spampd}->{sa_version} >= 3) and eval {
+    $_[0]->{assassin}->call_plugins("spamd_child_post_connection_close");
+  }
 }
 
 # Net::Server hook: called when we're using SA Logger or falling back to Net::Server logging.
