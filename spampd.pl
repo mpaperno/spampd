@@ -924,12 +924,12 @@ sub setup_logging {
 ##################   SERVER METHODS   ######################
 
 sub audit {
-  my ($self, $msglines) = @_;
+  my ($self, $msg) = @_;
   my $prop = $self->{spampd};
   my $status;
   # Audit the message
   if ($prop->{sa_client}) {
-    $status = $self->{assassinc}->process(\$msglines);
+    $status = $self->{assassinc}->process($msg);
     return {
       'is_spam'    => $status->{isspam} eq "True",
       'score'     => $status->{score},
@@ -941,13 +941,13 @@ sub audit {
   my $assassin = $self->{assassin};
   my ($mail, $msg_resp);
   if ($prop->{sa_version} >= 3) {
-    $mail = $assassin->parse(\$msglines, 0);
+    $mail = $assassin->parse($msg, 0);
   }
   elsif ($prop->{sa_version} >= 2.70) {
-    $mail = Mail::SpamAssassin::MsgParser->parse(\$msglines);
+    $mail = Mail::SpamAssassin::MsgParser->parse($msg);
   }
   else {
-    $mail = Mail::SpamAssassin::NoMailAudit->new(data => \$msglines);
+    $mail = Mail::SpamAssassin::NoMailAudit->new(data => $msg);
   }
 
   # Check spamminess (returns Mail::SpamAssassin:PerMsgStatus object)
@@ -1058,10 +1058,10 @@ sub process_message {
 
     # save previous timer and start new
     my $previous_alarm = alarm($prop->{satimeout});
-
-    # Audit the message
-    my $status = $self->audit(@msglines);
+    my $msg = join("", @msglines);
     undef @msglines;
+    # Audit the message
+    my $status = $self->audit($msg);
     $self->dbg("Returned from checking by SpamAssassin");
 
     #  Rewrite mail if high spam factor or options --tagall
