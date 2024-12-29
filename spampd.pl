@@ -556,10 +556,6 @@ sub init {
     require Mail::SpamAssassin::Client;
     $sa_c = Mail::SpamAssassin::Client->new($sa_c);
     $self->{assassinc} = $sa_c;
-    $self->inf("Pinging sa daemon");
-    if ($sa_c->ping()){
-      $self->inf("Connected successfully with sa daemon");
-    }
   } else {
     # Create and set up SpamAssassin object. This replaces our SpamPD->{assassin} property with the actual object instance.
     $sa_p = Mail::SpamAssassin->new($sa_p);
