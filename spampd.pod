@@ -384,7 +384,7 @@ Specifies what UNIX socket I<spampd> listens on. If this is specified,
 =item B<--socket-perms> I<<mode>>
 
 The file mode for the created UNIX socket (see --socket) in octal
-format, e.g. 700 to specify acces only for the user I<spampd> is run as.
+format, e.g. 700 to specify access only for the user I<spampd> is run as.
 
 
 =item B<--relayhost> I<< (<ip>|<hostname>)[:<port>] >>
@@ -834,7 +834,7 @@ I<Net::Server> supports some other options which I<spampd> doesn't accept direct
 For example there are access control options, child process tuning, and a few more (see below).
 Such options can be passed through to I<Net::Server> (and subtypes) by specifying them at the end
 of the I<spampd> command line (or in a configuration file) following two dashes
-C< -- > by themselves (this is a failry typicaly convention for passing options onto
+C< -- > by themselves (this is a failry typically convention for passing options onto
 another program). As an example, it may look something like this:
 
   spampd --host 10.0.0.1 -port 10025 -- --cidr_allow 10.0.0.0/24
