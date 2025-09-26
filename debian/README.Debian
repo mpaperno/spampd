@@ -24,7 +24,7 @@ secure. These notes of caution don't necessarily apply when running SpamPD as
 a pre-queue filter though. Anyway, here is as much help as I can give you with
 either setup. It's mostly related to network timeouts.
 
-By default, SpamPD times out after 5 minutes if no network paket is
+By default, SpamPD times out after 5 minutes if no network packet is
 received or after 6 minutes have gone by since start of the SMTP
 dialogue. The first parameter isn't directly adjustable, but that shouldn't be
 a problem in any case. The second one however can pose a problem for
