@@ -1,7 +1,7 @@
 SpamPD for Debian
 -----------------
 
-SpamPD configuration takes place in /etc/default/spampd as far as the network
+SpamPD configuration takes place in /etc/spampd.cfg as far as the network
 connections are concerned. Any more advanced configuration of the
 SpamAssassin part is done in /etc/spamassassin/local.cf as usual with
 SpamAssassin. Additionally, as of Debian package 2.30-5, it is now possible
@@ -31,8 +31,8 @@ a problem in any case. The second one however can pose a problem for
 really slow clients (or extremely large mails).
 If you experience such problems (i.e. a client isn't able to send
 large mails even though it slowly but steadily sends data), try
-passing "--childtimeout=3600" (60 minutes) to spampd using the
-ADDOPTS entry in /etc/default/spampd.
+passing "--childtimeout=3600" (60 minutes) to spampd by adding
+"childtimeout=3600" to /etc/spampd.cfg.
 
 SpamPD and SpamAssassin's Auto-Whitelist Feature
 ------------------------------------------------
