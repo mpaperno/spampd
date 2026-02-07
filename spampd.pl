@@ -1326,7 +1326,7 @@ sub read_conf_file {
     next if ($line !~ m/^\s* ((?:--?)?[\w\@-]+) (?:[=:\t ]+ (.+) \s*)?$/xo);
     ($dest = \@ptargs) && next if $1 eq '--';
     my $k = $1;
-    my $v = $2 || "";
+    my $v = defined($2) ? $2 : '';
     $v =~ s/^"(.*)"$/$1/;
     $k = join('', $prfx, $k) if $prfx && substr($k, 0, 1) ne '-';
     $k = join($sep, $k, $v) if $sep && $v ne '';
