@@ -2057,7 +2057,7 @@ Specifies what UNIX socket I<spampd> listens on. If this is specified,
 =item B<--socket-perms> I<<mode>>
 
 The file mode for the created UNIX socket (see --socket) in octal
-format, e.g. 700 to specify acces only for the user I<spampd> is run as.
+format, e.g. 700 to specify access only for the user I<spampd> is run as.
 
 
 =item B<--relayhost> I<< (<ip>|<hostname>)[:<port>] >>
@@ -2081,7 +2081,7 @@ specified in the C<--relayhost> option will override this one.
 
 =item B<--relaysocket> I<<socketpath>>
 
-Specifies what UNIX socket spampd will relay to. If this is specified
+Specifies what UNIX socket I<spampd> will relay to. If this is specified
 --relayhost and --relayport will be ignored.
 
 
@@ -2375,7 +2375,7 @@ Use the specified directory as home directory for the spamassassin process.
 Things like the auto-whitelist and other plugin (razor/pyzor) files get
 written to here. A good place for this is in the same
 place your C<bayes_path> SA config setting points to (if any).  Make sure this
-directory is accessible to the user that spampd is running as.
+directory is accessible to the user that I<spampd> is running as.
 
 Thanks to Alexander Wirt for this fix.
 
@@ -2390,8 +2390,8 @@ option from local.cf.
 =item B<--debug> or B<-d> I<< [<area,...>|1|0] >> C<(updated in v2.60)>
 
 Turns on SpamAssassin debug messages which print to the system mail log
-(same log as spampd will log to).  Also turns on more verbose logging of
-what spampd is doing (new in v2).  Also increases log level of Net::Server
+(same log as I<spampd> will log to).  Also turns on more verbose logging of
+what I<spampd> is doing (new in v2).  Also increases log level of Net::Server
 to 4 (debug), adding yet more info (but not too much) (new in v2.2).
 
 C<New in v2.60:>
@@ -2507,7 +2507,7 @@ I<Net::Server> supports some other options which I<spampd> doesn't accept direct
 For example there are access control options, child process tuning, and a few more (see below).
 Such options can be passed through to I<Net::Server> (and subtypes) by specifying them at the end
 of the I<spampd> command line (or in a configuration file) following two dashes
-C< -- > by themselves (this is a failry typicaly convention for passing options onto
+C< -- > by themselves (this is a common convention for passing options onto
 another program). As an example, it may look something like this:
 
   spampd --host 10.0.0.1 -port 10025 -- --cidr_allow 10.0.0.0/24
