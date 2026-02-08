@@ -30,10 +30,7 @@ See the [changelog](https://github.com/mpaperno/spampd/blob/master/changelog.txt
     <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?exclude_unsupported=1&minversion=2.61&header=Latest+release+v2.62" alt="Packaging status" align="right">
 </a>
 
-**HELP!** Debian package maintainer needed. Please see [GitHub Issue 46](https://github.com/mpaperno/spampd/issues/46).
-
 Linux packages data at right courtesy of Repology:
-
 
 <h2>Usage</h2>
 <p><i>SpamPD</i> was initially designed as a content filter mechanism for use with the <a href="http://www.postfix.org/"><i>Postfix</i></a> MTA.
