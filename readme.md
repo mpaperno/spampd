@@ -27,7 +27,7 @@ See the [changelog](https://github.com/mpaperno/spampd/blob/master/changelog.txt
 ## Package status
 
 <a href="https://repology.org/metapackage/spampd/versions" target="_new">
-    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?exclude_unsupported=1&minversion=2.61&header=Latest+release+v2.62" alt="Packaging status" align="right">
+    <img src="https://repology.org/badge/vertical-allrepos/spampd.svg?exclude_unsupported=1&minversion=2.61&header=Latest+release+v2.63" alt="Packaging status" align="right">
 </a>
 
 Linux packages data at right courtesy of Repology:

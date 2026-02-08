@@ -3,6 +3,9 @@
 ######################
 # SpamPD - Spam Proxy Daemon
 #
+# https://github.com/mpaperno/spampd/
+#
+# v2.63  - 08-Feb-26
 # v2.62  - 09-Dec-24
 # v2.61  - 06-Aug-21
 # v2.60  - 26-Jul-21
@@ -25,6 +28,8 @@
 # v1.0.2 - 13-Apr-03
 # v1.0.1 - 03-Feb-03
 # v1.0.0 - May 2002
+#
+# See changelog.txt for version details.
 #
 # spampd is Copyright (c) Maxim Paperno; All Rights Reserved.
 #
@@ -394,7 +399,7 @@ use Getopt::Long qw(GetOptions);
 use Time::HiRes qw(time);
 use Mail::SpamAssassin ();
 
-our $VERSION = '2.62';
+our $VERSION = '2.63';
 
 # ISA will change to a Net::Server "flavor" at runtime based on options.
 our @ISA = qw(Net::Server);

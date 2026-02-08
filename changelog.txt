@@ -8,6 +8,13 @@ SpamPD Change Log
     ! : important change, change of default behavior, etc.
 -----------------------------------------------------------
 
+2.63 (08-Feb-26)
+
+* Fixed that configuration file parsing was ignoring 0 (zero) values, instead treating the corresponding parameter as a flag with a truthy value.
+  Fixes https://github.com/mpaperno/spampd/issues/51 .  [https://github.com/mpaperno/spampd/commit/2e66dffa]
+* Call 'spamd_child_post_connection_close' hook when a child connection is closed (by @catap). [https://github.com/mpaperno/spampd/commit/36e7fd25]
+
+---
 2.62 (9-Dec-24)
 
 * Fixed that SpamPD shares the same socket to `redist` between children.
